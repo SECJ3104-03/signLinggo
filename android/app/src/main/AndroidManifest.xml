@@ -1,4 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET" /> <!--(Izzat 31/10/25 6:45 pm)-->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" /> <!--(Izzat 31/10/25 6:45 pm)-->
     <application
         android:label="signlinggo"
         android:name="${applicationName}"
