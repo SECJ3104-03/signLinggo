@@ -1,4 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:camera/camera.dart';
+import 'package:signlinggo/screens/sign_recognition/sign_recognition_screen.dart';
+
+List<CameraDescription> cameras = [];
+
+Future<void> main() async {
+
+  WidgetsFlutterBinding.ensureInitialized();
+  cameras = await availableCameras();
 
 // Import both of your screens
 import 'package:signlinggo/screens/Community_Module/community_hub.dart'; 

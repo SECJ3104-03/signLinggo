@@ -41,6 +41,9 @@ dependencies:
   cupertino_icons: ^1.0.8
   share_plus: ^12.0.1
   scroll_to_index: ^3.0.1
+  camera: ^0.11.3
+  path_provider: ^2.1.5
+  path: ^1.9.1
 
 dev_dependencies:
   flutter_test:
