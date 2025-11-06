@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
+import 'package:signlinggo/screens/sign_recognition/text_translation_screen.dart';
 
 class SignRecognitionScreen extends StatefulWidget {
   final CameraDescription camera;
+  final bool isSignToText;
 
-  const SignRecognitionScreen({super.key, required this.camera});
+  const SignRecognitionScreen({super.key, required this.camera, this.isSignToText = false});
 
   @override
   State<SignRecognitionScreen> createState() => _SignRecognitionScreenState();
@@ -13,23 +15,22 @@ class SignRecognitionScreen extends StatefulWidget {
 class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
   late CameraController _controller;
   late Future<void> _initializeControllerFuture;
+  late bool isSignToText;
 
   int selectedCameraIdx = 0;
   double _currentZoom = 1.0;
   double _minZoom = 1.0;
   double _maxZoom = 1.0;
 
-  bool isSignToText = false;
-
   @override
   void initState() {
     super.initState();
     _initializeCamera(widget.camera);
+    isSignToText = widget.isSignToText;
   }
   
   void _initializeCamera(CameraDescription cameraDescription) {
     _controller = CameraController(cameraDescription, ResolutionPreset.medium);
-    _initializeControllerFuture = _controller.initialize();
 
     _initializeControllerFuture = _controller.initialize().then((_) async {
       try {
@@ -43,9 +44,7 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
         _currentZoom = 1.0;
       }
 
-      if (mounted) {
-        setState(() {});
-      }
+      if (mounted) setState(() {});
     });
   }
 
@@ -72,25 +71,12 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'Sign Recognition',
-          style: TextStyle(
-            color: Colors.black,
-            fontFamily: 'Arimo',
-          ),
-        ),
+        title: const Text('Sign Recognition', style: TextStyle(color: Colors.black, fontFamily: 'Arimo',),),
         centerTitle: true,
         backgroundColor: Colors.white,
         elevation: 1,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () {
-            Navigator.pop(context);
-          },
-        ),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        leading: IconButton(icon: const Icon(Icons.arrow_back, color: Colors.black), onPressed: () { Navigator.pop(context); },),),
+      body: SingleChildScrollView(padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
@@ -110,11 +96,7 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
                 children: [
                   Text(
                     isSignToText ? 'Text → Sign' : 'Sign → Text',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                    ),
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.white,),
                   ),
                   Row(
                     children: [
@@ -133,10 +115,18 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
                         inactiveThumbColor: Colors.white,
                         activeTrackColor: Colors.grey[400],
                         inactiveTrackColor: Colors.grey[400],
-                        onChanged: (value) {
-                          setState(() {
-                            isSignToText = value;
-                          });
+                        onChanged: (value) async {
+                          setState(() => isSignToText = value);
+
+                          if (value) {
+                            await _controller.dispose();
+                            Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const TextTranslationScreen(),
+                              ),
+                            );
+                          }
                         },
                       ),
                     ],
