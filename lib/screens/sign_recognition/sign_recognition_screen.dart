@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
-import 'package:signlinggo/screens/sign_recognition/text_translation_screen.dart';
+import 'package:signlinggo/screens/text_to_sign/text_to_sign_screen.dart';
 
 class SignRecognitionScreen extends StatefulWidget {
   final CameraDescription camera;
