@@ -1,6 +1,13 @@
+/// Landing Screen
+/// 
+/// First-time user onboarding screen with:
+/// - Three-page introduction to app features
+/// - Skip functionality
+/// - Navigation to sign-in after completion
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:signlinggo/screens/sign_in/signin_screen.dart';
+import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+import '../../providers/app_provider.dart';
 
 class LandingScreen extends StatefulWidget {
   const LandingScreen({super.key});
@@ -37,14 +44,12 @@ class _LandingScreenState extends State<LandingScreen> {
     },
   ];
 
+  /// Complete onboarding and navigate to sign-in
   Future<void> _finishOnboarding() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('isFirstTime', false);
+    final appProvider = Provider.of<AppProvider>(context, listen: false);
+    await appProvider.completeOnboarding();
     if (!mounted) return;
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => const SignInScreen()),
-    );
+    context.go('/signin');
   }
 
   @override

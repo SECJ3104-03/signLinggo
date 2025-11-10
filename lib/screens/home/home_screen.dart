@@ -1,4 +1,11 @@
+/// Home Screen
+/// 
+/// Main navigation hub displaying:
+/// - Feature cards for different app modules
+/// - Quick access to all major features
+/// - Offline mode availability indicator
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
@@ -68,13 +75,14 @@ class HomePage extends StatelessWidget {
                   children: [
                     _buildCard(
                       icon: Icons.camera, 
-                      title: "Real-Time Sign Recongnition", 
+                      title: "Real-Time Sign Recognition", 
                       description: 'Translate BIM gesture instantly',
                       gradientColors: const [
                         Color(0xFF00C850),
                         Color(0xFF00BC7C),
                         Color(0xFF00BBA6),
                       ],
+                      onTap: () => context.go('/sign-recognition'),
                     ),
                     _buildCard(
                       icon: Icons.record_voice_over,
@@ -85,6 +93,7 @@ class HomePage extends StatelessWidget {
                         Color(0xFFF6329A),
                         Color(0xFFFF1F56),
                       ],
+                      onTap: () => context.go('/text-to-sign'),
                     ),
                     _buildCard(
                       icon: Icons.menu_book,
@@ -95,6 +104,7 @@ class HomePage extends StatelessWidget {
                         Color(0xFF00BC7C),
                         Color(0xFF00BBA6),
                       ],
+                      onTap: () => context.go('/learning'),
                     ),
                     _buildCard(
                       icon: Icons.chat_bubble,
@@ -105,6 +115,7 @@ class HomePage extends StatelessWidget {
                         Color(0xFFFD9900),
                         Color(0xFFF0B000),
                       ],
+                      onTap: () => context.go('/conversation'),
                     ),
                     _buildCard(
                       icon: Icons.show_chart,
@@ -115,6 +126,7 @@ class HomePage extends StatelessWidget {
                         Color(0xFFE12AFB),
                         Color(0xFFAC46FF),
                       ],
+                      onTap: () => context.go('/progress'),
                     ),
                     _buildCard(
                       icon: Icons.people,
@@ -125,6 +137,7 @@ class HomePage extends StatelessWidget {
                         Color(0xFF00A5F4),
                         Color(0xFF2B7FFF),
                       ],
+                      onTap: () => context.go('/community'),
                     ),
                   ],
                 ),
@@ -219,19 +232,22 @@ class HomePage extends StatelessWidget {
     required String title,
     required String description,
     required List<Color> gradientColors,
+    VoidCallback? onTap,
   }) {
-    return Container(
-      width: 160,
-      height: 250,
-      padding: const EdgeInsets.all(16),
-      decoration: ShapeDecoration(
-        color: Colors.white.withOpacity(0.85),
-        shape: RoundedRectangleBorder(
-          side: const BorderSide(width: 1, color: Color(0x99FFFEFE)),
-          borderRadius: BorderRadius.circular(14),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 160,
+        height: 250,
+        padding: const EdgeInsets.all(16),
+        decoration: ShapeDecoration(
+          color: Colors.white.withOpacity(0.85),
+          shape: RoundedRectangleBorder(
+            side: const BorderSide(width: 1, color: Color(0x99FFFEFE)),
+            borderRadius: BorderRadius.circular(14),
+          ),
         ),
-      ),
-      child: Column(
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
@@ -285,6 +301,7 @@ class HomePage extends StatelessWidget {
             ),
           ),
         ],
+      ),
       ),
     );
   }

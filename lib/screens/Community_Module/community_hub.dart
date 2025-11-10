@@ -1,6 +1,12 @@
-// lib/screens/Community_Module/community_hub.dart
-
+/// Community Hub Screen
+/// 
+/// Social feed for users to:
+/// - View and interact with posts
+/// - Create new posts
+/// - Filter by categories (All, Following, Tips, Help)
+/// - Search for posts by author
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'post_data.dart';
 import 'post_card.dart';
 import 'create_post_screen.dart';
@@ -175,6 +181,7 @@ class _CommunityHubEditedState extends State<CommunityHubEdited> {
     _unfocusSearch(); // Hides keyboard
     
     // We navigate to CreatePostScreen WITHOUT an existingPost
+    // TODO: Replace with GoRouter navigation when CreatePostScreen is ready
     final result = await Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const CreatePostScreen()),
@@ -304,7 +311,7 @@ class _CommunityHubEditedState extends State<CommunityHubEdited> {
         children: [
           InkWell(
             onTap: () {
-              print("Back button tapped");
+              context.pop();
             },
             child: Container(
               width: 24,

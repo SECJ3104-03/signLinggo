@@ -1,5 +1,12 @@
+/// Register Screen
+/// 
+/// Provides user registration interface with:
+/// - Full name, email, and password fields
+/// - Google Sign-In option
+/// - Guest mode access
+/// - Navigation to sign-in screen
 import 'package:flutter/material.dart';
-import '../sign_in/signin_screen.dart'; // import your SignInScreen
+import 'package:go_router/go_router.dart';
 
 class RegisterScreen extends StatelessWidget {
   const RegisterScreen({super.key});
@@ -63,12 +70,7 @@ class RegisterScreen extends StatelessWidget {
                       Expanded(
                         child: GestureDetector(
                           onTap: () {
-                            Navigator.pushReplacement(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (context) =>
-                                      const SignInScreen()),
-                            );
+                            context.go('/signin');
                           },
                           child: Container(
                             alignment: Alignment.center,

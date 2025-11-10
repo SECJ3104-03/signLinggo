@@ -1,5 +1,12 @@
+/// Progress Tracker Screen
+/// 
+/// Displays user learning progress including:
+/// - Total signs learned
+/// - Daily, weekly, and monthly goals
+/// - Achievement badges
+/// - Learning statistics
 import 'package:flutter/material.dart';
-import 'package:signlinggo/data/progress_manager.dart'; // adjust path
+import '../../data/progress_manager.dart';
 
 class ProgressScreen extends StatelessWidget {
   const ProgressScreen({super.key});
@@ -29,7 +36,10 @@ class ProgressScreen extends StatelessWidget {
         centerTitle: true,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios, color: Colors.black87),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            // Navigation handled by GoRouter
+            Navigator.of(context).pop();
+          },
         ),
         title: const Text(
           'Progress Tracker',

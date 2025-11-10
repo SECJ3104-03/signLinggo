@@ -1,6 +1,13 @@
+/// Learn Mode Screen
+/// 
+/// Displays sign language learning content with:
+/// - Category filtering
+/// - Search functionality
+/// - Video playback for each sign
+/// - Progress tracking integration
 import 'package:flutter/material.dart';
-import 'package:video_player/video_player.dart'; // ✅ new import
-import 'package:signlinggo/data/progress_manager.dart'; // adjust path
+import 'package:video_player/video_player.dart';
+import '../../data/progress_manager.dart';
 
 class LearnModePage extends StatefulWidget {
   const LearnModePage({super.key});
