@@ -11,11 +11,6 @@ Future<void> main() async {
 
   WidgetsFlutterBinding.ensureInitialized();
   //cameras = await availableCameras();
-
-// Import both of your screens
-import 'package:signlinggo/screens/Community_Module/community_hub.dart'; 
-import 'package:signlinggo/screens/Offline_Mode/offline_view.dart';
-
 // --- STEP 1: Call runApp() ONLY ONCE ---import 'package:signlinggo/screens/home/home_screen.dart';
 
 void main() {
@@ -24,3 +19,4 @@ void main() {
   ));
 }
 
+}
