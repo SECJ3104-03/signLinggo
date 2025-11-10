@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
+import 'package:signlinggo/screens/text_to_sign/text_to_sign_screen.dart';
 
 class SignRecognitionScreen extends StatefulWidget {
   final CameraDescription camera;
+  final bool isSignToText;
 
-  const SignRecognitionScreen({super.key, required this.camera});
+  const SignRecognitionScreen({super.key, required this.camera, this.isSignToText = false});
 
   @override
   State<SignRecognitionScreen> createState() => _SignRecognitionScreenState();
@@ -13,17 +15,48 @@ class SignRecognitionScreen extends StatefulWidget {
 class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
   late CameraController _controller;
   late Future<void> _initializeControllerFuture;
+  late bool isSignToText;
 
-  bool isSignToText = false;
+  int selectedCameraIdx = 0;
+  double _currentZoom = 1.0;
+  double _minZoom = 1.0;
+  double _maxZoom = 1.0;
 
   @override
   void initState() {
     super.initState();
-    _controller = CameraController(
-      widget.camera,
-      ResolutionPreset.medium,
-    );
-    _initializeControllerFuture = _controller.initialize();
+    _initializeCamera(widget.camera);
+    isSignToText = widget.isSignToText;
+  }
+  
+  void _initializeCamera(CameraDescription cameraDescription) {
+    _controller = CameraController(cameraDescription, ResolutionPreset.medium);
+
+    _initializeControllerFuture = _controller.initialize().then((_) async {
+      try {
+        _minZoom = await _controller.getMinZoomLevel();
+        _maxZoom = await _controller.getMaxZoomLevel();
+        _currentZoom = _minZoom.clamp(1.0, _maxZoom);
+        await _controller.setZoomLevel(_currentZoom);
+      } catch (e) {
+        _minZoom = 1.0;
+        _maxZoom = 1.0;
+        _currentZoom = 1.0;
+      }
+
+      if (mounted) setState(() {});
+    });
+  }
+
+  Future<void> _switchCamera() async {
+    final availableCamerasList = await availableCameras();
+    if (availableCamerasList.isEmpty) return;
+
+    selectedCameraIdx = (selectedCameraIdx + 1) % availableCamerasList.length;
+    final newCamera = availableCamerasList[selectedCameraIdx];
+
+    await _controller.dispose();
+    _initializeCamera(newCamera);
   }
 
   @override
@@ -38,14 +71,12 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Sign Recognition'),
+        title: const Text('Sign Recognition', style: TextStyle(color: Colors.black, fontFamily: 'Arimo',),),
         centerTitle: true,
         backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
         elevation: 1,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        leading: IconButton(icon: const Icon(Icons.arrow_back, color: Colors.black), onPressed: () { Navigator.pop(context); },),),
+      body: SingleChildScrollView(padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
@@ -65,11 +96,7 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
                 children: [
                   Text(
                     isSignToText ? 'Text → Sign' : 'Sign → Text',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                    ),
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.white,),
                   ),
                   Row(
                     children: [
@@ -88,10 +115,18 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
                         inactiveThumbColor: Colors.white,
                         activeTrackColor: Colors.grey[400],
                         inactiveTrackColor: Colors.grey[400],
-                        onChanged: (value) {
-                          setState(() {
-                            isSignToText = value;
-                          });
+                        onChanged: (value) async {
+                          setState(() => isSignToText = value);
+
+                          if (value) {
+                            await _controller.dispose();
+                            Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const TextTranslationScreen(),
+                              ),
+                            );
+                          }
                         },
                       ),
                     ],
@@ -150,6 +185,47 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
                             ),
                           ],
                         ),
+                      ),
+                    ),
+                    
+                    // Zoom and Flip buttons
+                    Positioned(
+                      top: 16,
+                      right: 16,
+                      child: Column(
+                        children: [
+                          // Zoom in button
+                          FloatingActionButton(
+                            heroTag: 'zoom',
+                            mini: true,
+                            backgroundColor: Colors.black45,
+                            onPressed: () async {
+                              if (!_controller.value.isInitialized) return;
+
+                              const double step = 0.5;
+                              final double newZoom = (_currentZoom + step).clamp(_minZoom, _maxZoom);
+
+                              try {
+                                await _controller.setZoomLevel(newZoom);
+                                _currentZoom = newZoom;
+                                setState(() {});
+                              } catch (e) {
+                                debugPrint('Zoom failed: $e');
+                              }
+                            },
+                            child: const Icon(Icons.zoom_in, color: Colors.white),
+                          ),
+                          const SizedBox(height: 12),
+
+                          // Flip camera button
+                          FloatingActionButton(
+                            heroTag: 'flip',
+                            mini: true,
+                            backgroundColor: Colors.black45,
+                            onPressed: _switchCamera,
+                            child: const Icon(Icons.flip_camera_ios, color: Colors.white),
+                          ),
+                        ],
                       ),
                     ),
                   ],

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 //import 'package:camera/camera.dart';
 import 'package:signlinggo/screens/sign_recognition/sign_recognition_screen.dart';
+import 'package:signlinggo/screens/Community_Module/community_hub.dart'; 
+import 'package:signlinggo/screens/Offline_Mode/offline_view.dart';
+import 'package:signlinggo/screens/conversation_mode/conversation_mode_screen.dart';
 
 //List<CameraDescription> cameras = [];
 
