@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "459608728889",
+    "project_id": "shared-notes-app-b9208",
+    "storage_bucket": "shared-notes-app-b9208.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:459608728889:android:93ab40aea6bfbb0868f4e8",
+        "android_client_info": {
+          "package_name": "com.example.shared_notes_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDlthpcEKCM4bTc0G_VgQ4U-A22nXku-Wc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:459608728889:android:159dfb105c249a3068f4e8",
+        "android_client_info": {
+          "package_name": "com.example.signlinggo"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDlthpcEKCM4bTc0G_VgQ4U-A22nXku-Wc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

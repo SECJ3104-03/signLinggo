@@ -9,6 +9,10 @@ import 'package:signlinggo/screens/sign_recognition/sign_recognition_screen.dart
 import 'package:signlinggo/screens/Community_Module/community_hub.dart'; 
 import 'package:signlinggo/screens/Offline_Mode/offline_view.dart';
 import 'package:signlinggo/screens/conversation_mode/conversation_mode_screen.dart';
+import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:signlinggo/screens/sign_in/signin_screen.dart';
+import 'package:signlinggo/screens/landing/landing_screen.dart'; // your 3-page landing
 
 //List<CameraDescription> cameras = [];
 
@@ -26,4 +30,26 @@ void main() {
   ));
 }
 
+}
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  final prefs = await SharedPreferences.getInstance();
+  final isFirstTime = prefs.getBool('isFirstTime') ?? true;
+
+  runApp(MyApp(isFirstTime: isFirstTime));
+}
+
+class MyApp extends StatelessWidget {
+  final bool isFirstTime;
+  const MyApp({super.key, required this.isFirstTime});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: isFirstTime ? const LandingScreen() : const SignInScreen(),
+    );
+  }
 }
