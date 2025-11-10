@@ -7,11 +7,16 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'routes/app_router.dart';
 import 'providers/app_provider.dart';
+import 'package:camera/camera.dart';
 
+List<CameraDescription> cameras = [];
 /// Main function - initializes the app and checks if it's the first launch
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Initialize cameras
+  cameras = await availableCameras();
+  
   // Check if this is the first time the app is launched
   final prefs = await SharedPreferences.getInstance();
   final isFirstTime = prefs.getBool('isFirstTime') ?? true;

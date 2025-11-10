@@ -1,6 +1,7 @@
 /// Navigation Helper Utilities
 /// 
 /// Provides helper functions for common navigation operations
+import 'package:flutter/material.dart'; 
 import 'package:go_router/go_router.dart';
 import '../constants/app_constants.dart';
 
