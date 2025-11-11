@@ -1,6 +1,6 @@
 // lib/main.dart
 import 'package:flutter/material.dart';
-//import 'package:camera/camera.dart';
+import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
 import 'screens/learn_mode/learn_screen.dart'; // 👈 correct import path
 import 'screens/learn_mode/category.dart'; // 👈 import Category screen
@@ -14,23 +14,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:signlinggo/screens/sign_in/signin_screen.dart';
 import 'package:signlinggo/screens/landing/landing_screen.dart'; // your 3-page landing
 
-//List<CameraDescription> cameras = [];
-
-Future<void> main() async {
-
-  WidgetsFlutterBinding.ensureInitialized();
-  //cameras = await availableCameras();
-// --- STEP 1: Call runApp() ONLY ONCE ---import 'package:signlinggo/screens/home/home_screen.dart';
-
-
-
-void main() {
-  runApp(MaterialApp (
-    home: HomePage(),
-  ));
-}
-
-}
+List<CameraDescription> cameras = [];
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -49,7 +33,8 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: isFirstTime ? const LandingScreen() : const SignInScreen(),
+      // home: isFirstTime ? const LandingScreen() : const SignInScreen(),
+      home: CommunityHubEdited(),
     );
   }
 }
