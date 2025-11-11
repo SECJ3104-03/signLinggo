@@ -34,7 +34,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       // home: isFirstTime ? const LandingScreen() : const SignInScreen(),
-      home: CommunityHubEdited(),
+      home: LearnModePage(),
     );
   }
 }
