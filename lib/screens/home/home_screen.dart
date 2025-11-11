@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+// --- Import the OfflineMode screen ---
+import '../Offline_Mode/offline_view.dart';
+
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
 
@@ -67,8 +70,8 @@ class HomePage extends StatelessWidget {
                   runSpacing: 16,
                   children: [
                     _buildCard(
-                      icon: Icons.camera, 
-                      title: "Real-Time Sign Recongnition", 
+                      icon: Icons.camera,
+                      title: "Real-Time Sign Recongnition",
                       description: 'Translate BIM gesture instantly',
                       gradientColors: const [
                         Color(0xFF00C850),
@@ -133,77 +136,105 @@ class HomePage extends StatelessWidget {
               const SizedBox(height: 20),
 
               // === FOOTER ===
-              Container(
-                width: double.infinity,
-                height: 91.95,
-                padding: const EdgeInsets.all(20),
-                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: ShapeDecoration(
-                  gradient: const LinearGradient(
-                    begin: Alignment(0.00, 0.50),
-                    end: Alignment(1.00, 0.50),
-                    colors: [
-                      Color(0xFF615EFF),
-                      Color(0xFFAC46FF),
-                      Color(0xFFF6329A),
+              GestureDetector(
+                onTap: () {
+                  // --- MODIFIED: Replaced MaterialPageRoute with PageRouteBuilder ---
+                  Navigator.of(context).push(
+                    PageRouteBuilder(
+                      // --- Set the duration of the animation (e.g., 400ms) ---
+                      transitionDuration: const Duration(milliseconds: 400),
+                      
+                      // --- This builds the screen (our OfflineMode page) ---
+                      pageBuilder: (context, animation, secondaryAnimation) {
+                        return OfflineMode();
+                      },
+                      
+                      // --- This builds the animation itself ---
+                      transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                        // We use a FadeTransition for a smooth fade-in
+                        return FadeTransition(
+                          // The 'animation' object is a value from 0.0 to 1.0
+                          opacity: animation, 
+                          child: child,
+                        );
+                      },
+                    ),
+                  );
+                },
+                child: Container(
+                  width: double.infinity,
+                  height: 91.95,
+                  padding: const EdgeInsets.all(20),
+                  margin:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: ShapeDecoration(
+                    gradient: const LinearGradient(
+                      begin: Alignment(0.00, 0.50),
+                      end: Alignment(1.00, 0.50),
+                      colors: [
+                        Color(0xFF615EFF),
+                        Color(0xFFAC46FF),
+                        Color(0xFFF6329A),
+                      ],
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.all(Radius.circular(14)),
+                    ),
+                    shadows: const [
+                      BoxShadow(
+                        color: Color(0x19000000),
+                        blurRadius: 6,
+                        offset: Offset(0, 4),
+                        spreadRadius: -4,
+                      ),
+                      BoxShadow(
+                        color: Color(0x19000000),
+                        blurRadius: 15,
+                        offset: Offset(0, 10),
+                        spreadRadius: -3,
+                      ),
                     ],
                   ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.all(Radius.circular(14)),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 47.99,
+                        height: 47.99,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: const Icon(Icons.cloud_download,
+                            color: Colors.white),
+                      ),
+                      const SizedBox(width: 16),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              'Offline Mode Available',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontFamily: 'Arimo',
+                                fontWeight: FontWeight.w400,
+                              ),
+                            ),
+                            Text(
+                              'Download signs for offline use',
+                              style: TextStyle(
+                                color: Color(0xCCFFFEFE),
+                                fontSize: 14,
+                                fontFamily: 'Arimo',
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                  shadows: const [
-                    BoxShadow(
-                      color: Color(0x19000000),
-                      blurRadius: 6,
-                      offset: Offset(0, 4),
-                      spreadRadius: -4,
-                    ),
-                    BoxShadow(
-                      color: Color(0x19000000),
-                      blurRadius: 15,
-                      offset: Offset(0, 10),
-                      spreadRadius: -3,
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 47.99,
-                      height: 47.99,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: const Icon(Icons.cloud_download, color: Colors.white),
-                    ),
-                    const SizedBox(width: 16),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            'Offline Mode Available',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontFamily: 'Arimo',
-                              fontWeight: FontWeight.w400,
-                            ),
-                          ),
-                          Text(
-                            'Download signs for offline use',
-                            style: TextStyle(
-                              color: Color(0xCCFFFEFE),
-                              fontSize: 14,
-                              fontFamily: 'Arimo',
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
                 ),
               ),
             ],
