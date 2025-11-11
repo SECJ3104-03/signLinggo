@@ -21,23 +21,24 @@ class _LearnModePageState extends State<LearnModePage> {
   // ✅ Example: Add video file names matching sign titles
     final List<Map<String, String>> signs = [
     //food and drinks
-    {'title': 'Bread', 'category': 'Food & Drinks', 'difficulty': 'Easy'},
-    {'title': 'Drink', 'category': 'Food & Drinks', 'difficulty': 'Easy'},
-    {'title': 'Eat', 'category': 'Food & Drinks', 'difficulty': 'Easy'},
-    {'title': 'Water', 'category': 'Food & Drinks', 'difficulty': 'Easy'},
+    {'title': 'Bread', 'category': 'Food & Drinks', 'difficulty': 'Easy', 'video': 'assets/assets/videos/Bread.mp4'},
+    {'title': 'Juice', 'category': 'Food & Drinks', 'difficulty': 'Easy', 'video': 'assets/assets/videos/Juice.mp4'},
+    {'title': 'Drink', 'category': 'Food & Drinks', 'difficulty': 'Easy', 'video': 'assets/assets/videos/Drink.mp4'},
+    {'title': 'Eat', 'category': 'Food & Drinks', 'difficulty': 'Easy', 'video': 'assets/assets/videos/Eat.mp4'},
+    {'title': 'Water', 'category': 'Food & Drinks', 'difficulty': 'Easy', 'video': 'assets/assets/videos/Water.mp4'},
     //family
     {'title': 'Brother', 'category': 'Family', 'difficulty': 'Easy', 'video': 'assets/assets/videos/Brother.mp4'},
     {'title': 'Elder Sister', 'category': 'Family', 'difficulty': 'Medium', 'video': 'assets/assets/videos/ElderSister.mp4'},
     {'title': 'Father', 'category': 'Family', 'difficulty': 'Easy', 'video': 'assets/assets/videos/Father.mp4'},
     {'title': 'Mother', 'category': 'Family', 'difficulty': 'Easy', 'video': 'assets/assets/videos/Mother.mp4'},
     //travel
-    {'title': 'Bus', 'category': 'Travel', 'difficulty': 'Medium'},
-    {'title': 'Hotel', 'category': 'Travel', 'difficulty': 'Medium'},
-    {'title': 'Toilet', 'category': 'Travel', 'difficulty': 'Medium'},
+    {'title': 'Bus', 'category': 'Travel', 'difficulty': 'Medium', 'video': 'assets/assets/videos/Bus.mp4'},
+    {'title': 'Hotel', 'category': 'Travel', 'difficulty': 'Medium', 'video': 'assets/assets/videos/Hotel.mp4'},
+    {'title': 'Toilet', 'category': 'Travel', 'difficulty': 'Medium', 'video': 'assets/assets/videos/Toilet.mp4'},
     //emotions
-    {'title': 'Help', 'category': 'Emotions', 'difficulty': 'Medium'},
-    {'title': 'Hungry', 'category': 'Emotions', 'difficulty': 'Medium'},
-    {'title': 'Thirsty', 'category': 'Emotions', 'difficulty': 'Medium'},
+    {'title': 'Help', 'category': 'Emotions', 'difficulty': 'Medium', 'video': 'assets/assets/videos/Help.mp4'},
+    {'title': 'Hungry', 'category': 'Emotions', 'difficulty': 'Medium', 'video': 'assets/assets/videos/Hungry.mp4'},
+    {'title': 'Thirsty', 'category': 'Emotions', 'difficulty': 'Medium', 'video': 'assets/assets/videos/Thirsty.mp4'},
     //others
     {'title': 'Objects', 'category': 'Others', 'difficulty': 'Medium'},
     //numbers
@@ -82,21 +83,21 @@ class _LearnModePageState extends State<LearnModePage> {
     {'title': 'Backspace', 'category': 'Alphabets', 'difficulty': 'Medium'},
     {'title': 'Space', 'category': 'Alphabets', 'difficulty': 'Easy'},
     // greetings and others
-    {'title': 'Hari ini', 'category': 'Greetings', 'difficulty': 'Medium'},
-    {'title': 'Hello', 'category': 'Greetings', 'difficulty': 'Easy'},
-    {'title': 'I', 'category': 'Greetings', 'difficulty': 'Easy'},
-    {'title': 'I love you', 'category': 'Greetings', 'difficulty': 'Easy'},
-    {'title': 'Kawan-kawan', 'category': 'Family', 'difficulty': 'Medium'},
-    {'title': 'Malam', 'category': 'Greetings', 'difficulty': 'Medium'},
-    {'title': 'Pagi', 'category': 'Greetings', 'difficulty': 'Easy'},
-    {'title': 'Selamat', 'category': 'Greetings', 'difficulty': 'Easy'},
-    {'title': 'Tengahari', 'category': 'Greetings', 'difficulty': 'Medium'},
-    {'title': 'Terima Kasih', 'category': 'Greetings', 'difficulty': 'Easy'},
+    {'title': 'Today', 'category': 'Greetings', 'difficulty': 'Medium', 'video': 'assets/assets/videos/Today.mp4'},
+    {'title': 'Hello', 'category': 'Greetings', 'difficulty': 'Easy', 'video': 'assets/assets/videos/Hello.mp4'},
+    {'title': 'I', 'category': 'Greetings', 'difficulty': 'Easy', 'video': 'assets/assets/videos/I(Saya).mp4'},
+    {'title': 'I love you', 'category': 'Greetings', 'difficulty': 'Easy', 'video': 'assets/assets/videos/ILoveYou.mp4'},
+    {'title': 'Friends', 'category': 'Family', 'difficulty': 'Medium', 'video': 'assets/assets/videos/Friends.mp4'},
+    {'title': 'Night', 'category': 'Greetings', 'difficulty': 'Medium', 'video': 'assets/assets/videos/Night.mp4'},
+    {'title': 'Morning', 'category': 'Greetings', 'difficulty': 'Easy', 'video': 'assets/assets/videos/Morning.mp4'},
+    {'title': 'Selamat', 'category': 'Greetings', 'difficulty': 'Easy', 'video': 'assets/assets/videos/Selamat.mp4'},
+    {'title': 'Noon', 'category': 'Greetings', 'difficulty': 'Medium', 'video': 'assets/assets/videos/Noon.mp4'},
+    {'title': 'Thank you', 'category': 'Greetings', 'difficulty': 'Easy', 'video': 'assets/assets/videos/ThankYou.mp4'},
     {'title': 'Ucapan', 'category': 'Greetings', 'difficulty': 'Medium'},
-    {'title': 'How much', 'category': 'Greetings', 'difficulty': 'Hard'},
-    {'title': 'No', 'category': 'Greetings', 'difficulty': 'Easy'},
-    {'title': 'Yes', 'category': 'Greetings', 'difficulty': 'Easy'},
-    {'title': 'Sorry', 'category': 'Greetings', 'difficulty': 'Easy'},
+    {'title': 'How much', 'category': 'Greetings', 'difficulty': 'Hard', 'video': 'assets/assets/videos/HowMuch.mp4'},
+    {'title': 'No', 'category': 'Greetings', 'difficulty': 'Easy', 'video': 'assets/assets/videos/No.mp4'},
+    {'title': 'Yes', 'category': 'Greetings', 'difficulty': 'Easy', 'video': 'assets/assets/videos/Yes.mp4'},
+    {'title': 'Sorry', 'category': 'Greetings', 'difficulty': 'Easy', 'video': 'assets/assets/videos/Sorry.mp4'},
   ];
 
 
