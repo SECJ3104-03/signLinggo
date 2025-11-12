@@ -1,12 +1,11 @@
 // lib/screens/Community_Module/post_card.dart
 
 import 'package:flutter/material.dart';
-import 'package:video_player/video_player.dart'; // We need this
-import 'package:share_plus/share_plus.dart'; // --- *** NEW IMPORT *** ---
-import 'post_data.dart'; // Import the model
-import 'video_player_widget.dart'; // Import the video player
+import 'package:video_player/video_player.dart';
+import 'package:share_plus/share_plus.dart'; 
+import 'post_data.dart'; 
+import 'video_player_widget.dart'; 
 
-// This is a StatefulWidget to hold the video controller
 class PostCard extends StatefulWidget {
   final PostData post;
   final VoidCallback? onFollowTap;
@@ -28,38 +27,25 @@ class PostCard extends StatefulWidget {
 }
 
 class _PostCardState extends State<PostCard> {
-  // This holds the controller for this card's video player
   VideoPlayerController? _videoController;
 
-  // This is our helper function that does BOTH
-  // pausing the video AND navigating.
   void _navigateToCommentScreen() {
-    // 1. Check if we have a controller and if it's playing
     if (_videoController != null && _videoController!.value.isPlaying) {
-      // 2. If it is, pause it
       _videoController!.pause();
     }
     
-    // 3. Now, call the original comment tap function to navigate
     if (widget.onCommentTap != null) {
       widget.onCommentTap!();
     }
   }
 
-  // --- *** NEW FUNCTION *** ---
-  // This function is called when the share icon is tapped
   void _sharePost() {
-    // This combines the title and content for sharing
     final String shareText = '${widget.post.title}\n\n${widget.post.content}';
-    
-    // This opens the native share dialog
     Share.share(shareText, subject: 'Check out this post!');
   }
-  // --- *** --- *** --- ---
 
   @override
   Widget build(BuildContext context) {
-    // The InkWell (the whole card) now calls our new function
     return InkWell(
       onTap: _navigateToCommentScreen,
       child: ClipRRect(
@@ -67,12 +53,11 @@ class _PostCardState extends State<PostCard> {
         child: Container(
           width: double.infinity,
           decoration: ShapeDecoration(
-            color: Colors.white,
+            // --- MODIFIED: Make card background semi-transparent ---
+            color: Colors.white.withOpacity(0.85),
             shape: RoundedRectangleBorder(
-              side: BorderSide(
-                width: 1.24,
-                color: const Color(0xFFE5E7EB),
-              ),
+              // --- MODIFIED: Use same border as HomePage cards ---
+              side: const BorderSide(width: 1, color: Color(0x99FFFEFE)),
               borderRadius: BorderRadius.circular(14),
             ),
           ),
@@ -91,12 +76,13 @@ class _PostCardState extends State<PostCard> {
                     Divider(
                       height: 1.24,
                       thickness: 1.24,
-                      color: const Color(0xFFE5E7EB),
+                      // --- MODIFIED: Make divider match new border ---
+                      color: const Color(0x99FFFEFE),
                       indent: 21.22,
                       endIndent: 21.22,
                     ),
 
-                    _buildFooter(), // This method is now fixed
+                    _buildFooter(), 
                   ],
                 ),
               ),
@@ -112,7 +98,10 @@ class _PostCardState extends State<PostCard> {
   }
 
   // --- Helper Methods ---
-
+  // (No changes needed in the helper methods _buildHeader, 
+  // _buildFollowButton, _buildMoreOptionsButton, _buildContent,
+  // _buildFooter, or _buildFooterIcon)
+  // ... (All helper methods remain the same) ...
   Widget _buildHeader() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(21.22, 21.22, 0, 0),
@@ -171,7 +160,6 @@ class _PostCardState extends State<PostCard> {
                       ),
                     ),
                     
-                    // This will display '(edited)' if the post.isEdited is true
                     if (widget.post.isEdited)
                       Padding(
                         padding: const EdgeInsets.only(left: 7.99),
@@ -228,7 +216,6 @@ class _PostCardState extends State<PostCard> {
   }
 
   Widget _buildFollowButton() {
-    // This helper method is complete and correct
     return Positioned(
       right: 21.22,
       top: 22.06,
@@ -267,7 +254,6 @@ class _PostCardState extends State<PostCard> {
   }
 
   Widget _buildMoreOptionsButton() {
-    // This helper method is complete and correct
     return Positioned(
       right: 21.22,
       top: 22.06,
@@ -287,14 +273,12 @@ class _PostCardState extends State<PostCard> {
   }
 
   Widget _buildContent() {
-    // This helper method is complete and correct
     return Padding(
       padding: const EdgeInsets.fromLTRB(0, 20, 0, 0),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // If the videoUrl is not null, we show the video player.
           if (widget.post.videoUrl != null)
             Padding(
               padding: const EdgeInsets.only(bottom: 20.0),
@@ -302,15 +286,12 @@ class _PostCardState extends State<PostCard> {
                 key: ValueKey(widget.post.videoUrl!),
                 videoUrl: widget.post.videoUrl!,
                 isSquare: true, 
-                
-                // This saves the controller to our _videoController variable
                 onControllerInitialized: (controller) {
                   _videoController = controller;
                 },
               ),
             ),
 
-          // --- This is the Title ---
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 21.22),
             child: Text(
@@ -327,7 +308,6 @@ class _PostCardState extends State<PostCard> {
           
           const SizedBox(height: 12), 
           
-          // --- This is the Content ---
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 21.22),
             child: SizedBox(
@@ -352,7 +332,6 @@ class _PostCardState extends State<PostCard> {
   }
 
   Widget _buildFooter() {
-    // This helper method is complete and correct
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 21.22),
       child: Padding(
@@ -361,7 +340,6 @@ class _PostCardState extends State<PostCard> {
           mainAxisAlignment: MainAxisAlignment.start,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // --- Likes ---
             _buildFooterIcon(
               icon: widget.post.isLiked ? Icons.favorite : Icons.favorite_border,
               label: widget.post.likes.toString(),
@@ -370,7 +348,6 @@ class _PostCardState extends State<PostCard> {
             ),
             const SizedBox(width: 24),
             
-            // --- Comments ---
             _buildFooterIcon(
               icon: Icons.chat_bubble_outline,
               label: widget.post.commentList.length.toString(),
@@ -380,8 +357,6 @@ class _PostCardState extends State<PostCard> {
             
             const Spacer(),
             
-            // --- *** THIS IS THE CHANGE *** ---
-            // The InkWell now calls our new _sharePost function
             InkWell(
               onTap: _sharePost,
               child: Container(
@@ -390,7 +365,6 @@ class _PostCardState extends State<PostCard> {
                 child: Icon(Icons.share_outlined, color: const Color(0xFF495565)),
               ),
             ),
-            // --- *** --- *** --- --- *** --- ---
           ],
         ),
       ),
@@ -403,7 +377,6 @@ class _PostCardState extends State<PostCard> {
     required Color color,
     required VoidCallback? onTap,
   }) {
-    // This helper method is complete and correct
     return InkWell(
       onTap: onTap,
       child: Row(

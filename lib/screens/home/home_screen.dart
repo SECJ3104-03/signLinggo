@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 // --- Import the OfflineMode screen ---
 import '../Offline_Mode/offline_view.dart';
 
+// --- NEW: Import the CommunityHubEdited screen ---
+import '../Community_Module/community_hub.dart';
+
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
 
@@ -119,16 +122,41 @@ class HomePage extends StatelessWidget {
                         Color(0xFFAC46FF),
                       ],
                     ),
-                    _buildCard(
-                      icon: Icons.people,
-                      title: 'Community Hub',
-                      description: 'Connect and share experiences',
-                      gradientColors: const [
-                        Color(0xFF00B8DA),
-                        Color(0xFF00A5F4),
-                        Color(0xFF2B7FFF),
-                      ],
+
+                    // --- NEW: Wrapped this card with a GestureDetector ---
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.of(context).push(
+                          PageRouteBuilder(
+                            transitionDuration:
+                                const Duration(milliseconds: 400),
+                            pageBuilder:
+                                (context, animation, secondaryAnimation) {
+                              // --- NEW: Point to CommunityHubEdited ---
+                              return const CommunityHubEdited();
+                            },
+                            transitionsBuilder: (context, animation,
+                                secondaryAnimation, child) {
+                              return FadeTransition(
+                                opacity: animation,
+                                child: child,
+                              );
+                            },
+                          ),
+                        );
+                      },
+                      child: _buildCard(
+                        icon: Icons.people,
+                        title: 'Community Hub',
+                        description: 'Connect and share experiences',
+                        gradientColors: const [
+                          Color(0xFF00B8DA),
+                          Color(0xFF00A5F4),
+                          Color(0xFF2B7FFF),
+                        ],
+                      ),
                     ),
+                    // --- End of new GestureDetector ---
                   ],
                 ),
               ),
@@ -138,23 +166,16 @@ class HomePage extends StatelessWidget {
               // === FOOTER ===
               GestureDetector(
                 onTap: () {
-                  // --- MODIFIED: Replaced MaterialPageRoute with PageRouteBuilder ---
                   Navigator.of(context).push(
                     PageRouteBuilder(
-                      // --- Set the duration of the animation (e.g., 400ms) ---
                       transitionDuration: const Duration(milliseconds: 400),
-                      
-                      // --- This builds the screen (our OfflineMode page) ---
                       pageBuilder: (context, animation, secondaryAnimation) {
                         return OfflineMode();
                       },
-                      
-                      // --- This builds the animation itself ---
-                      transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                        // We use a FadeTransition for a smooth fade-in
+                      transitionsBuilder:
+                          (context, animation, secondaryAnimation, child) {
                         return FadeTransition(
-                          // The 'animation' object is a value from 0.0 to 1.0
-                          opacity: animation, 
+                          opacity: animation,
                           child: child,
                         );
                       },
