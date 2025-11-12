@@ -5,6 +5,7 @@
 library;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:signlinggo/screens/conversation_mode/chat_list_screen.dart';
 import '../screens/landing/landing_screen.dart';
 import '../screens/sign_in/signin_screen.dart';
 import '../screens/register/register_screen.dart';
@@ -197,7 +198,7 @@ class AppRouter {
       GoRoute(
         path: '/conversation',
         name: 'conversation',
-        builder: (context, state) => const ConversationScreen(),
+        builder: (context, state) => const ChatListScreen(),
       ),
       GoRoute(
         path: '/text-to-sign',
