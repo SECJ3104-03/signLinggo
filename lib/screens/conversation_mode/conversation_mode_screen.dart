@@ -1,5 +1,13 @@
+/// Conversation Mode Screen
+/// 
+/// Real-time two-way conversation with support for:
+/// - Text messages
+/// - Sign language (camera-based)
+/// - Voice messages
+/// - Translation between modes
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:camera/camera.dart';
 import 'package:video_player/video_player.dart';
 
@@ -49,9 +57,45 @@ class _ConversationScreenState extends State<ConversationScreen> {
               CameraController(_cameras.first, ResolutionPreset.medium);
           await _cameraController?.initialize();
           if (mounted) setState(() {});
+        } else {
+          // No cameras available
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('No camera available. Please use Text or Voice mode.'),
+                duration: Duration(seconds: 3),
+              ),
+            );
+            // Switch back to Text mode if camera is not available
+            setState(() => _mode = 'Text');
+          }
+        }
+      } on CameraException catch (e) {
+        debugPrint("CameraException initializing camera: ${e.code} - ${e.description}");
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Camera error: ${e.description ?? e.code}. Please use Text or Voice mode.',
+              ),
+              duration: const Duration(seconds: 4),
+            ),
+          );
+          // Switch back to Text mode on error
+          setState(() => _mode = 'Text');
         }
       } catch (e) {
         debugPrint("Error initializing camera: $e");
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to initialize camera: ${e.toString()}'),
+              duration: const Duration(seconds: 3),
+            ),
+          );
+          // Switch back to Text mode on error
+          setState(() => _mode = 'Text');
+        }
       }
     }
   }
@@ -444,7 +488,14 @@ class _ConversationScreenState extends State<ConversationScreen> {
         elevation: 1,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black87),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            // Use pop if there's a route to pop, otherwise go to home
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/home');
+            }
+          },
         ),
         title: Row(
           children: const [

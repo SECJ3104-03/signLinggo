@@ -2,6 +2,7 @@
 /// 
 /// Defines all routes for the SignLinggo app using GoRouter.
 /// Handles navigation between screens and manages route parameters.
+library;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../screens/landing/landing_screen.dart';
@@ -12,15 +13,13 @@ import '../screens/learn_mode/learn_screen.dart' show LearnModePage;
 import '../screens/learn_mode/category.dart' show CategoriesPage;
 import '../screens/progress_tracker/progress_screen.dart';
 import '../screens/sign_recognition/sign_recognition_screen.dart';
+import '../services/camera_service.dart';
 import '../screens/Community_Module/community_hub.dart' show CommunityHubEdited;
 import '../screens/Offline_Mode/offline_view.dart' show OfflineMode;
 import '../screens/conversation_mode/conversation_mode_screen.dart' show ConversationScreen;
 import '../screens/text_to_sign/text_to_sign_screen.dart' show TextTranslationScreen;
-import '../screens/speech_output/speech_output_screen.dart';
-import '../screens/onboarding/welcome_screen.dart';
-import '../screens/onboarding/onboarding_screen.dart';
 
-// Note: Some screens may need to be created or renamed to match these imports
+// Note: Speech output and onboarding screens are placeholders for future implementation
 
 /// Router configuration for the app
 class AppRouter {
@@ -88,12 +87,100 @@ class AppRouter {
         path: '/sign-recognition',
         name: 'sign-recognition',
         builder: (context, state) {
-          // TODO: Initialize camera and pass to SignRecognitionScreen
-          // For now, return a placeholder that navigates to text-to-sign
-          return const Scaffold(
-            body: Center(
-              child: Text('Sign Recognition - Camera initialization required'),
-            ),
+          // Check if cameras are available
+          if (!CameraService.hasCameras) {
+            // Show error screen if no cameras available
+            return Scaffold(
+              appBar: AppBar(
+                title: const Text('Sign Recognition'),
+                leading: IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: () => context.pop(),
+                ),
+              ),
+              body: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.camera_alt_outlined,
+                        size: 80,
+                        color: Colors.grey,
+                      ),
+                      const SizedBox(height: 24),
+                      const Text(
+                        'Camera Not Available',
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        CameraService.errorMessage ?? 
+                        'No camera found on this device. Please connect a camera or use a device with a camera.',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          color: Colors.grey,
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+                      ElevatedButton.icon(
+                        onPressed: () async {
+                          // Try to re-initialize cameras
+                          final initialized = await CameraService.initializeCameras();
+                          if (initialized && CameraService.hasCameras) {
+                            // Navigate to sign recognition if camera is now available
+                            context.go('/sign-recognition');
+                          } else {
+                            // Show snackbar with error
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  CameraService.errorMessage ?? 
+                                  'Camera is still not available',
+                                ),
+                                duration: const Duration(seconds: 3),
+                              ),
+                            );
+                          }
+                        },
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('Retry Camera'),
+                      ),
+                      const SizedBox(height: 16),
+                      TextButton(
+                        onPressed: () => context.go('/text-to-sign'),
+                        child: const Text('Use Text to Sign Instead'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }
+
+          // Get first available camera
+          final camera = CameraService.getFirstCamera();
+          if (camera == null) {
+            // Fallback if camera is null (shouldn't happen if hasCameras is true)
+            return Scaffold(
+              body: Center(
+                child: Text(
+                  CameraService.errorMessage ?? 
+                  'Camera initialization failed',
+                ),
+              ),
+            );
+          }
+
+          // Navigate to sign recognition screen with camera
+          return SignRecognitionScreen(
+            camera: camera,
+            isSignToText: false,
           );
         },
       ),

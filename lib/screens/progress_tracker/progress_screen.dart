@@ -5,7 +5,9 @@
 /// - Daily, weekly, and monthly goals
 /// - Achievement badges
 /// - Learning statistics
+library;
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../data/progress_manager.dart';
 
 class ProgressScreen extends StatelessWidget {
@@ -37,8 +39,12 @@ class ProgressScreen extends StatelessWidget {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios, color: Colors.black87),
           onPressed: () {
-            // Navigation handled by GoRouter
-            Navigator.of(context).pop();
+            // Use pop if there's a route to pop, otherwise go to home
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/home');
+            }
           },
         ),
         title: const Text(

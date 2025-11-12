@@ -1,4 +1,10 @@
+/// Categories Screen
+/// 
+/// Displays sign language categories for browsing:
+/// - Category grid with icons
+/// - Navigation to category detail pages
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 class CategoriesPage extends StatelessWidget {
   const CategoriesPage({super.key});
@@ -35,7 +41,14 @@ class CategoriesPage extends StatelessWidget {
                   children: [
                     IconButton(
                       icon: const Icon(Icons.arrow_back),
-                      onPressed: () => Navigator.pop(context),
+                      onPressed: () {
+                        // Use pop if there's a route to pop, otherwise go to home
+                        if (context.canPop()) {
+                          context.pop();
+                        } else {
+                          context.go('/home');
+                        }
+                      },
                     ),
                     const Expanded(
                       child: Text(

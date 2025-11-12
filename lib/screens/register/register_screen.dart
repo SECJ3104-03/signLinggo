@@ -5,8 +5,11 @@
 /// - Google Sign-In option
 /// - Guest mode access
 /// - Navigation to sign-in screen
+library;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+import '../../providers/app_provider.dart';
 
 class RegisterScreen extends StatelessWidget {
   const RegisterScreen({super.key});
@@ -116,10 +119,21 @@ class RegisterScreen extends StatelessWidget {
                 // Create account button
                 GestureDetector(
                   onTap: () {
+                    // Update app state to mark user as logged in
+                    final appProvider = Provider.of<AppProvider>(context, listen: false);
+                    appProvider.setLoggedIn(true);
+                    appProvider.setGuestMode(false);
+                    
+                    // Show success message
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
-                          content: Text("Account created successfully!")),
+                        content: Text("Account created successfully!"),
+                        duration: Duration(seconds: 1),
+                      ),
                     );
+                    
+                    // Navigate to home page
+                    context.go('/home');
                   },
                   child: Container(
                     width: double.infinity,
@@ -141,7 +155,15 @@ class RegisterScreen extends StatelessWidget {
 
                 // Continue as guest
                 TextButton(
-                  onPressed: () {},
+                  onPressed: () {
+                    // Update app state to mark user as guest
+                    final appProvider = Provider.of<AppProvider>(context, listen: false);
+                    appProvider.setGuestMode(true);
+                    appProvider.setLoggedIn(false);
+                    
+                    // Navigate to home page
+                    context.go('/home');
+                  },
                   child: const Text(
                     "Continue as Guest",
                     style: TextStyle(color: Colors.white, fontSize: 14),

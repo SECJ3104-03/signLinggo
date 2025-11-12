@@ -2,20 +2,31 @@
 /// 
 /// This is the main entry point for the SignLinggo app.
 /// It initializes the app, sets up navigation, and manages app-wide state.
+library;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/foundation.dart';
 import 'routes/app_router.dart';
 import 'providers/app_provider.dart';
-import 'package:camera/camera.dart';
+import 'services/camera_service.dart';
 
-List<CameraDescription> cameras = [];
 /// Main function - initializes the app and checks if it's the first launch
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize cameras
-  cameras = await availableCameras();
+  // Initialize cameras with error handling
+  // This will not block app startup if camera initialization fails
+  try {
+    final camerasInitialized = await CameraService.initializeCameras();
+    if (!camerasInitialized) {
+      debugPrint('Main: Camera initialization failed - ${CameraService.errorMessage}');
+      debugPrint('Main: App will continue to run, but camera features will be unavailable');
+    }
+  } catch (e) {
+    debugPrint('Main: Unexpected error during camera initialization: $e');
+    // Continue app startup even if camera initialization fails
+  }
   
   // Check if this is the first time the app is launched
   final prefs = await SharedPreferences.getInstance();
@@ -52,3 +63,4 @@ class MyApp extends StatelessWidget {
     );
   }
 }
+

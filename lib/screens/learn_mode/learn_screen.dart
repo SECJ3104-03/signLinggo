@@ -5,7 +5,9 @@
 /// - Search functionality
 /// - Video playback for each sign
 /// - Progress tracking integration
+library;
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:video_player/video_player.dart';
 import '../../data/progress_manager.dart';
 
@@ -125,7 +127,14 @@ class _LearnModePageState extends State<LearnModePage> {
         backgroundColor: Colors.white,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            // Use pop if there's a route to pop, otherwise go to home
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/home');
+            }
+          },
         ),
         centerTitle: true,
         title: const Text(
@@ -362,7 +371,7 @@ class _VideoPlayerDialogState extends State<_VideoPlayerDialog> {
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
         ),
         TextButton(
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => context.pop(),
           child: const Text("Close", style: TextStyle(color: Colors.blue)),
         ),
       ],

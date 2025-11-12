@@ -1,6 +1,13 @@
+/// Text to Sign Screen
+/// 
+/// Converts text or voice input to sign language:
+/// - Text input field for typing messages
+/// - Voice recording (to be implemented)
+/// - Mode switching between Text→Sign and Sign→Text
+/// - Translation display
 import 'package:flutter/material.dart';
-import 'package:signlinggo/screens/sign_recognition/sign_recognition_screen.dart';
-import 'package:signlinggo/main.dart';
+import 'package:go_router/go_router.dart';
+import '../../services/camera_service.dart';
 
 class TextTranslationScreen extends StatefulWidget {
   const TextTranslationScreen({super.key});
@@ -30,7 +37,18 @@ class _TextTranslationScreenState extends State<TextTranslationScreen> {
         centerTitle: true,
         backgroundColor: Colors.white,
         elevation: 1,
-        leading: IconButton(icon: const Icon(Icons.arrow_back, color: Colors.black), onPressed: () { Navigator.pop(context); },),),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          onPressed: () {
+            // Use pop if there's a route to pop, otherwise go to home
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/home');
+            }
+          },
+        ),
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
@@ -77,14 +95,42 @@ class _TextTranslationScreenState extends State<TextTranslationScreen> {
                             setState(() => isSignToText = value);
 
                             if (value) {
-                              Navigator.pushReplacement(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => SignRecognitionScreen(
-                                    camera: cameras.first,
-                                  ),
-                                ),
-                              );
+                              // Switch to Sign→Text mode
+                              // Check if camera is available
+                              if (!CameraService.hasCameras) {
+                                // Try to re-initialize cameras
+                                final initialized = await CameraService.initializeCameras();
+                                if (!initialized || !CameraService.hasCameras) {
+                                  // Show error if camera is still not available
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          CameraService.errorMessage ?? 
+                                          'Camera is not available. Please use a device with a camera.',
+                                        ),
+                                        duration: const Duration(seconds: 4),
+                                        action: SnackBarAction(
+                                          label: 'Retry',
+                                          onPressed: () async {
+                                            final retryInitialized = await CameraService.initializeCameras();
+                                            if (retryInitialized && CameraService.hasCameras && mounted) {
+                                              context.go('/sign-recognition');
+                                            }
+                                          },
+                                        ),
+                                      ),
+                                    );
+                                    // Revert switch state
+                                    setState(() => isSignToText = false);
+                                  }
+                                  return;
+                                }
+                              }
+
+                              // Navigate to sign recognition screen using GoRouter
+                              // The router will handle camera availability
+                              context.go('/sign-recognition');
                             }
                           },
                         ),

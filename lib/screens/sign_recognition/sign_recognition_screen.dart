@@ -1,6 +1,13 @@
+/// Sign Recognition Screen
+/// 
+/// Real-time sign language recognition using camera:
+/// - Camera preview with detection overlay
+/// - Zoom and camera switching controls
+/// - Sign-to-text translation
+/// - Mode switching between sign-to-text and text-to-sign
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:camera/camera.dart';
-import 'package:signlinggo/screens/text_to_sign/text_to_sign_screen.dart';
 
 class SignRecognitionScreen extends StatefulWidget {
   final CameraDescription camera;
@@ -39,29 +46,76 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
         _currentZoom = _minZoom.clamp(1.0, _maxZoom);
         await _controller.setZoomLevel(_currentZoom);
       } catch (e) {
+        debugPrint('SignRecognitionScreen: Error setting zoom: $e');
         _minZoom = 1.0;
         _maxZoom = 1.0;
         _currentZoom = 1.0;
       }
 
       if (mounted) setState(() {});
+    }).catchError((error) {
+      debugPrint('SignRecognitionScreen: Camera initialization error: $error');
+      if (mounted) {
+        setState(() {});
+        // Show error message to user
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              error is CameraException
+                  ? 'Camera error: ${error.description ?? error.code}'
+                  : 'Failed to initialize camera: ${error.toString()}',
+            ),
+            duration: const Duration(seconds: 5),
+            action: SnackBarAction(
+              label: 'Retry',
+              onPressed: () {
+                _initializeCamera(cameraDescription);
+              },
+            ),
+          ),
+        );
+      }
     });
   }
 
   Future<void> _switchCamera() async {
-    final availableCamerasList = await availableCameras();
-    if (availableCamerasList.isEmpty) return;
+    try {
+      final availableCamerasList = await availableCameras();
+      if (availableCamerasList.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('No other cameras available'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+        return;
+      }
 
-    selectedCameraIdx = (selectedCameraIdx + 1) % availableCamerasList.length;
-    final newCamera = availableCamerasList[selectedCameraIdx];
+      selectedCameraIdx = (selectedCameraIdx + 1) % availableCamerasList.length;
+      final newCamera = availableCamerasList[selectedCameraIdx];
 
-    await _controller.dispose();
-    _initializeCamera(newCamera);
+      await _controller.dispose();
+      _initializeCamera(newCamera);
+    } catch (e) {
+      debugPrint('SignRecognitionScreen: Error switching camera: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to switch camera: ${e.toString()}'),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _controller.dispose().catchError((error) {
+      debugPrint('SignRecognitionScreen: Error disposing camera: $error');
+    });
     super.dispose();
   }
 
@@ -75,8 +129,20 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
         centerTitle: true,
         backgroundColor: Colors.white,
         elevation: 1,
-        leading: IconButton(icon: const Icon(Icons.arrow_back, color: Colors.black), onPressed: () { Navigator.pop(context); },),),
-      body: SingleChildScrollView(padding: const EdgeInsets.all(16),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          onPressed: () {
+            // Use pop if there's a route to pop, otherwise go to home
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/home');
+            }
+          },
+        ),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
@@ -120,12 +186,8 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
 
                           if (value) {
                             await _controller.dispose();
-                            Navigator.pushReplacement(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const TextTranslationScreen(),
-                              ),
-                            );
+                            // Navigate to text-to-sign screen using GoRouter
+                            context.go('/text-to-sign');
                           }
                         },
                       ),
@@ -156,8 +218,50 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
                       future: _initializeControllerFuture,
                       builder: (context, snapshot) {
                         if (snapshot.connectionState == ConnectionState.done) {
-                          return CameraPreview(_controller);
+                          if (snapshot.hasError) {
+                            // Show error state if initialization failed
+                            return Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(
+                                    Icons.error_outline,
+                                    size: 48,
+                                    color: Colors.red,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    snapshot.error is CameraException
+                                        ? 'Camera error: ${(snapshot.error as CameraException).description ?? (snapshot.error as CameraException).code}'
+                                        : 'Failed to initialize camera',
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(color: Colors.red),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  ElevatedButton(
+                                    onPressed: () {
+                                      _initializeCamera(widget.camera);
+                                    },
+                                    child: const Text('Retry'),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }
+                          // Check if controller is initialized before showing preview
+                          if (_controller.value.isInitialized) {
+                            return CameraPreview(_controller);
+                          } else {
+                            return const Center(
+                              child: CircularProgressIndicator(),
+                            );
+                          }
+                        } else if (snapshot.connectionState == ConnectionState.waiting) {
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
                         } else {
+                          // Initial or other states
                           return const Center(
                             child: CircularProgressIndicator(),
                           );
