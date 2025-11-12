@@ -5,6 +5,7 @@ import '../Offline_Mode/offline_view.dart';
 
 // --- NEW: Import the CommunityHubEdited screen ---
 import '../Community_Module/community_hub.dart';
+import '../conversation_mode/chat_list_screen.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
@@ -102,16 +103,39 @@ class HomePage extends StatelessWidget {
                         Color(0xFF00BBA6),
                       ],
                     ),
-                    _buildCard(
-                      icon: Icons.chat_bubble,
-                      title: 'Conversation Mode',
-                      description: 'Real-time two-way chat',
-                      gradientColors: const [
-                        Color(0xFFFF6800),
-                        Color(0xFFFD9900),
-                        Color(0xFFF0B000),
-                      ],
+                    
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.of(context).push(
+                          PageRouteBuilder(
+                            transitionDuration:
+                                const Duration(milliseconds: 400),
+                            pageBuilder:
+                                (context, animation, secondaryAnimation) {
+                              return const ChatListScreen();
+                            },
+                            transitionsBuilder: (context, animation,
+                                secondaryAnimation, child) {
+                              return FadeTransition(
+                                opacity: animation,
+                                child: child,
+                              );
+                            },
+                          ),
+                        );
+                      },
+                      child: _buildCard(
+                        icon: Icons.chat_bubble,
+                        title: 'Conversation Mode',
+                        description: 'Real-time two-way chat',
+                        gradientColors: const [
+                          Color(0xFFFF6800),
+                          Color(0xFFFD9900),
+                          Color(0xFFF0B000),
+                        ],
+                      ),
                     ),
+
                     _buildCard(
                       icon: Icons.show_chart,
                       title: 'Progress Tracker',
