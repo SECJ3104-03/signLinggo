@@ -1,9 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-<<<<<<< HEAD
+<!--<<<<<<< HEAD-->
     <uses-permission android:name="android.permission.INTERNET" /> <!--(Izzat 31/10/25 6:45 pm)-->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" /> <!--(Izzat 31/10/25 6:45 pm)-->
-=======
->>>>>>> origin/features/aiman-signinscreen
+<!--=======-->
+<!-->>>>>>> origin/features/aiman-signinscreen-->
     <application
         android:label="signlinggo"
         android:name="${applicationName}"
@@ -47,8 +47,8 @@
             <data android:mimeType="text/plain"/>
         </intent>
     </queries>
-<<<<<<< HEAD
+<!--<<<<<<< HEAD-->
     <uses-permission android:name="android.permission.CAMERA" />
-=======
->>>>>>> origin/features/aiman-signinscreen
+<!--=======-->
+<!-->>>>>>> origin/features/aiman-signinscreen-->
 </manifest>

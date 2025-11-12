@@ -13,6 +13,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:signlinggo/screens/sign_in/signin_screen.dart';
 import 'package:signlinggo/screens/landing/landing_screen.dart'; // your 3-page landing
+import 'package:signlinggo/screens/home/home_screen.dart'; 
 
 List<CameraDescription> cameras = [];
 
@@ -34,7 +35,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       // home: isFirstTime ? const LandingScreen() : const SignInScreen(),
-      home: LearnModePage(),
+      home:HomePage(),
     );
   }
 }

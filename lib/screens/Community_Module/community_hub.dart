@@ -24,9 +24,8 @@ class _CommunityHubEditedState extends State<CommunityHubEdited> {
   @override
   void initState() {
     super.initState();
-    // This is all your hard-coded post data
     _posts = [
-      const PostData(
+      PostData(
         initials: 'SC',
         author: 'Sarah Chen',
         timeAgo: '2h ago',
@@ -40,7 +39,7 @@ class _CommunityHubEditedState extends State<CommunityHubEdited> {
         ],
         isLiked: false,
         isFollowed: false,
-        videoUrl: 'https://flutter.github.io/assets-for-api-docs/assets/videos/bee.mp4',
+        videoUrl: 'assets/assets/videos/Bahasa_Isyarat.mp4', // Your asset video
       ),
       const PostData(
         initials: 'AR',
@@ -71,11 +70,8 @@ class _CommunityHubEditedState extends State<CommunityHubEdited> {
       ),
     ];
 
-    // This listener triggers a rebuild when you type in the search bar
     _searchController.addListener(() {
-      setState(() {
-        // We just need to trigger a rebuild
-      });
+      setState(() {});
     });
   }
   
@@ -85,21 +81,17 @@ class _CommunityHubEditedState extends State<CommunityHubEdited> {
     super.dispose();
   }
 
-  // This function clears the search bar and hides the keyboard
+  // --- All helper functions (_unfocusSearch, _onFollowTapped, etc.) are unchanged ---
   void _unfocusSearch() {
     _searchController.clear(); 
     FocusManager.instance.primaryFocus?.unfocus();
   }
-
-  // This function handles the follow/unfollow toggle
   void _onFollowTapped(int postIndex) {
     final post = _posts[postIndex];
     setState(() {
       _posts[postIndex] = post.copyWith(isFollowed: !post.isFollowed);
     });
   }
-
-  // This function handles the like/unlike toggle
   void _onLikeTapped(int postIndex) {
     final post = _posts[postIndex];
     if (post.isLiked) {
@@ -118,15 +110,11 @@ class _CommunityHubEditedState extends State<CommunityHubEdited> {
       });
     }
   }
-
-  // This function handles deleting a post
   void _onDeleteTapped(int postIndex) {
     setState(() {
       _posts.removeAt(postIndex);
     });
   }
-  
-  // This function shows the "Edit/Delete" menu
   void _onMoreOptionsTapped(int postIndex) {
     showModalBottomSheet(
       context: context,
@@ -139,11 +127,8 @@ class _CommunityHubEditedState extends State<CommunityHubEdited> {
               leading: Icon(Icons.edit_outlined),
               title: Text('Edit Post'),
               onTap: () {
-                Navigator.pop(context); // Close the sheet
-                // --- *** NEW *** ---
-                // Call our new edit function
+                Navigator.pop(context); 
                 _navigateToEditPost(postIndex); 
-                // --- *** --- *** ---
               },
             ),
             ListTile(
@@ -153,8 +138,8 @@ class _CommunityHubEditedState extends State<CommunityHubEdited> {
                 style: TextStyle(color: Colors.red[600]),
               ),
               onTap: () {
-                Navigator.pop(context); // Close the sheet
-                _onDeleteTapped(postIndex); // Call the original delete function
+                Navigator.pop(context); 
+                _onDeleteTapped(postIndex); 
               },
             ),
           ],
@@ -162,19 +147,14 @@ class _CommunityHubEditedState extends State<CommunityHubEdited> {
       },
     );
   }
-
-  // This function handles changing the category tab
   void _onCategoryTapped(String category) {
     setState(() {
       _selectedCategory = category;
     });
   }
-  
-  // This function handles navigating to the "Create Post" screen
   void _navigateAndCreatePost() async {
-    _unfocusSearch(); // Hides keyboard
+    _unfocusSearch(); 
     
-    // We navigate to CreatePostScreen WITHOUT an existingPost
     final result = await Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const CreatePostScreen()),
@@ -186,33 +166,25 @@ class _CommunityHubEditedState extends State<CommunityHubEdited> {
       });
     }
   }
-  
-  // --- *** NEW FUNCTION *** ---
-  // This function handles navigating to the "Edit Post" screen
   void _navigateToEditPost(int postIndex) async {
-    _unfocusSearch(); // Hides keyboard
+    _unfocusSearch(); 
     final PostData postToEdit = _posts[postIndex];
 
-    // We navigate to CreatePostScreen WITH an existingPost
     final updatedPost = await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => CreatePostScreen(existingPost: postToEdit),
       ),
     );
-
-    // When we get back, we replace the old post with the updated one
+    
     if (updatedPost != null && updatedPost is PostData) {
       setState(() {
         _posts[postIndex] = updatedPost;
       });
     }
   }
-  // --- *** --- *** --- ---
-
-  // This function handles navigating to the "Post Detail" (comment) screen
   void _navigateToPostDetail(int postIndex) async {
-    _unfocusSearch(); // Hides keyboard
+    _unfocusSearch(); 
     
     final PostData postToView = _posts[postIndex];
 
@@ -229,8 +201,6 @@ class _CommunityHubEditedState extends State<CommunityHubEdited> {
       });
     }
   }
-
-  // This getter builds our final list based on filters and search
   List<PostData> get _filteredPosts {
     List<PostData> categoryFilteredList;
     switch (_selectedCategory) {
@@ -259,31 +229,45 @@ class _CommunityHubEditedState extends State<CommunityHubEdited> {
       return authorName.contains(query);
     }).toList();
   }
+  // --- End of unchanged helper functions ---
+
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      floatingActionButton: _buildFloatingAddButton(_navigateAndCreatePost),
-      body: SafeArea( 
-        child: Column(
-          children: [
-            _buildAppBar(context),
-            _buildSearchBar(),
-            const SizedBox(height: 24),
-            _buildCategoryTabs(),
-            const SizedBox(height: 24),
-            
-            // This 'Expanded' container holds our list
-            Expanded(
-              // The 'AnimatedSwitcher' fades between the old and new list
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 300),
-                // The child of the switcher is our list-building function
-                child: _buildPostList(),
-              ),
-            ),
+    // --- NEW: Wrap the Scaffold in the gradient Container ---
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment(0.00, 0.00),
+          end: Alignment(1.00, 1.00),
+          colors: [
+            Color(0xFFF2E7FE),
+            Color(0xFFFCE6F3),
+            Color(0xFFFFECD4),
           ],
+        ),
+      ),
+      child: Scaffold(
+        // --- MODIFIED: Make Scaffold transparent ---
+        backgroundColor: Colors.transparent,
+        floatingActionButton: _buildFloatingAddButton(_navigateAndCreatePost),
+        body: SafeArea( 
+          child: Column(
+            children: [
+              _buildAppBar(context),
+              _buildSearchBar(),
+              const SizedBox(height: 24),
+              _buildCategoryTabs(),
+              const SizedBox(height: 24),
+              
+              Expanded(
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 300),
+                  child: _buildPostList(),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -292,29 +276,32 @@ class _CommunityHubEditedState extends State<CommunityHubEdited> {
   // --- Helper Methods ---
   
   Widget _buildAppBar(BuildContext context) {
-    // This helper method is complete and correct
     return Container(
       width: double.infinity,
       height: 61.96,
       padding: const EdgeInsets.only(top: 15.99, left: 24, right: 24),
-      decoration: BoxDecoration(color: Colors.white),
+      // --- MODIFIED: Make AppBar transparent and remove box decoration ---
+      decoration: BoxDecoration(color: Colors.transparent),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           InkWell(
             onTap: () {
-              print("Back button tapped");
+              // --- This now correctly pops back to HomePage ---
+              Navigator.of(context).pop();
             },
             child: Container(
               width: 24,
               height: 24,
-              child: Icon(Icons.arrow_back),
+              // --- MODIFIED: Icon defaults to dark color, which is correct ---
+              child: Icon(Icons.arrow_back, color: Color(0xFF101727)),
             ),
           ),
           Text(
             'Community Hub',
             style: TextStyle(
+              // --- This dark color is correct for the light gradient ---
               color: const Color(0xFF101727),
               fontSize: 20,
               fontFamily: 'Arimo',
@@ -329,7 +316,8 @@ class _CommunityHubEditedState extends State<CommunityHubEdited> {
             child: Container(
               width: 24,
               height: 24,
-              child: Icon(Icons.person_outline),
+              // --- MODIFIED: Icon defaults to dark color, which is correct ---
+              child: Icon(Icons.person_outline, color: Color(0xFF101727)),
             ),
           ),
         ],
@@ -338,7 +326,6 @@ class _CommunityHubEditedState extends State<CommunityHubEdited> {
   }
 
   Widget _buildSearchBar() {
-    // This helper method is complete and correct
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Container(
@@ -354,12 +341,11 @@ class _CommunityHubEditedState extends State<CommunityHubEdited> {
               child: Container(
                 clipBehavior: Clip.antiAlias,
                 decoration: ShapeDecoration(
-                  color: const Color(0xFFF9FAFB),
+                  // --- MODIFIED: Make search bar semi-transparent ---
+                  color: const Color(0xFFF9FAFB).withOpacity(0.85),
                   shape: RoundedRectangleBorder(
-                    side: BorderSide(
-                      width: 1.24,
-                      color: const Color(0xFFE5E7EB),
-                    ),
+                    // --- MODIFIED: Use same border as HomePage cards ---
+                    side: const BorderSide(width: 1, color: Color(0x99FFFEFE)),
                     borderRadius: BorderRadius.circular(16),
                   ),
                 ),
@@ -403,7 +389,6 @@ class _CommunityHubEditedState extends State<CommunityHubEdited> {
   }
 
   Widget _buildCategoryTabs() {
-    // This helper method is complete and correct
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Container(
@@ -411,7 +396,8 @@ class _CommunityHubEditedState extends State<CommunityHubEdited> {
         height: 35.99,
         padding: const EdgeInsets.only(right: 0.02),
         decoration: ShapeDecoration(
-          color: const Color(0xFFF3F4F6),
+          // --- MODIFIED: Make tabs background semi-transparent ---
+          color: const Color(0xFFF3F4F6).withOpacity(0.85),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
           ),
@@ -453,19 +439,19 @@ class _CommunityHubEditedState extends State<CommunityHubEdited> {
   }
 
   Widget _buildTabItem(String title, {required bool isSelected, required VoidCallback onTap}) {
-    // This helper method is complete and correct
     return InkWell(
       onTap: onTap,
       child: Container(
         height: 29,
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
         decoration: ShapeDecoration(
-          color: isSelected ? Colors.white : Colors.transparent,
+          // --- MODIFIED: Selected tab is now semi-transparent white ---
+          color: isSelected ? Colors.white.withOpacity(0.9) : Colors.transparent,
           shape: RoundedRectangleBorder(
-            side: BorderSide(
-              width: 1.24,
-              color: Colors.transparent,
-            ),
+            // --- MODIFIED: Use same border as HomePage cards ---
+            side: isSelected 
+                ? const BorderSide(width: 1, color: Color(0x99FFFEFE)) 
+                : BorderSide.none,
             borderRadius: BorderRadius.circular(14),
           ),
         ),
@@ -493,18 +479,12 @@ class _CommunityHubEditedState extends State<CommunityHubEdited> {
     );
   }
 
-  // --- *** THIS IS THE MODIFIED METHOD *** ---
   Widget _buildPostList() {
-    // 1. Create a unique key based on category AND search.
-    // This tells the AnimatedSwitcher to animate
-    // when either the tab or the search text changes.
     final String listKey = '${_selectedCategory}_${_searchController.text}';
 
-    // 2. Check if the final filtered list is empty.
     if (_filteredPosts.isEmpty) {
-      // If it is, return a message with the unique key.
       return Container(
-        key: ValueKey(listKey), // Give this widget the key
+        key: ValueKey(listKey), 
         child: Center(
           child: Text(
             'No posts found.',
@@ -517,11 +497,8 @@ class _CommunityHubEditedState extends State<CommunityHubEdited> {
       );
     }
 
-    // 3. If the list is NOT empty, return the ListView.
     return ListView.builder(
-      // Give the ListView the unique key
       key: ValueKey(listKey),
-      
       padding: const EdgeInsets.only(top: 0),
       itemCount: _filteredPosts.length,
       itemBuilder: (context, index) {
@@ -544,7 +521,6 @@ class _CommunityHubEditedState extends State<CommunityHubEdited> {
   }
 
   Widget _buildFloatingAddButton(VoidCallback onTap) {
-    // This helper method is complete and correct
     return InkWell(
       onTap: onTap,
       child: Container(
