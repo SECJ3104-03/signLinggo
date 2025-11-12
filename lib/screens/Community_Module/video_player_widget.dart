@@ -9,11 +9,7 @@ import 'package:visibility_detector/visibility_detector.dart';
 
 class PostVideoPlayer extends StatefulWidget {
   final String videoUrl;
-  
-  // This bool decides if the video is forced to a 1:1 square
   final bool isSquare;
-  
-  // This function will pass the controller up to the parent widget
   final Function(VideoPlayerController) onControllerInitialized;
   
   const PostVideoPlayer({
@@ -30,32 +26,35 @@ class PostVideoPlayer extends StatefulWidget {
 class _PostVideoPlayerState extends State<PostVideoPlayer> {
   late VideoPlayerController _controller;
   late Future<void> _initializeVideoPlayerFuture;
-
-  // This tracks the mute state
   bool _isMuted = false;
 
   @override
   void initState() {
     super.initState();
     
-    // Logic to load from internet or from local file
+    // --- *** THIS IS THE UPDATED LOGIC *** ---
     if (widget.videoUrl.startsWith('http') || widget.videoUrl.startsWith('https')) {
+      // 1. Load from the internet
       _controller = VideoPlayerController.networkUrl(
         Uri.parse(widget.videoUrl),
       );
+    } else if (widget.videoUrl.startsWith('assets/')) {
+      // 2. --- NEW: Load from app assets ---
+      _controller = VideoPlayerController.asset(
+        widget.videoUrl,
+      );
     } else {
+      // 3. Load from a local device file (e.g., from the picker)
       _controller = VideoPlayerController.file(
         File(widget.videoUrl),
       );
     }
+    // --- *** END OF UPDATE *** ---
 
-    // We initialize, THEN we pass the controller to the parent
     _initializeVideoPlayerFuture = _controller.initialize().then((_) {
       _controller.setLooping(true);
       _controller.setVolume(0.0);
       _isMuted = true;
-      
-      // Pass the fully initialized controller back up
       widget.onControllerInitialized(_controller);
     });
   }
@@ -66,35 +65,31 @@ class _PostVideoPlayerState extends State<PostVideoPlayer> {
     super.dispose();
   }
 
-  // This function plays the video
   void _playVideo() {
     setState(() {
       _controller.play();
     });
   }
   
-  // This function pauses the video
   void _pauseVideo() {
      setState(() {
       _controller.pause();
     });
   }
 
-  // This function toggles the mute state
   void _toggleMute() {
     setState(() {
-      _isMuted = !_isMuted; // Flip the boolean
+      _isMuted = !_isMuted; 
       if (_isMuted) {
-        _controller.setVolume(0.0); // Mute
+        _controller.setVolume(0.0); 
       } else {
-        _controller.setVolume(1.0); // Unmute (full volume)
+        _controller.setVolume(1.0);
       }
     });
   }
 
-  // This navigates to our new full-screen player
   void _goToFullScreen() {
-    _controller.pause(); // Pause the current video
+    _controller.pause(); 
     
     Navigator.push(
       context,
@@ -106,22 +101,17 @@ class _PostVideoPlayerState extends State<PostVideoPlayer> {
 
   @override
   Widget build(BuildContext context) {
-    // This 'VisibilityDetector' will watch for scrolling
     return VisibilityDetector(
       key: Key(widget.videoUrl),
       onVisibilityChanged: (visibilityInfo) {
-        // If the video is not visible AND it is playing,
-        // we must pause it.
         if (visibilityInfo.visibleFraction < 0.1 && _controller.value.isPlaying) {
-          _controller.pause(); // Just pause, no need for setState
+          _controller.pause(); 
         }
       },
       child: FutureBuilder(
         future: _initializeVideoPlayerFuture,
         builder: (context, snapshot) {
-          // If the video is still loading
           if (snapshot.connectionState != ConnectionState.done) {
-            // Show a black 1:1 box while loading
             return AspectRatio(
               aspectRatio: 1 / 1,
               child: Container(
@@ -136,7 +126,6 @@ class _PostVideoPlayerState extends State<PostVideoPlayer> {
             );
           }
 
-          // If the video has an error
           if (snapshot.hasError) {
             return AspectRatio(
               aspectRatio: 1/1,
@@ -151,13 +140,9 @@ class _PostVideoPlayerState extends State<PostVideoPlayer> {
               ),
             );
           }
-
-          // --- If the video is loaded, build the player ---
           
-          // 1. Create the CORE video player (JUST the video)
           final Widget coreVideoPlayer = VideoPlayer(_controller);
           
-          // 2. Create the Mute Button
           final Widget muteButton = Positioned(
             bottom: 8,
             right: 8,
@@ -171,7 +156,6 @@ class _PostVideoPlayerState extends State<PostVideoPlayer> {
             ),
           );
           
-          // 3. Create the Full-Screen Button
           final Widget fullScreenButton = widget.isSquare
               ? SizedBox.shrink()
               : Positioned(
@@ -187,10 +171,8 @@ class _PostVideoPlayerState extends State<PostVideoPlayer> {
                   ),
                 );
           
-          // 4. Create a single, smart play/pause button
           final Widget playPauseGestureDetector = _controller.value.isPlaying
             ? 
-            // If PLAYING: Show an invisible button to PAUSE
             GestureDetector(
                 onTap: _pauseVideo,
                 child: Container(
@@ -198,7 +180,6 @@ class _PostVideoPlayerState extends State<PostVideoPlayer> {
                 ),
               )
             : 
-            // If PAUSED: Show a visible button to PLAY
             GestureDetector(
                 onTap: _playVideo,
                 child: Container(
@@ -213,46 +194,36 @@ class _PostVideoPlayerState extends State<PostVideoPlayer> {
                 ),
               );
 
-          // --- 5. Build the final layout ---
-          
           if (widget.isSquare) {
-            // For the feed AND detail screen (isSquare == true)
             return AspectRatio(
-              aspectRatio: 1 / 1, // 1:1 Square
+              aspectRatio: 1 / 1, 
               child: Container(
-                // We add a black background to the container
-                // This will create the "black bars"
                 color: Colors.black,
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
-                    // The FittedBox now contains the video
                     FittedBox(
-                      // --- *** THIS IS THE FIX *** ---
-                      // It shrinks the video to FIT, not COVER
                       fit: BoxFit.contain, 
-                      // --- *** --- *** --- *** --- *** ---
                       child: SizedBox(
                         width: _controller.value.size.width,
                         height: _controller.value.size.height,
-                        child: coreVideoPlayer, // Just the video
+                        child: coreVideoPlayer, 
                       ),
                     ),
-                    playPauseGestureDetector, // Add the smart play/pause button
-                    muteButton,      // Add mute button
+                    playPauseGestureDetector, 
+                    muteButton,      
                   ],
                 ),
               ),
             );
           } else {
-            // For the (now unused) non-square version
             return AspectRatio(
               aspectRatio: _controller.value.aspectRatio,
               child: Stack(
                 alignment: Alignment.center,
                 children: [
-                  coreVideoPlayer,  // Just the video
-                  playPauseGestureDetector,  // Add the smart play/pause button
+                  coreVideoPlayer,  
+                  playPauseGestureDetector,  
                   muteButton,
                   fullScreenButton,
                 ],
