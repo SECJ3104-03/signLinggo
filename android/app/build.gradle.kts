@@ -3,10 +3,10 @@ plugins {
     id("kotlin-android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
-<<<<<<< HEAD
-=======
+//<<<<<<< HEAD
+//=======
     id("com.google.gms.google-services")
->>>>>>> origin/features/aiman-signinscreen
+//>>>>>>> origin/features/aiman-signinscreen
 }
 
 android {
