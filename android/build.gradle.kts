@@ -1,5 +1,5 @@
-<<<<<<< HEAD
-=======
+//<<<<<<< HEAD
+//=======
 plugins {
   // ...
 
@@ -8,7 +8,7 @@ plugins {
 
 }
 
->>>>>>> origin/features/aiman-signinscreen
+//>>>>>>> origin/features/aiman-signinscreen
 allprojects {
     repositories {
         google()
