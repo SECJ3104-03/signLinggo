@@ -1,32 +1,39 @@
-/// Conversation Mode Screen
-/// 
-/// Real-time two-way conversation with support for:
-/// - Text messages
-/// - Sign language (camera-based)
-/// - Voice messages
-/// - Translation between modes
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:camera/camera.dart';
 import 'package:video_player/video_player.dart';
 
+
 class ConversationScreen extends StatefulWidget {
-  const ConversationScreen({super.key});
+  final String chatName;
+  final String avatar;
+  final bool isOnline;
+
+
+  const ConversationScreen({
+    super.key,
+    required this.chatName,
+    required this.avatar,
+    this.isOnline = false,
+  });
+
 
   @override
   State<ConversationScreen> createState() => _ConversationScreenState();
 }
+
 
 class _ConversationScreenState extends State<ConversationScreen> {
   String _mode = "Text";
   final List<Map<String, dynamic>> _messages = [];
   final TextEditingController _textController = TextEditingController();
 
+
   CameraController? _cameraController;
   List<CameraDescription> _cameras = [];
   bool _isRecording = false;
   final Map<String, VideoPlayerController> _videoControllers = {};
+
 
   @override
   void dispose() {
@@ -36,9 +43,11 @@ class _ConversationScreenState extends State<ConversationScreen> {
     super.dispose();
   }
 
+
   // ---------------- Mode Switching ----------------
   void _switchMode(String mode) async {
     if (_mode == mode) return;
+
 
     if (_mode == 'Sign') {
       await _cameraController?.dispose();
@@ -47,7 +56,9 @@ class _ConversationScreenState extends State<ConversationScreen> {
       _isRecording = false;
     }
 
+
     setState(() => _mode = mode);
+
 
     if (_mode == 'Sign') {
       try {
@@ -57,53 +68,19 @@ class _ConversationScreenState extends State<ConversationScreen> {
               CameraController(_cameras.first, ResolutionPreset.medium);
           await _cameraController?.initialize();
           if (mounted) setState(() {});
-        } else {
-          // No cameras available
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('No camera available. Please use Text or Voice mode.'),
-                duration: Duration(seconds: 3),
-              ),
-            );
-            // Switch back to Text mode if camera is not available
-            setState(() => _mode = 'Text');
-          }
-        }
-      } on CameraException catch (e) {
-        debugPrint("CameraException initializing camera: ${e.code} - ${e.description}");
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Camera error: ${e.description ?? e.code}. Please use Text or Voice mode.',
-              ),
-              duration: const Duration(seconds: 4),
-            ),
-          );
-          // Switch back to Text mode on error
-          setState(() => _mode = 'Text');
         }
       } catch (e) {
         debugPrint("Error initializing camera: $e");
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Failed to initialize camera: ${e.toString()}'),
-              duration: const Duration(seconds: 3),
-            ),
-          );
-          // Switch back to Text mode on error
-          setState(() => _mode = 'Text');
-        }
       }
     }
   }
+
 
   // ---------------- Message Handling ----------------
   void _sendTextMessage() {
     final text = _textController.text.trim();
     if (text.isEmpty) return;
+
 
     setState(() {
       _messages.add({
@@ -114,8 +91,19 @@ class _ConversationScreenState extends State<ConversationScreen> {
       _textController.clear();
     });
 
-    _botReply(text);
+
+    // Simulate the other user replying after 1.5 seconds
+    Future.delayed(const Duration(seconds: 1), () {
+      setState(() {
+        _messages.add({
+          'type': 'text',
+          'content': '$text 😄',
+          'isUser': false,
+        });
+      });
+    });
   }
+
 
   Future<void> _startSignRecording() async {
     if (_cameraController == null || _isRecording) return;
@@ -123,51 +111,39 @@ class _ConversationScreenState extends State<ConversationScreen> {
     setState(() => _isRecording = true);
   }
 
+
   Future<void> _stopSignRecording() async {
     if (_cameraController == null || !_isRecording) return;
     final video = await _cameraController!.stopVideoRecording();
     setState(() => _isRecording = false);
 
+
     final controller = VideoPlayerController.file(File(video.path))
       ..initialize().then((_) => setState(() {}));
     _videoControllers[video.path] = controller;
+
 
     setState(() {
       _messages.add({
         'type': 'video',
         'video': video,
         'controller': controller,
-        'translation': 'Translated text of your sign',
         'isUser': true,
       });
     });
-
-    _botReply('Bot reply for sign video');
   }
+
 
   void _sendVoiceMessage() {
     setState(() {
       _messages.add({
         'type': 'voice',
         'content': '[Voice]',
-        'translation': 'Transcribed voice text',
         'isUser': true,
       });
     });
-
-    _botReply('[Bot reply for voice]');
   }
 
-  void _botReply(String userMsg) {
-    setState(() {
-      _messages.add({
-        'type': 'bot',
-        'text': userMsg,
-        'signVideo': null,
-        'isUser': false,
-      });
-    });
-  }
 
   // ---------------- UI Components ----------------
   Widget _buildModeSelector() {
@@ -182,7 +158,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
             onTap: () => _switchMode(mode),
             child: Container(
               padding:
-                  const EdgeInsets.symmetric(vertical: 10, horizontal: 24),
+                  const EdgeInsets.symmetric(vertical: 10, horizontal: 28), //here
               decoration: BoxDecoration(
                 color: isSelected ? Colors.purple[50] : Colors.white,
                 borderRadius: BorderRadius.circular(20),
@@ -206,28 +182,31 @@ class _ConversationScreenState extends State<ConversationScreen> {
     );
   }
 
+
   Widget _buildCameraOverlay() {
     if (!_isRecording || _cameraController == null || !_cameraController!.value.isInitialized) {
-    return const SizedBox.shrink();
+      return const SizedBox.shrink();
+    }
+
+
+    return Center(
+      child: Container(
+        width: 200,
+        height: 200,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.white70, width: 3),
+          boxShadow: [
+            BoxShadow(color: Colors.black26, blurRadius: 6, offset: Offset(0, 3))
+          ],
+        ),
+        child: ClipOval(
+          child: CameraPreview(_cameraController!),
+        ),
+      ),
+    );
   }
 
-  return Center(
-    child: Container(
-      width: 200,
-      height: 200,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(color: Colors.white70, width: 3),
-        boxShadow: [
-          BoxShadow(color: Colors.black26, blurRadius: 6, offset: Offset(0, 3))
-        ],
-      ),
-      child: ClipOval(
-        child: CameraPreview(_cameraController!),
-      ),
-    ),
-  );
-}
 
   Widget _buildInputBar() {
     if (_mode == 'Text') {
@@ -251,7 +230,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
                 ),
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 16),
             GestureDetector(
               onTap: _sendTextMessage,
               child: Container(
@@ -316,6 +295,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
     return const SizedBox.shrink();
   }
 
+
   Widget _buildTextBubble(String text, bool isUser) {
     return Align(
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
@@ -335,8 +315,8 @@ class _ConversationScreenState extends State<ConversationScreen> {
     );
   }
 
-  Widget _buildVideoBubble(
-      VideoPlayerController controller, String translation, bool isUser) {
+
+  Widget _buildVideoBubble (VideoPlayerController controller, bool isUser) {
     final width = MediaQuery.of(context).size.width * 0.55;
     return Align(
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
@@ -382,21 +362,53 @@ class _ConversationScreenState extends State<ConversationScreen> {
                     )
                   : const Center(child: CircularProgressIndicator()),
             ),
-            if (translation.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Text(
-                  translation,
-                  style: const TextStyle(fontSize: 13, color: Colors.grey),
-                ),
-              ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildVoiceBubble(String content, String translation, bool isUser) {
+
+  Widget _buildBotMessage(Map<String, dynamic> msg) {
+    msg.putIfAbsent('showSign', () => false);
+
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildTextBubble(msg['content'], false), // always bot bubble
+        if (msg['showSign'] && msg['signVideo'] != null)
+          _buildVideoBubble(msg['signVideo'], false),
+        Container(
+          margin: const EdgeInsets.only(top: 4),
+          child: GestureDetector(
+            onTap: () {
+              setState(() {
+                msg['showSign'] = !(msg['showSign'] ?? false);
+                if (msg['showSign'] && msg['signVideo'] == null) {
+                  final controller = VideoPlayerController.asset(
+                    'assets/sample_sign.mp4', // replace with actual sign video
+                  )..initialize().then((_) => setState(() {}));
+                  _videoControllers['bot_${msg.hashCode}'] = controller;
+                  msg['signVideo'] = controller;
+                }
+              });
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              child: Text(
+                msg['showSign'] == true ? 'Hide Sign' : 'Show Sign',
+                style: const TextStyle(color: Color(0xFFAC46FF)),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+
+  Widget _buildVoiceBubble(String content, bool isUser) {
     return Align(
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
@@ -409,113 +421,80 @@ class _ConversationScreenState extends State<ConversationScreen> {
         child: Column(
           crossAxisAlignment:
               isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-          children: [
-            Text(
-              content,
-              style: TextStyle(
-                  fontSize: 15,
-                  color: isUser ? Colors.blue[900] : Colors.black87),
-            ),
-            if (translation.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Text(
-                  translation,
-                  style: const TextStyle(fontSize: 13, color: Colors.grey),
-                ),
-              ),
-          ],
         ),
       ),
     );
   }
 
+
   Widget _buildUserMessage(Map<String, dynamic> msg) {
+    final bool isUser = msg['isUser'];
     if (msg['type'] == 'text') {
-      return _buildTextBubble(msg['content'], true);
+      return _buildTextBubble(msg['content'], isUser);
     } else if (msg['type'] == 'video') {
-      return _buildVideoBubble(msg['controller'], msg['translation'], true);
+      return _buildVideoBubble(msg['controller'], isUser);
     } else if (msg['type'] == 'voice') {
-      return _buildVoiceBubble(msg['content'], msg['translation'], true);
+      return _buildVoiceBubble(msg['content'], isUser);
     }
     return const SizedBox.shrink();
   }
 
-  Widget _buildBotMessage(Map<String, dynamic> msg) {
-    msg.putIfAbsent('showSign', () => false);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildTextBubble(msg['text'], false),
-        if (msg['showSign'] && msg['signVideo'] != null)
-          _buildVideoBubble(msg['signVideo'], '', false),
-        Container(
-          margin: const EdgeInsets.only(top: 4),
-          child: GestureDetector(
-            onTap: () {
-              setState(() {
-                msg['showSign'] = !(msg['showSign'] ?? false);
-                if (msg['showSign'] && msg['signVideo'] == null) {
-                  final controller = VideoPlayerController.asset(
-                      'assets/sample_sign.mp4') // replace with actual sign video
-                    ..initialize().then((_) => setState(() {}));
-                  _videoControllers['bot_${msg.hashCode}'] = controller;
-                  msg['signVideo'] = controller;
-                }
-              });
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              child: Text(
-                msg['showSign'] == true ? 'Hide Sign' : 'Show Sign',
-                style: const TextStyle(
-                    color: Color(0xFFAC46FF)),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
 
   // ---------------- Build ----------------
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 1,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black87),
-          onPressed: () {
-            // Use pop if there's a route to pop, otherwise go to home
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.go('/home');
-            }
-          },
-        ),
-        title: Row(
-          children: const [
-            CircleAvatar(
-              backgroundColor: Color(0xFF980FFA),
-              child: Text("JD", style: TextStyle(color: Colors.black)),
-            ),
-            SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text("John Doe",
-                    style: TextStyle(color: Colors.black, fontSize: 18)),
-                Text("Online",
-                    style: TextStyle(color: Colors.grey, fontSize: 14)),
-              ],
-            ),
-          ],
-        ),
+      backgroundColor: Colors.white,
+      elevation: 1,
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back, color: Colors.black87),
+        onPressed: () => Navigator.pop(context),
       ),
+      title: Row(
+        children: [
+          Stack(
+            children: [
+              CircleAvatar(
+                backgroundColor: const Color(0xFF980FFA),
+                child: Text(
+                  widget.avatar,
+                  style: const TextStyle(color: Colors.white),
+                ),
+              ),
+              if (widget.isOnline)
+                Positioned(
+                  bottom: 0,
+                  right: 0,
+                  child: Container(
+                    width: 12,
+                    height: 12,
+                    decoration: BoxDecoration(
+                      color: Colors.green,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                widget.chatName,
+                style: const TextStyle(color: Colors.black, fontSize: 18),
+              ),
+              Text(
+                widget.isOnline ? "Online" : "Offline",
+                style: const TextStyle(color: Colors.grey, fontSize: 14),
+              ),
+            ],
+          ),
+        ],
+      ),
+    ),
       backgroundColor: Colors.white,
       body: Stack(
         children: [
@@ -531,8 +510,8 @@ class _ConversationScreenState extends State<ConversationScreen> {
                     final reversedIndex = _messages.length - 1 - index;
                     final msg = _messages[reversedIndex];
                     return msg['isUser']
-                        ? _buildUserMessage(msg)
-                        : _buildBotMessage(msg);
+                      ? _buildUserMessage(msg)
+                      : _buildBotMessage(msg);
                   },
                 ),
               ),

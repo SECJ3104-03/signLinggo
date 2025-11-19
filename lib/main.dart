@@ -3,6 +3,7 @@
 /// This is the main entry point for the SignLinggo app.
 /// It initializes the app, sets up navigation, and manages app-wide state.
 library;
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -14,6 +15,7 @@ import 'services/camera_service.dart';
 /// Main function - initializes the app and checks if it's the first launch
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
 
   // Initialize cameras with error handling
   // This will not block app startup if camera initialization fails

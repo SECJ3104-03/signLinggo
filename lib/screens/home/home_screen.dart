@@ -147,7 +147,10 @@ class HomePage extends StatelessWidget {
               const SizedBox(height: 20),
 
               // === FOOTER ===
-              Container(
+              // wrapped Cointainer with GestureDetector for offline mode
+              GestureDetector(
+                onTap: () => context.push('/offline'),
+                child: Container(
                 width: double.infinity,
                 height: 91.95,
                 padding: const EdgeInsets.all(20),
@@ -219,6 +222,7 @@ class HomePage extends StatelessWidget {
                     ),
                   ],
                 ),
+              ),
               ),
             ],
           ),

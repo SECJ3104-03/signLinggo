@@ -5,6 +5,7 @@
 library;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:signlinggo/screens/conversation_mode/chat_list_screen.dart';
 import '../screens/landing/landing_screen.dart';
 import '../screens/sign_in/signin_screen.dart';
 import '../screens/register/register_screen.dart';
@@ -18,6 +19,7 @@ import '../screens/Community_Module/community_hub.dart' show CommunityHubEdited;
 import '../screens/Offline_Mode/offline_view.dart' show OfflineMode;
 import '../screens/conversation_mode/conversation_mode_screen.dart' show ConversationScreen;
 import '../screens/text_to_sign/text_to_sign_screen.dart' show TextTranslationScreen;
+import '../screens/Offline_Mode/offline_file_list_screen.dart';
 
 // Note: Speech output and onboarding screens are placeholders for future implementation
 
@@ -195,9 +197,24 @@ class AppRouter {
         builder: (context, state) => OfflineMode(),
       ),
       GoRoute(
+        path: '/offline-files',
+        name: 'offline-files',
+        builder: (context, state) {
+          // Get the parameters we passed
+          final params = state.extra as Map<String, String>;
+          final String folderPath = params['path']!;
+          final String title = params['title']!;
+
+          return OfflineFileListScreen(
+            folderPath: folderPath,
+            title: title,
+          );
+        },
+       ),
+      GoRoute(
         path: '/conversation',
         name: 'conversation',
-        builder: (context, state) => const ConversationScreen(),
+        builder: (context, state) => const ChatListScreen(),
       ),
       GoRoute(
         path: '/text-to-sign',
