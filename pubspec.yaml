@@ -6,8 +6,9 @@ publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  sdk: ^3.9.0
- # sdk: ">=3.3.0 <4.0.0"
+ # sdk: '^3.9.0'
+ # sdk: '>=3.3.0 <4.0.0'
+ sdk: '>=3.9.0 <4.0.0'
 
 dependencies:
   flutter:
@@ -28,7 +29,8 @@ dependencies:
   path: ^1.9.1
 
   # Firebase & Authentication
-  firebase_core: ^3.5.0
+  firebase_core: ^4.2.1
+  firebase_auth: ^6.1.2
   google_sign_in: ^6.2.1
 
   # Media & File Handling

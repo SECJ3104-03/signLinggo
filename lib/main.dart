@@ -1,68 +1,99 @@
-/// SignLinggo - Main Entry Point
-/// 
-/// This is the main entry point for the SignLinggo app.
-/// It initializes the app, sets up navigation, and manages app-wide state.
-library;
-import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter/foundation.dart';
 import 'routes/app_router.dart';
 import 'providers/app_provider.dart';
 import 'services/camera_service.dart';
 
-/// Main function - initializes the app and checks if it's the first launch
-Future<void> main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
-
-  // Initialize cameras with error handling
-  // This will not block app startup if camera initialization fails
-  try {
-    final camerasInitialized = await CameraService.initializeCameras();
-    if (!camerasInitialized) {
-      debugPrint('Main: Camera initialization failed - ${CameraService.errorMessage}');
-      debugPrint('Main: App will continue to run, but camera features will be unavailable');
-    }
-  } catch (e) {
-    debugPrint('Main: Unexpected error during camera initialization: $e');
-    // Continue app startup even if camera initialization fails
-  }
-  
-  // Check if this is the first time the app is launched
-  final prefs = await SharedPreferences.getInstance();
-  final isFirstTime = prefs.getBool('isFirstTime') ?? true;
-
-  runApp(MyApp(isFirstTime: isFirstTime));
+  runApp(const AppInitializer());
 }
 
-/// Root widget of the application
-/// 
-/// Sets up Provider for state management and GoRouter for navigation
-class MyApp extends StatelessWidget {
-  final bool isFirstTime;
+/// Widget to handle async initialization safely
+class AppInitializer extends StatelessWidget {
+  const AppInitializer({super.key});
 
-  const MyApp({super.key, required this.isFirstTime});
+  Future<Map<String, dynamic>> _initializeApp() async {
+    Map<String, dynamic> result = {
+      'firebaseInitialized': false,
+      'camerasInitialized': false,
+      'isFirstTime': true,
+    };
+
+    try {
+      if(kIsWeb) {
+        await Firebase.initializeApp(
+          options: const FirebaseOptions(
+            apiKey: "AIzaSyB-sc6v7UDLwKVN714rcAuuE6fvzEMgnF0",
+            authDomain: "signlinggo.firebaseapp.com",
+            projectId: "signlinggo",
+            storageBucket: "signlinggo.firebasestorage.app",
+            messagingSenderId: "724828186533",
+            appId: "1:724828186533:web:b7431f34cbcf6ba4f6ea4c",
+            measurementId: "G-GV4N1JMLTB",
+          ),
+        );
+      } else {
+        await Firebase.initializeApp();
+      }
+      result['firebaseInitialized'] = true;
+    } catch (e) {
+      debugPrint('Firebase init error: $e');
+    }
+
+    try {
+      final camerasInitialized = await CameraService.initializeCameras();
+      result['camerasInitialized'] = camerasInitialized;
+      if (!camerasInitialized) {
+        debugPrint('Camera init failed: ${CameraService.errorMessage}');
+      }
+    } catch (e) {
+      debugPrint('Camera init exception: $e');
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    result['isFirstTime'] = prefs.getBool('isFirstTime') ?? true;
+
+    return result;
+  }
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => AppProvider(isFirstTime: isFirstTime),
-      child: Consumer<AppProvider>(
-        builder: (context, appProvider, _) {
-          return MaterialApp.router(
-            debugShowCheckedModeBanner: false,
-            title: 'SignLinggo',
-            theme: ThemeData(
-              primarySwatch: Colors.blue,
-              useMaterial3: true,
+    return FutureBuilder<Map<String, dynamic>>(
+      future: _initializeApp(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          // Show loading spinner while initializing
+          return const MaterialApp(
+            home: Scaffold(
+              body: Center(child: CircularProgressIndicator()),
             ),
-            routerConfig: AppRouter.router,
           );
-        },
-      ),
+        }
+
+        // Initialization done, run the main app
+        final isFirstTime = snapshot.data?['isFirstTime'] ?? true;
+
+        return ChangeNotifierProvider(
+          create: (_) => AppProvider(isFirstTime: isFirstTime),
+          child: Consumer<AppProvider>(
+            builder: (context, appProvider, _) {
+              return MaterialApp.router(
+                debugShowCheckedModeBanner: false,
+                title: 'SignLinggo',
+                theme: ThemeData(
+                  primarySwatch: Colors.blue,
+                  useMaterial3: true,
+                ),
+                routerConfig: AppRouter.router,
+              );
+            },
+          ),
+        );
+      },
     );
   }
 }
-

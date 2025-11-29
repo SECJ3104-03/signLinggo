@@ -1,18 +1,27 @@
-/// Register Screen
-/// 
-/// Provides user registration interface with:
-/// - Full name, email, and password fields
-/// - Google Sign-In option
-/// - Guest mode access
-/// - Navigation to sign-in screen
 library;
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../providers/app_provider.dart';
+import '../../auth/auth_service.dart';   // <-- make sure this file exists
 
-class RegisterScreen extends StatelessWidget {
+class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
+
+  @override
+  State<RegisterScreen> createState() => _RegisterScreenState();
+}
+
+class _RegisterScreenState extends State<RegisterScreen> {
+  // controllers
+  final _fullName = TextEditingController();
+  final _email = TextEditingController();
+  final _password = TextEditingController();
+
+  final _auth = AuthService(); // Firebase Auth service
+
+  bool _loading = false;
 
   @override
   Widget build(BuildContext context) {
@@ -49,6 +58,7 @@ class RegisterScreen extends StatelessWidget {
                   child: const Icon(Icons.sign_language,
                       size: 50, color: Colors.white),
                 ),
+
                 const SizedBox(height: 20),
                 const Text(
                   "Welcome to SignLingo",
@@ -61,7 +71,7 @@ class RegisterScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 40),
 
-                // Toggle buttons
+                // Toggle
                 Container(
                   height: 40,
                   decoration: BoxDecoration(
@@ -72,16 +82,12 @@ class RegisterScreen extends StatelessWidget {
                     children: [
                       Expanded(
                         child: GestureDetector(
-                          onTap: () {
-                            context.go('/signin');
-                          },
-                          child: Container(
-                            alignment: Alignment.center,
-                            child: const Text(
+                          onTap: () => context.go('/signin'),
+                          child: const Center(
+                            child: Text(
                               "Login",
                               style: TextStyle(
                                   color: Colors.white,
-                                  fontSize: 14,
                                   fontWeight: FontWeight.bold),
                             ),
                           ),
@@ -98,7 +104,6 @@ class RegisterScreen extends StatelessWidget {
                             "Register",
                             style: TextStyle(
                                 color: Color(0xFF980FFA),
-                                fontSize: 14,
                                 fontWeight: FontWeight.bold),
                           ),
                         ),
@@ -106,35 +111,23 @@ class RegisterScreen extends StatelessWidget {
                     ],
                   ),
                 ),
+
                 const SizedBox(height: 40),
 
-                // Input fields
-                _buildInputField("Full Name", Icons.person),
+                // Inputs
+                _buildInputField(_fullName, "Full Name", Icons.person),
                 const SizedBox(height: 20),
-                _buildInputField("Email", Icons.email),
+
+                _buildInputField(_email, "Email", Icons.email),
                 const SizedBox(height: 20),
-                _buildInputField("Password", Icons.lock, obscureText: true),
+
+                _buildInputField(_password, "Password", Icons.lock,
+                    obscureText: true),
                 const SizedBox(height: 40),
 
-                // Create account button
+                // Create Account
                 GestureDetector(
-                  onTap: () {
-                    // Update app state to mark user as logged in
-                    final appProvider = Provider.of<AppProvider>(context, listen: false);
-                    appProvider.setLoggedIn(true);
-                    appProvider.setGuestMode(false);
-                    
-                    // Show success message
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text("Account created successfully!"),
-                        duration: Duration(seconds: 1),
-                      ),
-                    );
-                    
-                    // Navigate to home page
-                    context.go('/home');
-                  },
+                  onTap: _loading ? null : _signup,
                   child: Container(
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(vertical: 16),
@@ -145,28 +138,29 @@ class RegisterScreen extends StatelessWidget {
                       ),
                     ),
                     alignment: Alignment.center,
-                    child: const Text(
-                      "Create Account",
-                      style: TextStyle(color: Colors.white, fontSize: 16),
-                    ),
+                    child: _loading
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : const Text(
+                            "Create Account",
+                            style: TextStyle(color: Colors.white, fontSize: 16),
+                          ),
                   ),
                 ),
+
                 const SizedBox(height: 20),
 
-                // Continue as guest
+                // Guest mode
                 TextButton(
                   onPressed: () {
-                    // Update app state to mark user as guest
-                    final appProvider = Provider.of<AppProvider>(context, listen: false);
+                    final appProvider =
+                        Provider.of<AppProvider>(context, listen: false);
                     appProvider.setGuestMode(true);
                     appProvider.setLoggedIn(false);
-                    
-                    // Navigate to home page
                     context.go('/home');
                   },
                   child: const Text(
                     "Continue as Guest",
-                    style: TextStyle(color: Colors.white, fontSize: 14),
+                    style: TextStyle(color: Colors.white),
                   ),
                 ),
               ],
@@ -177,9 +171,15 @@ class RegisterScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildInputField(String label, IconData icon,
-      {bool obscureText = false}) {
+  /// Build text input field
+  Widget _buildInputField(
+    TextEditingController controller,
+    String label,
+    IconData icon, {
+    bool obscureText = false,
+  }) {
     return TextField(
+      controller: controller,
       obscureText: obscureText,
       decoration: InputDecoration(
         prefixIcon: Icon(icon, color: const Color(0xFF495565)),
@@ -189,9 +189,43 @@ class RegisterScreen extends StatelessWidget {
         hintStyle: const TextStyle(color: Color(0xFF495565)),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: Colors.white60),
         ),
       ),
     );
+  }
+
+  /// Firebase Sign Up
+  Future<void> _signup() async {
+    if (_email.text.isEmpty || _password.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please fill all fields")),
+      );
+      return;
+    }
+
+    setState(() => _loading = true);
+
+    final result = await _auth.register(
+      name: _fullName.text,
+      email: _email.text,
+      password: _password.text,
+    );
+
+    setState(() => _loading = false);
+
+    if (result == null) {
+      // success
+      final appProvider = Provider.of<AppProvider>(context, listen: false);
+      appProvider.setLoggedIn(true);
+      appProvider.setGuestMode(false);
+
+      context.go('/home');
+
+    } else {
+      // error
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(result)),
+      );
+    }
   }
 }
