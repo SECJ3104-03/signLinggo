@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../providers/app_provider.dart';
 import '../../auth/auth_service.dart';
+import '../../auth/google_auth.dart';
 
 class SignInScreen extends StatefulWidget {
   const SignInScreen({super.key});
@@ -17,7 +18,8 @@ class _SignInScreenState extends State<SignInScreen> {
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
 
-  final AuthService _auth = AuthService();
+  final AuthService _authService = AuthService();
+  final FirebaseServices _googleAuth = FirebaseServices();
 
   bool _loading = false;
 
@@ -75,7 +77,7 @@ class _SignInScreenState extends State<SignInScreen> {
                 ),
                 const SizedBox(height: 40),
 
-                // Toggle
+                // Toggle: Login/Register
                 Container(
                   height: 40,
                   decoration: BoxDecoration(
@@ -107,9 +109,8 @@ class _SignInScreenState extends State<SignInScreen> {
                             child: Text(
                               "Register",
                               style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                              ),
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold),
                             ),
                           ),
                         ),
@@ -120,7 +121,7 @@ class _SignInScreenState extends State<SignInScreen> {
 
                 const SizedBox(height: 40),
 
-                // Input: Email
+                // Email Field
                 _buildInputField(
                     controller: emailController,
                     label: "Email",
@@ -128,7 +129,7 @@ class _SignInScreenState extends State<SignInScreen> {
 
                 const SizedBox(height: 20),
 
-                // Input: Password
+                // Password Field
                 _buildInputField(
                   controller: passwordController,
                   label: "Password",
@@ -138,9 +139,9 @@ class _SignInScreenState extends State<SignInScreen> {
 
                 const SizedBox(height: 40),
 
-                // Login Button
+                // Email/Password Login Button
                 GestureDetector(
-                  onTap: _loading ? null : _signin,
+                  onTap: _loading ? null : _emailPasswordLogin,
                   child: Container(
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(vertical: 16),
@@ -162,12 +163,9 @@ class _SignInScreenState extends State<SignInScreen> {
 
                 const SizedBox(height: 20),
 
-                // Google Sign-In
+                // Google Sign-In Button
                 GestureDetector(
-                  onTap: () async {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                        content: Text("Google Sign-In Coming Soon")));
-                  },
+                  onTap: _loading ? null : _googleLogin,
                   child: Container(
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(vertical: 14),
@@ -195,7 +193,7 @@ class _SignInScreenState extends State<SignInScreen> {
 
                 const SizedBox(height: 20),
 
-                // Guest
+                // Guest Mode
                 TextButton(
                   onPressed: () {
                     final appProvider =
@@ -217,38 +215,65 @@ class _SignInScreenState extends State<SignInScreen> {
     );
   }
 
-  // Firebase Sign In
-  Future<void> _signin() async {
+  // EMAIL/PASSWORD LOGIN
+  Future<void> _emailPasswordLogin() async {
     if (emailController.text.isEmpty || passwordController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please fill all fields")),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text("Fill all fields")));
       return;
     }
 
     setState(() => _loading = true);
 
-    final result = await _auth.login(
+    // Sign out any previous session
+    await _authService.signOut();
+
+    final user = await _authService.login(
       email: emailController.text.trim(),
       password: passwordController.text.trim(),
     );
 
     setState(() => _loading = false);
 
-    if (result == null) {
-      final appProvider =
-          Provider.of<AppProvider>(context, listen: false);
+    if (user != null) {
+      final appProvider = Provider.of<AppProvider>(context, listen: false);
       appProvider.setLoggedIn(true);
       appProvider.setGuestMode(false);
-
       context.go('/home');
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result)),
+        const SnackBar(content: Text("Login failed: Invalid email or password")),
       );
     }
   }
 
+  // GOOGLE LOGIN
+  Future<void> _googleLogin() async {
+    setState(() => _loading = true);
+
+    try {
+      final success = await _googleAuth.signInWithGoogle();
+
+      if (success) {
+        final appProvider = Provider.of<AppProvider>(context, listen: false);
+        appProvider.setLoggedIn(true);
+        appProvider.setGuestMode(false);
+        context.go('/home');
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Google Sign-In cancelled")),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Google Sign-In failed: $e")),
+      );
+    } finally {
+      if (mounted) setState(() => _loading = false); // Always reset loading
+    }
+  }
+
+  // INPUT FIELD BUILDER
   Widget _buildInputField({
     required TextEditingController controller,
     required String label,

@@ -1,45 +1,44 @@
 {
   "project_info": {
-    "project_number": "459608728889",
-    "project_id": "shared-notes-app-b9208",
-    "storage_bucket": "shared-notes-app-b9208.firebasestorage.app"
+    "project_number": "724828186533",
+    "project_id": "signlinggo",
+    "storage_bucket": "signlinggo.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:459608728889:android:93ab40aea6bfbb0868f4e8",
-        "android_client_info": {
-          "package_name": "com.example.shared_notes_app"
-        }
-      },
-      "oauth_client": [],
-      "api_key": [
-        {
-          "current_key": "AIzaSyDlthpcEKCM4bTc0G_VgQ4U-A22nXku-Wc"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": []
-        }
-      }
-    },
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:459608728889:android:159dfb105c249a3068f4e8",
+        "mobilesdk_app_id": "1:724828186533:android:df87974ae20409a4f6ea4c",
         "android_client_info": {
           "package_name": "com.example.signlinggo"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "724828186533-jmt6iucm4np1qt8hi27s6ttajbf8o1ti.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.signlinggo",
+            "certificate_hash": "e44d87381ad35c84ace6bbbcb2154782fce953a3"
+          }
+        },
+        {
+          "client_id": "724828186533-pd8s3b8kf9o3msjcova7n45eep61hha5.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
-          "current_key": "AIzaSyDlthpcEKCM4bTc0G_VgQ4U-A22nXku-Wc"
+          "current_key": "AIzaSyDtnZA4ah9ad7__hDiS-CDOTCrrDkEY2SE"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "724828186533-pd8s3b8kf9o3msjcova7n45eep61hha5.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

@@ -206,9 +206,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
     setState(() => _loading = true);
 
     final result = await _auth.register(
-      name: _fullName.text,
-      email: _email.text,
-      password: _password.text,
+      name: _fullName.text.trim(),
+      email: _email.text.trim(),
+      password: _password.text.trim(),
     );
 
     setState(() => _loading = false);
