@@ -1,8 +1,8 @@
 plugins {
     id("com.android.application")
     id("kotlin-android")
-    id("com.google.gms.google-services") // Google Services plugin BEFORE Flutter plugin
-    id("dev.flutter.flutter-gradle-plugin") // Flutter plugin LAST
+    id("com.google.gms.google-services")
+    id("dev.flutter.flutter-gradle-plugin")
 }
 
 android {
@@ -25,14 +25,21 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
-
-        // MultiDex (needed if Firebase adds many methods)
         multiDexEnabled = true
     }
 
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("debug")
+             signingConfig = signingConfigs.getByName("debug")
+        }
+    }
+
+    // <--- PASTE IT HERE (Inside android, but at the end) ---
+    configurations.all {
+        resolutionStrategy {
+            force("androidx.browser:browser:1.8.0")
+            force("androidx.core:core-ktx:1.15.0")
+            force("androidx.core:core:1.15.0")
         }
     }
 }
@@ -42,12 +49,7 @@ flutter {
 }
 
 dependencies {
-    // Firebase BoM
     implementation(platform("com.google.firebase:firebase-bom:34.6.0"))
-
-    // Firebase Analytics
     implementation("com.google.firebase:firebase-analytics")
-
-    // MultiDex dependency
     implementation("androidx.multidex:multidex:2.0.1")
 }

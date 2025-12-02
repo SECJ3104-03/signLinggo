@@ -1,45 +1,25 @@
+// lib/screens/conversation_mode/chat_list_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:signlinggo/screens/conversation_mode/conversation_mode_screen.dart';
-
+// 1. IMPORT THE SERVICE
+import 'mock_chat_service.dart'; 
 
 class ChatListScreen extends StatefulWidget {
   const ChatListScreen({super.key});
-
 
   @override
   State<ChatListScreen> createState() => _ChatListScreenState();
 }
 
-
 class _ChatListScreenState extends State<ChatListScreen> {
-  // Dummy data
-  final List<Map<String, dynamic>> _chats = [
-    {
-      'name': 'John Doe',
-      'avatar': 'JD',
-      'lastMessage': 'See you later!',
-      'time': '9:45 AM',
-      'isOnline': true,
-    },
-    {
-      'name': 'Clark Vo',
-      'avatar': 'CV',
-      'lastMessage': 'Sure, send me the file.',
-      'time': 'Yesterday',
-      'isOnline': false,
-    },
-    {
-      'name': 'Tang Wei',
-      'avatar': 'TW',
-      'lastMessage': 'Can we meet tomorrow?',
-      'time': 'Mon',
-      'isOnline': true,
-    },
-  ];
-
-
+  // 2. REMOVE THE OLD HARDCODED LIST HERE
+  
   @override
   Widget build(BuildContext context) {
+    // 3. GET THE DATA FROM OUR SERVICE
+    final List<Map<String, dynamic>> currentChats = MockChatService.chats;
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.white,
@@ -55,9 +35,9 @@ class _ChatListScreenState extends State<ChatListScreen> {
       ),
       backgroundColor: Colors.white,
       body: ListView.builder(
-        itemCount: _chats.length,
+        itemCount: currentChats.length, // Use currentChats
         itemBuilder: (context, index) {
-          final chat = _chats[index];
+          final chat = currentChats[index]; // Use currentChats
           return ListTile(
             leading: Stack(
               children: [
@@ -108,7 +88,10 @@ class _ChatListScreenState extends State<ChatListScreen> {
                     isOnline: chat['isOnline'],
                   ),
                 ),
-              );
+              ).then((_) {
+                 // Optional: When coming back from chat, refresh this list
+                 setState(() {});
+              });
             },
           );
         },

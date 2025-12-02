@@ -2,12 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart'; 
 import 'package:scroll_to_index/scroll_to_index.dart';
 import 'dart:io';
+import 'dart:async'; // Needed for the Timer/Delay
+import 'dart:typed_data'; 
 import 'package:dio/dio.dart'; 
 import 'package:path_provider/path_provider.dart';
-import 'package:open_file/open_file.dart'; 
 import 'package:archive/archive.dart';
 
-// --- STEP 1: CREATE A DATA MODEL (MODIFIED) ---
+// --- STEP 1: DATA MODEL ---
 class _DownloadableItemData {
   final String downloadUrl; 
   final String title;
@@ -15,9 +16,7 @@ class _DownloadableItemData {
   final IconData icon;
   final Color iconColor;
   final Color backgroundColor;
-  
-  // --- NEW: A list of what's inside the pack ---
-  final List<String> includedVideos;
+  final List<String> includedVideos; 
 
   const _DownloadableItemData({
     required this.title,
@@ -26,13 +25,13 @@ class _DownloadableItemData {
     required this.iconColor,
     required this.backgroundColor,
     required this.downloadUrl, 
-    this.includedVideos = const [], // --- NEW: Add to constructor ---
+    this.includedVideos = const [], 
   });
   
   String get folderName => title.replaceAll(' ', '_').replaceAll('&', 'and');
 }
 
-// --- STEP 2: SEARCHDELEGATE CLASS (Unchanged) ---
+// --- STEP 2: SEARCH DELEGATE ---
 class _DownloadSearchDelegate extends SearchDelegate<_DownloadableItemData> {
   final List<_DownloadableItemData> searchItems;
   _DownloadSearchDelegate({required this.searchItems});
@@ -44,17 +43,7 @@ class _DownloadSearchDelegate extends SearchDelegate<_DownloadableItemData> {
         icon: const Icon(Icons.clear),
         onPressed: () {
           if (query.isEmpty) {
-            close(
-              context,
-              _DownloadableItemData(
-                title: '',
-                description: '',
-                icon: Icons.error,
-                iconColor: Colors.transparent,
-                backgroundColor: Colors.transparent,
-                downloadUrl: '',
-              ),
-            );
+            close(context, _emptyItem());
           } else {
             query = '';
           }
@@ -67,39 +56,30 @@ class _DownloadSearchDelegate extends SearchDelegate<_DownloadableItemData> {
   Widget? buildLeading(BuildContext context) {
     return IconButton(
       icon: const Icon(Icons.arrow_back),
-      onPressed: () {
-        close(
-          context,
-          _DownloadableItemData(
-            title: '',
-            description: '',
-            icon: Icons.error,
-            iconColor: Colors.transparent,
-            backgroundColor: Colors.transparent,
-            downloadUrl: '',
-          ),
-        );
-      },
+      onPressed: () => close(context, _emptyItem()),
+    );
+  }
+
+  _DownloadableItemData _emptyItem() {
+    return const _DownloadableItemData(
+      title: '', description: '', icon: Icons.error, 
+      iconColor: Colors.transparent, backgroundColor: Colors.transparent, 
+      downloadUrl: ''
     );
   }
 
   @override
-  Widget buildResults(BuildContext context) {
-    return _buildSuggestions(context);
-  }
+  Widget buildResults(BuildContext context) => _buildSuggestions(context);
 
   @override
-  Widget buildSuggestions(BuildContext context) {
-    return _buildSuggestions(context);
-  }
+  Widget buildSuggestions(BuildContext context) => _buildSuggestions(context);
 
   Widget _buildSuggestions(BuildContext context) {
     final List<_DownloadableItemData> suggestions = searchItems.where((item) {
       final titleLower = item.title.toLowerCase();
       final descriptionLower = item.description.toLowerCase();
       final queryLower = query.toLowerCase();
-      return titleLower.contains(queryLower) ||
-          descriptionLower.contains(queryLower);
+      return titleLower.contains(queryLower) || descriptionLower.contains(queryLower);
     }).toList();
 
     return ListView.builder(
@@ -109,23 +89,17 @@ class _DownloadSearchDelegate extends SearchDelegate<_DownloadableItemData> {
         return ListTile(
           leading: Icon(item.icon, color: item.iconColor),
           title: Text(item.title),
-          subtitle: Text(
-            item.description,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          onTap: () {
-            close(context, item);
-          },
+          subtitle: Text(item.description, maxLines: 1, overflow: TextOverflow.ellipsis),
+          onTap: () => close(context, item),
         );
       },
     );
   }
 }
 
-// --- OFFLINE MODE SCREEN ---
+// --- STEP 3: MAIN SCREEN ---
 class OfflineMode extends StatefulWidget {
-  OfflineMode({super.key});
+  const OfflineMode({super.key});
 
   @override
   State<OfflineMode> createState() => _OfflineModeState();
@@ -134,84 +108,77 @@ class OfflineMode extends StatefulWidget {
 class _OfflineModeState extends State<OfflineMode> with SingleTickerProviderStateMixin {
   late AutoScrollController _scrollController;
   String? _highlightedTitle;
-  
   late TabController _tabController;
   List<_DownloadableItemData> _downloadedItems = [];
 
-  // --- MODIFIED: Added the 'includedVideos' list to each item ---
+  // --- THE DATA LIST ---
   final List<_DownloadableItemData> _items = [
-    _DownloadableItemData(
+    // 1. Full BIM Dictionary
+    const _DownloadableItemData(
       title: 'Full BIM Dictionary',
       description: 'The complete collection of all BIM signs | 200 MB',
       icon: Icons.book_outlined,
-      iconColor: const Color(0xFF007AFF),
-      backgroundColor: const Color(0xFFEBF5FF),
+      iconColor: Color(0xFF007AFF),
+      backgroundColor: Color(0xFFEBF5FF),
       downloadUrl: 'https://raw.githubusercontent.com/Assadi-bit/BimTalk-SignLanguage-Recognition/fd3407305f1636c60389519bfad47bd515e6e495/test/sample6.png', 
-      // --- NEW ---
-      includedVideos: [
-        'Over 200+ signs',
-        'Full A-Z Alphabet',
-        'Common Verbs (Eat, Drink, Go)',
-        '...and many more!',
-      ],
+      includedVideos: ['Over 200+ signs', 'Full A-Z Alphabet', 'Common Verbs'],
     ),
-    _DownloadableItemData(
+    
+    // 2. Basic Greetings
+    const _DownloadableItemData(
       title: 'Basic Greetings & Phrases',
       description: 'Essential signs for beginners & daily chat | 15 MB',
       icon: Icons.waving_hand_outlined,
-      iconColor: const Color(0xFFE5890A),
-      backgroundColor: const Color(0xFFFFF2DE),
-      downloadUrl: 'https.drive.google.com/uc?export=download&id=1IVY1gC2ebZkIhNT0CYqkbiynAZSulVKQ', 
-      // --- NEW: This is where you can add your video names ---
-      includedVideos: [
-        'Minum (video)',
-        'Roti (video)',
-        'Hello (video)',
-        'Goodbye (video)',
-        'Thank You (video)',
-      ],
+      iconColor: Color(0xFFE5890A),
+      backgroundColor: Color(0xFFFFF2DE),
+      //downloadUrl: 'https://drive.google.com/uc?export=download&id=1IVY1gC2ebZkIhNT0CYqkbiynAZSulVKQ', 
+      downloadUrl: 'assets/assets/offline_materials/basic_greetings.zip', 
+      includedVideos: ['Minum', 'Roti', 'Hello', 'Goodbye', 'Thank You'],
     ),
-    _DownloadableItemData(
+
+    // 3. Food & Drink (OFFLINE ASSET MODE)
+    const _DownloadableItemData(
       title: 'Food & Drink Signs',
       description: 'Signs for eating, restaurant, and common foods | 20MB',
       icon: Icons.coffee_outlined,
-      iconColor: const Color(0xFFD62F0B),
-      backgroundColor: const Color(0xFFFFD6D1),
-      downloadUrl: 'https.files.flutter-demo.org/sample.zip',
-      // --- NEW ---
-      includedVideos: [
-        'Chicken (video)',
-        'Rice (video)',
-        'Water (video)',
-        'Coffee (video)',
-      ],
+      iconColor: Color(0xFFD62F0B),
+      backgroundColor: Color(0xFFFFD6D1),
+      // Points to local asset
+      downloadUrl: 'assets/assets/offline_materials/Foof_Drink_Signs.zip',
+      includedVideos: ['Chicken', 'Rice', 'Water', 'Coffee'],
     ),
-    _DownloadableItemData(
+
+    // 4. Medical
+    const _DownloadableItemData(
       title: 'Medical & Emergency',
       description: 'Critical signs for health, safety, and emergencies | 25MB',
       icon: Icons.medical_services_outlined,
-      iconColor: const Color(0xFF34C759),
-      backgroundColor: const Color(0xFFD5FFD4),
-      downloadUrl: 'https.files.flutter-demo.org/sample.zip',
-      includedVideos: ['Help (video)', 'Hurt (video)', 'Doctor (video)'],
+      iconColor: Color(0xFF34C759),
+      backgroundColor: Color(0xFFD5FFD4),
+      downloadUrl: 'assets/assets/offline_materials/Medical_Emergency.zip',
+      includedVideos: ['Help', 'Hurt', 'Doctor'],
     ),
-    _DownloadableItemData(
+
+    // 5. Family
+    const _DownloadableItemData(
       title: 'Family & People',
       description: 'Signs for family members, friends, and relationships | 18 MB',
       icon: Icons.groups_outlined,
-      iconColor: const Color(0xFFD60B95),
-      backgroundColor: const Color(0xFFFFDFF2),
-      downloadUrl: 'https.files.flutter-demo.org/sample.zip',
-      includedVideos: ['Father (video)', 'Mother (video)', 'Friend (video)'],
+      iconColor: Color(0xFFD60B95),
+      backgroundColor: Color(0xFFFFDFF2),
+      downloadUrl: 'assets/assets/offline_materials/Family_People.zip', 
+      includedVideos: ['Father', 'Mother', 'Friend'],
     ),
-    _DownloadableItemData(
+
+    // 6. Travel
+    const _DownloadableItemData(
       title: 'Travel & Transport',
       description: 'Signs for travel, transport, and common actions | 22 MB',
       icon: Icons.travel_explore_outlined,
-      iconColor: const Color(0xFF5E0BD6),
-      backgroundColor: const Color(0xFFF5F1FF),
-      downloadUrl: 'https.files.flutter-demo.org/sample.zip',
-      includedVideos: ['Car (video)', 'Train (video)', 'Go (video)'],
+      iconColor: Color(0xFF5E0BD6),
+      backgroundColor: Color(0xFFF5F1FF),
+      downloadUrl: 'assets/assets/offline_materials/Travel_Transport.zip', 
+      includedVideos: ['Car', 'Train', 'Go'],
     ),
   ];
 
@@ -238,7 +205,7 @@ class _OfflineModeState extends State<OfflineMode> with SingleTickerProviderStat
       final String folderPath = '${appDir.path}/${item.folderName}';
       final directory = Directory(folderPath);
       
-      if (await directory.exists()) {
+      if (await directory.exists() && directory.listSync().isNotEmpty) {
         foundItems.add(item);
       }
     }
@@ -248,19 +215,12 @@ class _OfflineModeState extends State<OfflineMode> with SingleTickerProviderStat
     });
   }
 
-  Future<void> _scrollToItemAndHighlight(
-    _DownloadableItemData selectedItem,
-  ) async {
-    final int dataIndex = _items.indexWhere(
-      (item) => item.title == selectedItem.title,
-    );
-
+  Future<void> _scrollToItemAndHighlight(_DownloadableItemData selectedItem) async {
+    final int dataIndex = _items.indexWhere((item) => item.title == selectedItem.title);
     if (dataIndex != -1) {
       final int listViewIndex = dataIndex + 1;
-      _tabController.animateTo(0);
-      setState(() {
-        _highlightedTitle = selectedItem.title;
-      });
+      _tabController.animateTo(0); 
+      setState(() => _highlightedTitle = selectedItem.title);
 
       await _scrollController.scrollToIndex(
         listViewIndex,
@@ -269,11 +229,7 @@ class _OfflineModeState extends State<OfflineMode> with SingleTickerProviderStat
       );
 
       Future.delayed(const Duration(seconds: 2), () {
-        if (mounted) {
-          setState(() {
-            _highlightedTitle = null;
-          });
-        }
+        if (mounted) setState(() => _highlightedTitle = null);
       });
     }
   }
@@ -293,19 +249,13 @@ class _OfflineModeState extends State<OfflineMode> with SingleTickerProviderStat
         appBar: AppBar(
           backgroundColor: Colors.transparent,
           elevation: 0,
-          shadowColor: Colors.transparent,
           leading: IconButton(
             icon: const Icon(Icons.arrow_back, color: Color(0xFF101727)),
             onPressed: () => Navigator.of(context).pop(),
           ),
           title: const Text(
             'Offline Downloads',
-            style: TextStyle(
-              color: Color(0xFF101727),
-              fontSize: 20,
-              fontFamily: 'Arimo',
-              fontWeight: FontWeight.w400,
-            ),
+            style: TextStyle(color: Color(0xFF101727), fontSize: 20, fontFamily: 'Arimo'),
           ),
           centerTitle: true,
           actions: [
@@ -316,7 +266,6 @@ class _OfflineModeState extends State<OfflineMode> with SingleTickerProviderStat
                   context: context,
                   delegate: _DownloadSearchDelegate(searchItems: _items),
                 );
-
                 if (selectedItem != null && selectedItem.title.isNotEmpty) {
                   _scrollToItemAndHighlight(selectedItem);
                 }
@@ -324,25 +273,17 @@ class _OfflineModeState extends State<OfflineMode> with SingleTickerProviderStat
             ),
             const SizedBox(width: 8),
           ],
-          
           bottom: TabBar(
             controller: _tabController,
-            labelColor: Color(0xFF101727), 
+            labelColor: const Color(0xFF101727), 
             unselectedLabelColor: Colors.grey[700], 
-            indicatorColor: Color(0xFF007AFF), 
-            tabs: const [
-              Tab(text: 'AVAILABLE'),
-              Tab(text: 'DOWNLOADED'),
-            ],
+            indicatorColor: const Color(0xFF007AFF), 
+            tabs: const [Tab(text: 'AVAILABLE'), Tab(text: 'DOWNLOADED')],
           ),
         ),
-        
         body: TabBarView(
           controller: _tabController,
-          children: [
-            _buildAvailableTab(),
-            _buildDownloadedTab(),
-          ],
+          children: [_buildAvailableTab(), _buildDownloadedTab()],
         ),
       ),
     );
@@ -364,16 +305,12 @@ class _OfflineModeState extends State<OfflineMode> with SingleTickerProviderStat
               child: Text(
                 'Downloadable Files',
                 style: TextStyle(
-                  color: Color(0xFF101727),
-                  fontSize: 25.15,
-                  fontFamily: 'Figtree',
-                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF101727), fontSize: 25, fontFamily: 'Figtree', fontWeight: FontWeight.w700,
                 ),
               ),
             ),
           );
         }
-
         final item = _items[index - 1]; 
         final bool isHighlighted = (item.title == _highlightedTitle);
 
@@ -398,10 +335,7 @@ class _OfflineModeState extends State<OfflineMode> with SingleTickerProviderStat
   Widget _buildDownloadedTab() {
     if (_downloadedItems.isEmpty) {
       return Center(
-        child: Text(
-          'No downloaded files yet.',
-          style: TextStyle(color: Colors.grey[700], fontSize: 16),
-        ),
+        child: Text('No downloaded files yet.', style: TextStyle(color: Colors.grey[700], fontSize: 16)),
       );
     }
     
@@ -419,25 +353,14 @@ class _OfflineModeState extends State<OfflineMode> with SingleTickerProviderStat
                 final Directory appDir = await getApplicationDocumentsDirectory();
                 final String folderPath = '${appDir.path}/${item.folderName}';
                 
-                // --- We pass the folder path AND title to the new screen ---
-                final Map<String, String> params = {
+                context.pushNamed('offline-files', extra: {
                   'path': folderPath,
                   'title': item.title,
-                };
-                
-                print("Navigating to /offline-files with params: $params");
-                context.pushNamed('offline-files', extra: params);
-
+                });
               } catch (e) {
-                print("Error navigating to file list: $e");
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Could not open file list: $e'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+                );
               }
             },
             child: Container(
@@ -452,21 +375,12 @@ class _OfflineModeState extends State<OfflineMode> with SingleTickerProviderStat
               child: Row(
                 children: [
                   Container(
-                    width: 50.29,
-                    height: 50.29,
+                    width: 50.29, height: 50.29,
                     decoration: ShapeDecoration(
                       color: item.backgroundColor,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(17.60),
-                      ),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(17.60)),
                     ),
-                    child: Center(
-                      child: Icon(
-                        item.icon,
-                        color: item.iconColor,
-                        size: 28,
-                      ),
-                    ),
+                    child: Center(child: Icon(item.icon, color: item.iconColor, size: 28)),
                   ),
                   const SizedBox(width: 15.09),
                   Expanded(
@@ -476,21 +390,14 @@ class _OfflineModeState extends State<OfflineMode> with SingleTickerProviderStat
                         Text(
                           item.title,
                           style: const TextStyle(
-                            color: Colors.black,
-                            fontSize: 20.12,
-                            fontFamily: 'Figtree',
-                            fontWeight: FontWeight.w600,
+                            color: Colors.black, fontSize: 20, fontFamily: 'Figtree', fontWeight: FontWeight.w600,
                           ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
+                          maxLines: 2, overflow: TextOverflow.ellipsis,
                         ),
-                        Text(
+                        const Text(
                           'Ready for offline use',
-                          style: const TextStyle(
-                            color: Color(0xFF34C759),
-                            fontSize: 16,
-                            fontFamily: 'Figtree',
-                            fontWeight: FontWeight.w400,
+                          style: TextStyle(
+                            color: Color(0xFF34C759), fontSize: 16, fontFamily: 'Figtree', fontWeight: FontWeight.w400,
                           ),
                         ),
                       ],
@@ -507,10 +414,9 @@ class _OfflineModeState extends State<OfflineMode> with SingleTickerProviderStat
   }
 }
 
-// --- Define the different states for our download button ---
+// --- STEP 4: DOWNLOAD ITEM LOGIC (HYBRID WITH FAKE DELAY) ---
 enum DownloadState { idle, downloading, downloaded }
 
-// --- This is our stateful item card ---
 class _DownloadableFileItem extends StatefulWidget {
   final _DownloadableItemData data;
   final bool isHighlighted;
@@ -527,11 +433,8 @@ class _DownloadableFileItem extends StatefulWidget {
   State<_DownloadableFileItem> createState() => _DownloadableFileItemState();
 }
 
-class _DownloadableFileItemState extends State<_DownloadableFileItem>
-    with AutomaticKeepAliveClientMixin {
-  
+class _DownloadableFileItemState extends State<_DownloadableFileItem> with AutomaticKeepAliveClientMixin {
   var _downloadState = DownloadState.idle;
-  String? _localFolderPath;
   final Dio _dio = Dio();
   double _downloadProgress = 0.0;
 
@@ -555,19 +458,19 @@ class _DownloadableFileItemState extends State<_DownloadableFileItem>
       final String folderPath = '${appDir.path}/$folderName';
 
       final directory = Directory(folderPath);
-      if (await directory.exists()) {
+      if (await directory.exists() && directory.listSync().isNotEmpty) {
         if (mounted) {
           setState(() {
             _downloadState = DownloadState.downloaded;
-            _localFolderPath = folderPath;
           });
         }
       }
     } catch (e) {
-      print("Error in _checkIfFolderExists: $e");
+      print("Error checking folder: $e");
     }
   }
 
+  // --- UPDATED DOWNLOAD LOGIC ---
   Future<void> _startDownload() async {
     setState(() {
       _downloadState = DownloadState.downloading;
@@ -576,62 +479,85 @@ class _DownloadableFileItemState extends State<_DownloadableFileItem>
 
     try {
       final Directory appDir = await getApplicationDocumentsDirectory();
-      final String url = widget.data.downloadUrl;
-      final String zipFileName = Uri.parse(url).pathSegments.last;
+      final String pathOrUrl = widget.data.downloadUrl;
+      final String zipFileName = pathOrUrl.split('/').last; 
       final String zipSavePath = '${appDir.path}/$zipFileName';
-      
-      await _dio.download(
-        url,
-        zipSavePath, 
-        onReceiveProgress: (received, total) {
-          if (total != -1) {
-            setState(() {
-              _downloadProgress = received / total;
-            });
-          }
-        },
-      );
 
-      final bytes = await File(zipSavePath).readAsBytes();
-      
-      try {
-        final archive = ZipDecoder().decodeBytes(bytes);
-
-        final String folderName = _getTargetFolderName();
-        final String folderPath = '${appDir.path}/$folderName';
-        await Directory(folderPath).create(recursive: true);
-
-        for (final file in archive) {
-          final String filename = '${appDir.path}/$folderName/${file.name}';
-          if (file.isFile) {
-            final data = file.content as List<int>;
-            await File(filename).writeAsBytes(data);
-          } else { 
-            await Directory(filename).create(recursive: true);
-          }
+      // CHECK: Is it HTTP (Web) or Asset (Local)?
+      if (pathOrUrl.startsWith('http') || pathOrUrl.startsWith('https')) {
+        // --- SCENARIO A: WEB DOWNLOAD (Real speed) ---
+        await _dio.download(
+          pathOrUrl,
+          zipSavePath, 
+          onReceiveProgress: (received, total) {
+            if (total != -1) {
+              setState(() {
+                _downloadProgress = received / total;
+              });
+            }
+          },
+        );
+      } else {
+        // --- SCENARIO B: LOCAL ASSET COPY (Simulated Delay) ---
+        // We use a loop to "fake" the download time to make it feel satisfying
+        
+        for (int i = 0; i <= 100; i+=2) {
+          if (!mounted) return; // Stop if user leaves screen
+          
+          setState(() {
+            _downloadProgress = i / 100;
+          });
+          
+          // Wait 20ms for each step. Total time approx 1-2 seconds.
+          await Future.delayed(const Duration(milliseconds: 20));
         }
-        await File(zipSavePath).delete();
 
-      } catch (e) {
-        print("Failed to unzip file. Is it a valid .zip file? Error: $e");
-        final String folderName = _getTargetFolderName();
-        final String folderPath = '${appDir.path}/$folderName';
-        await Directory(folderPath).create(recursive: true);
-        await File(zipSavePath).rename('$folderPath/$zipFileName');
+        // Now actually load the file
+        final ByteData data = await DefaultAssetBundle.of(context).load(pathOrUrl);
+        final List<int> bytes = data.buffer.asUint8List();
+        
+        // Write it to the app's document storage
+        await File(zipSavePath).writeAsBytes(bytes);
       }
+
+      // --- COMMON STEP: UNZIP THE FILE ---
+      final bytes = await File(zipSavePath).readAsBytes();
+      final archive = ZipDecoder().decodeBytes(bytes);
+
+      final String folderName = _getTargetFolderName();
+      final String folderPath = '${appDir.path}/$folderName';
+      await Directory(folderPath).create(recursive: true);
+
+      for (final file in archive) {
+        final String filename = '$folderPath/${file.name}';
+        if (file.isFile) {
+          final data = file.content as List<int>;
+          await File(filename).create(recursive: true);
+          await File(filename).writeAsBytes(data);
+        } else { 
+          await Directory(filename).create(recursive: true);
+        }
+      }
+
+      // Cleanup
+      await File(zipSavePath).delete();
 
       if (mounted) {
         setState(() {
           _downloadState = DownloadState.downloaded;
-          _localFolderPath = '${appDir.path}/${_getTargetFolderName()}'; 
         });
-        
         widget.onDownloadComplete();
       }
 
     } catch (e) {
-      print("Error downloading file: $e");
+      print("Error downloading/extracting: $e");
       if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: Could not load file. $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
         setState(() {
           _downloadState = DownloadState.idle;
           _downloadProgress = 0.0;
@@ -640,40 +566,36 @@ class _DownloadableFileItemState extends State<_DownloadableFileItem>
     }
   } 
   
-  // --- NEW: This function shows the "What's Inside" dialog ---
   Future<void> _showContentsDialog() async {
-    // Show a pop-up dialog
     await showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text("What's Inside?"),
+          title: Text(widget.data.title),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
-              // Build a list of items from our data
-              children: widget.data.includedVideos.map((videoName) {
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4.0),
-                  child: Row(
-                    children: [
-                      Icon(Icons.check_circle_outline, color: Colors.green, size: 20),
-                      SizedBox(width: 8),
-                      Expanded(child: Text(videoName)),
-                    ],
-                  ),
-                );
-              }).toList(),
+              children: [
+                const Text("Included in this pack:", style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 10),
+                ...widget.data.includedVideos.map((videoName) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4.0),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.check_circle_outline, color: Colors.green, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(child: Text(videoName)),
+                      ],
+                    ),
+                  );
+                }),
+              ],
             ),
           ),
           actions: [
-            TextButton(
-              child: Text("Close"),
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-            ),
+            TextButton(child: const Text("Close"), onPressed: () => Navigator.of(context).pop()),
           ],
         );
       },
@@ -684,47 +606,23 @@ class _DownloadableFileItemState extends State<_DownloadableFileItem>
     switch (_downloadState) {
       case DownloadState.idle:
         return IconButton(
-          icon: const Icon(
-            Icons.download_outlined,
-            color: Color(0xFF007AFF),
-            size: 30,
-          ),
+          icon: const Icon(Icons.download_outlined, color: Color(0xFF007AFF), size: 30),
           onPressed: _startDownload,
         );
-        
       case DownloadState.downloading:
         return Container(
-          width: 48,
-          height: 48,
-          padding: const EdgeInsets.all(9.0),
+          width: 48, height: 48, padding: const EdgeInsets.all(9.0),
           child: Stack(
             alignment: Alignment.center,
             children: [
-              CircularProgressIndicator(
-                strokeWidth: 2.5,
-                color: Color(0xFF007AFF),
-                value: _downloadProgress > 0 ? _downloadProgress : null,
-              ),
-              Text(
-                '${(_downloadProgress * 100).toInt()}%',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF007AFF),
-                ),
-              )
+              CircularProgressIndicator(strokeWidth: 2.5, color: const Color(0xFF007AFF), value: _downloadProgress > 0 ? _downloadProgress : null),
+              Text('${(_downloadProgress * 100).toInt()}%', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFF007AFF)))
             ],
           ),
         );
-        
       case DownloadState.downloaded:
         return IconButton(
-          icon: const Icon(
-            Icons.check_circle,
-            color: Color(0xFF34C759),
-            size: 30,
-          ),
-          // --- MODIFIED: Tapping the green check now also shows the dialog ---
+          icon: const Icon(Icons.check_circle, color: Color(0xFF34C759), size: 30),
           onPressed: _showContentsDialog,
         );
     }
@@ -733,51 +631,34 @@ class _DownloadableFileItemState extends State<_DownloadableFileItem>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-
-    final Color highlightColor = Color(0xFF007AFF);
-    final Color highlightBackgroundColor = Color.fromARGB(255, 235, 245, 255);
+    final Color highlightColor = const Color(0xFF007AFF);
+    final Color highlightBackgroundColor = const Color.fromARGB(255, 235, 245, 255);
 
     return Container(
       padding: const EdgeInsets.all(20.0),
       decoration: ShapeDecoration(
-        color: widget.isHighlighted
-            ? highlightBackgroundColor
-            : Colors.white.withOpacity(0.85),
+        color: widget.isHighlighted ? highlightBackgroundColor : Colors.white.withOpacity(0.85),
         shape: RoundedRectangleBorder(
-          side: widget.isHighlighted
-              ? BorderSide(width: 2.0, color: highlightColor)
-              : const BorderSide(width: 1, color: Color(0x99FFFEFE)),
+          side: widget.isHighlighted ? BorderSide(width: 2.0, color: highlightColor) : const BorderSide(width: 1, color: Color(0x99FFFEFE)),
           borderRadius: BorderRadius.circular(30.18),
         ),
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // --- MODIFIED: Wrap the text/icon area in a GestureDetector ---
           Expanded(
             child: GestureDetector(
-              onTap: _showContentsDialog, // <-- NEW: Tap to show info
-              child: Container( // Wrap in a container to make the tap area work
-                color: Colors.transparent, // Makes the tap area fill the space
+              onTap: _showContentsDialog,
+              child: Container(
+                color: Colors.transparent,
                 child: Row(
                   children: [
                     Container(
-                      width: 50.29,
-                      height: 50.29,
+                      width: 50.29, height: 50.29,
                       decoration: ShapeDecoration(
                         color: widget.data.backgroundColor,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(17.60),
-                        ),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(17.60)),
                       ),
-                      child: Center(
-                        child: Icon(
-                          widget.data.icon,
-                          color: widget.data.iconColor,
-                          size: 28,
-                        ),
-                      ),
+                      child: Center(child: Icon(widget.data.icon, color: widget.data.iconColor, size: 28)),
                     ),
                     const SizedBox(width: 15.09),
                     Expanded(
@@ -786,26 +667,14 @@ class _DownloadableFileItemState extends State<_DownloadableFileItem>
                         children: [
                           Text(
                             widget.data.title,
-                            style: const TextStyle(
-                              color: Colors.black,
-                              fontSize: 20.12,
-                              fontFamily: 'Figtree',
-                              fontWeight: FontWeight.w600,
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: Colors.black, fontSize: 20, fontFamily: 'Figtree', fontWeight: FontWeight.w600),
+                            maxLines: 2, overflow: TextOverflow.ellipsis,
                           ),
-                          const SizedBox(height: 5.03),
+                          const SizedBox(height: 5),
                           Text(
                             widget.data.description,
-                            style: const TextStyle(
-                              color: Color(0xFFA5A5A5),
-                              fontSize: 17.60,
-                              fontFamily: 'Figtree',
-                              fontWeight: FontWeight.w400,
-                            ),
-                            maxLines: 3,
-                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: Color(0xFFA5A5A5), fontSize: 17, fontFamily: 'Figtree', fontWeight: FontWeight.w400),
+                            maxLines: 2, overflow: TextOverflow.ellipsis,
                           ),
                         ],
                       ),
@@ -815,10 +684,8 @@ class _DownloadableFileItemState extends State<_DownloadableFileItem>
               ),
             ),
           ),
-          // --- END MODIFICATION ---
-          
           const SizedBox(width: 12.0),
-          _buildDownloadIcon(), // This is the download button
+          _buildDownloadIcon(),
         ],
       ),
     );
