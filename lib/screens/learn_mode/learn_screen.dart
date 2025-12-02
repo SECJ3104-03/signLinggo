@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:video_player/video_player.dart'; // ✅ new import
-import 'package:signlinggo/data/progress_manager.dart'; // adjust path
+import 'package:video_player/video_player.dart';
+import 'package:provider/provider.dart'; // Add this
+import 'package:signlinggo/data/progress_manager.dart';
 
 class LearnModePage extends StatefulWidget {
   const LearnModePage({super.key});
@@ -198,9 +199,12 @@ class _LearnModePageState extends State<LearnModePage> {
                 itemCount: filteredSigns.length,
                 itemBuilder: (context, index) {
                   final sign = filteredSigns[index];
+                  final progressManager = Provider.of<ProgressManager>(context);
+                  final isWatched = progressManager.isWatched(sign['title']!);
+                  
                   return GestureDetector(
                     onTap: () {
-                      _showVideoPopup(context, sign); // ✅ show popup
+                      _showVideoPopup(context, sign);
                     },
                     child: Container(
                       decoration: BoxDecoration(
@@ -213,6 +217,9 @@ class _LearnModePageState extends State<LearnModePage> {
                             blurRadius: 8,
                           ),
                         ],
+                        border: isWatched 
+                          ? Border.all(color: Colors.green, width: 2)
+                          : null,
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -233,6 +240,26 @@ class _LearnModePageState extends State<LearnModePage> {
                                     ),
                                   ),
                                 ),
+                                
+                                // Already watched indicator
+                                if (isWatched)
+                                  Positioned(
+                                    top: 8,
+                                    right: 8,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(4),
+                                      decoration: const BoxDecoration(
+                                        color: Colors.green,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(
+                                        Icons.check,
+                                        size: 16,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                
                                 const Positioned(
                                   right: 8,
                                   bottom: 8,
@@ -258,15 +285,26 @@ class _LearnModePageState extends State<LearnModePage> {
                                 Text(sign['category']!,
                                     style: TextStyle(fontSize: 13, color: Colors.grey[600])),
                                 const SizedBox(height: 4),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: Colors.blue.shade50,
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(sign['difficulty']!,
-                                      style: TextStyle(
-                                          fontSize: 12, color: Colors.blue.shade700)),
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: Colors.blue.shade50,
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Text(sign['difficulty']!,
+                                          style: TextStyle(
+                                              fontSize: 12, color: Colors.blue.shade700)),
+                                    ),
+                                    const Spacer(),
+                                    if (isWatched)
+                                      const Icon(
+                                        Icons.check_circle,
+                                        color: Colors.green,
+                                        size: 16,
+                                      ),
+                                  ],
                                 ),
                               ],
                             ),
@@ -284,27 +322,27 @@ class _LearnModePageState extends State<LearnModePage> {
     );
   }
 
-// ✅ Function to show popup dialog with video
-void _showVideoPopup(BuildContext context, Map<String, String> sign) {
-  // 🟢 Mark this sign as watched
-  ProgressManager().markAsWatched(sign['title']!);
+  // ✅ Function to show popup dialog with video
+  void _showVideoPopup(BuildContext context, Map<String, String> sign) {
+    // 🟢 Mark this sign as watched
+    final progressManager = Provider.of<ProgressManager>(context, listen: false);
+    progressManager.markAsWatched(sign['title']!);
 
-  // 🟦 Then show video dialog
-  showDialog(
-    context: context,
-    builder: (context) {
-      return Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        insetPadding: const EdgeInsets.all(20),
-        child: _VideoPlayerDialog(
-          videoPath: sign['video']!,
-          title: sign['title']!,
-        ),
-      );
-    },
-  );
-}
-
+    // 🟦 Show video dialog
+    showDialog(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          insetPadding: const EdgeInsets.all(20),
+          child: _VideoPlayerDialog(
+            videoPath: sign['video']!,
+            title: sign['title']!,
+          ),
+        );
+      },
+    );
+  }
 }
 
 // ✅ Separate stateful widget for the video player inside popup
@@ -339,6 +377,9 @@ class _VideoPlayerDialogState extends State<_VideoPlayerDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final progressManager = Provider.of<ProgressManager>(context);
+    final isWatched = progressManager.isWatched(widget.title);
+    
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -352,8 +393,26 @@ class _VideoPlayerDialogState extends State<_VideoPlayerDialog> {
         ),
         Padding(
           padding: const EdgeInsets.all(12.0),
-          child: Text(widget.title,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          child: Column(
+            children: [
+              Text(widget.title,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              const SizedBox(height: 4),
+              if (isWatched)
+                const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.check_circle, color: Colors.green, size: 16),
+                    SizedBox(width: 4),
+                    Text(
+                      'Learned',
+                      style: TextStyle(color: Colors.green, fontSize: 14),
+                    ),
+                  ],
+                ),
+            ],
+          ),
         ),
         TextButton(
           onPressed: () => Navigator.pop(context),
