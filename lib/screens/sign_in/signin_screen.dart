@@ -1,24 +1,35 @@
-/// Sign In Screen
-/// 
-/// Provides user authentication interface with:
-/// - Email and password login
-/// - Google Sign-In option
-/// - Guest mode access
-/// - Navigation to registration screen
 library;
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../providers/app_provider.dart';
+import '../../auth/auth_service.dart';
 
-class SignInScreen extends StatelessWidget {
+class SignInScreen extends StatefulWidget {
   const SignInScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final TextEditingController emailController = TextEditingController();
-    final TextEditingController passwordController = TextEditingController();
+  State<SignInScreen> createState() => _SignInScreenState();
+}
 
+class _SignInScreenState extends State<SignInScreen> {
+  final TextEditingController emailController = TextEditingController();
+  final TextEditingController passwordController = TextEditingController();
+
+  final AuthService _auth = AuthService();
+
+  bool _loading = false;
+
+  @override
+  void dispose() {
+    emailController.dispose();
+    passwordController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
         width: double.infinity,
@@ -64,7 +75,7 @@ class SignInScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 40),
 
-                // Toggle buttons
+                // Toggle
                 Container(
                   height: 40,
                   decoration: BoxDecoration(
@@ -91,17 +102,14 @@ class SignInScreen extends StatelessWidget {
                       ),
                       Expanded(
                         child: GestureDetector(
-                          onTap: () {
-                            context.go('/register');
-                          },
-                          child: Container(
-                            alignment: Alignment.center,
-                            child: const Text(
+                          onTap: () => context.go('/register'),
+                          child: const Center(
+                            child: Text(
                               "Register",
                               style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold),
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
                         ),
@@ -109,35 +117,30 @@ class SignInScreen extends StatelessWidget {
                     ],
                   ),
                 ),
+
                 const SizedBox(height: 40),
 
-                // Input fields
-                _buildInputField("Email", Icons.email,
-                    controller: emailController),
+                // Input: Email
+                _buildInputField(
+                    controller: emailController,
+                    label: "Email",
+                    icon: Icons.email),
+
                 const SizedBox(height: 20),
-                _buildInputField("Password", Icons.lock,
-                    controller: passwordController, obscureText: true),
+
+                // Input: Password
+                _buildInputField(
+                  controller: passwordController,
+                  label: "Password",
+                  icon: Icons.lock,
+                  obscureText: true,
+                ),
+
                 const SizedBox(height: 40),
 
-                // Login button
+                // Login Button
                 GestureDetector(
-                  onTap: () {
-                    // Update app state to mark user as logged in
-                    final appProvider = Provider.of<AppProvider>(context, listen: false);
-                    appProvider.setLoggedIn(true);
-                    appProvider.setGuestMode(false);
-                    
-                    // Show success message
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text("Logged in successfully!"),
-                        duration: Duration(seconds: 1),
-                      ),
-                    );
-                    
-                    // Navigate to home page
-                    context.go('/home');
-                  },
+                  onTap: _loading ? null : _signin,
                   child: Container(
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(vertical: 16),
@@ -148,32 +151,22 @@ class SignInScreen extends StatelessWidget {
                       ),
                     ),
                     alignment: Alignment.center,
-                    child: const Text(
-                      "Login",
-                      style: TextStyle(color: Colors.white, fontSize: 16),
-                    ),
+                    child: _loading
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : const Text(
+                            "Login",
+                            style: TextStyle(color: Colors.white, fontSize: 16),
+                          ),
                   ),
                 ),
+
                 const SizedBox(height: 20),
 
-                // Google Sign-in button
+                // Google Sign-In
                 GestureDetector(
-                  onTap: () {
-                    // Update app state to mark user as logged in
-                    final appProvider = Provider.of<AppProvider>(context, listen: false);
-                    appProvider.setLoggedIn(true);
-                    appProvider.setGuestMode(false);
-                    
-                    // Show success message
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text("Signed in with Google successfully!"),
-                        duration: Duration(seconds: 1),
-                      ),
-                    );
-                    
-                    // Navigate to home page
-                    context.go('/home');
+                  onTap: () async {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                        content: Text("Google Sign-In Coming Soon")));
                   },
                   child: Container(
                     width: double.infinity,
@@ -181,44 +174,39 @@ class SignInScreen extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.9),
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.white70, width: 1),
+                      border: Border.all(color: Colors.white70),
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Image.asset(
-                          'assets/images/google_logo.png',
-                          height: 24,
-                        ),
+                        Image.asset('assets/icons/google_logo.png', height: 24),
                         const SizedBox(width: 10),
                         const Text(
                           "Sign in with Google",
                           style: TextStyle(
-                            color: Color(0xFF495565),
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                          ),
+                              color: Color(0xFF495565),
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600),
                         ),
                       ],
                     ),
                   ),
                 ),
+
                 const SizedBox(height: 20),
 
-                // Continue as guest
+                // Guest
                 TextButton(
                   onPressed: () {
-                    // Update app state to mark user as guest
-                    final appProvider = Provider.of<AppProvider>(context, listen: false);
+                    final appProvider =
+                        Provider.of<AppProvider>(context, listen: false);
                     appProvider.setGuestMode(true);
                     appProvider.setLoggedIn(false);
-                    
-                    // Navigate to home page
                     context.go('/home');
                   },
                   child: const Text(
                     "Continue as Guest",
-                    style: TextStyle(color: Colors.white, fontSize: 14),
+                    style: TextStyle(color: Colors.white),
                   ),
                 ),
               ],
@@ -229,8 +217,44 @@ class SignInScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildInputField(String label, IconData icon,
-      {bool obscureText = false, TextEditingController? controller}) {
+  // Firebase Sign In
+  Future<void> _signin() async {
+    if (emailController.text.isEmpty || passwordController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please fill all fields")),
+      );
+      return;
+    }
+
+    setState(() => _loading = true);
+
+    final result = await _auth.login(
+      email: emailController.text.trim(),
+      password: passwordController.text.trim(),
+    );
+
+    setState(() => _loading = false);
+
+    if (result == null) {
+      final appProvider =
+          Provider.of<AppProvider>(context, listen: false);
+      appProvider.setLoggedIn(true);
+      appProvider.setGuestMode(false);
+
+      context.go('/home');
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(result)),
+      );
+    }
+  }
+
+  Widget _buildInputField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    bool obscureText = false,
+  }) {
     return TextField(
       controller: controller,
       obscureText: obscureText,
@@ -242,7 +266,6 @@ class SignInScreen extends StatelessWidget {
         hintStyle: const TextStyle(color: Color(0xFF495565)),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: Colors.white60),
         ),
       ),
     );
