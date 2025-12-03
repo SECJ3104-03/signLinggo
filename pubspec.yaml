@@ -32,7 +32,7 @@ dependencies:
   firebase_core: ^4.2.1
   firebase_auth: ^6.1.2
   google_sign_in: ^6.2.1
-  cloud_firestore: #izzat
+  cloud_firestore: ^6.1.0
 
   #SupaBase Videos and Pictures
   supabase_flutter: ^2.8.0
@@ -66,6 +66,7 @@ flutter:
 
   assets:
     - assets/assets/icons/
+    - assets/assets/icons/google_logo.png
     - assets/assets/videos/
     - assets/assets/placeholder.png
     - assets/assets/offline_materials/ 

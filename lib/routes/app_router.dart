@@ -4,6 +4,7 @@
 /// Handles navigation between screens and manages route parameters.
 library;
 import 'package:flutter/material.dart';
+import '../screens/profile/profile_screen.dart' show ProfileScreen;
 import 'package:go_router/go_router.dart';
 import 'package:signlinggo/screens/conversation_mode/chat_list_screen.dart';
 import '../screens/landing/landing_screen.dart';
@@ -21,6 +22,7 @@ import '../screens/conversation_mode/conversation_mode_screen.dart' show Convers
 import '../screens/text_to_sign/text_to_sign_screen.dart' show TextTranslationScreen;
 import '../screens/Offline_Mode/offline_file_list_screen.dart';
 import '../screens/Community_Module/notification_screen.dart';
+import '../screens/daily_quiz/daily_quiz_screen.dart' show DailyQuizScreen;
 
 // Note: Speech output and onboarding screens are placeholders for future implementation
 
@@ -60,6 +62,11 @@ class AppRouter {
           body: Center(child: Text('Welcome Screen - To be implemented')),
         ),
       ),
+      GoRoute(
+        path: '/profile',
+        name: 'profile',
+        builder: (context, state) => const ProfileScreen(),
+      ),
 
       // Main App Routes
       GoRoute(
@@ -80,6 +87,11 @@ class AppRouter {
           // final category = state.uri.queryParameters['category'] ?? 'All';
           return CategoriesPage();
         },
+      ),
+      GoRoute(
+        path: '/daily-quiz',
+        name: 'daily-quiz',
+        builder: (context, state) => const DailyQuizScreen(),
       ),
       GoRoute(
         path: '/progress',

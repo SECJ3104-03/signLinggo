@@ -1,39 +1,53 @@
+// lib/screens/conversation_mode/conversation_mode_screen.dart
+
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:video_player/video_player.dart';
-
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:supabase_flutter/supabase_flutter.dart'; 
 
 class ConversationScreen extends StatefulWidget {
   final String chatName;
   final String avatar;
   final bool isOnline;
-
+  
+  // These are required to link the chat to the correct database document
+  final String conversationId;
+  final String currentUserID;
 
   const ConversationScreen({
     super.key,
     required this.chatName,
     required this.avatar,
+    required this.conversationId,
+    required this.currentUserID,
     this.isOnline = false,
   });
-
 
   @override
   State<ConversationScreen> createState() => _ConversationScreenState();
 }
 
-
 class _ConversationScreenState extends State<ConversationScreen> {
   String _mode = "Text";
-  final List<Map<String, dynamic>> _messages = [];
   final TextEditingController _textController = TextEditingController();
-
 
   CameraController? _cameraController;
   List<CameraDescription> _cameras = [];
   bool _isRecording = false;
   final Map<String, VideoPlayerController> _videoControllers = {};
 
+  // We use the ID passed from the parent widget
+  late final String currentUserId;
+
+  @override
+  void initState() {
+    super.initState();
+    currentUserId = widget.currentUserID; 
+    if (_mode == 'Sign') _initCamera();
+  }
 
   @override
   void dispose() {
@@ -43,11 +57,9 @@ class _ConversationScreenState extends State<ConversationScreen> {
     super.dispose();
   }
 
-
   // ---------------- Mode Switching ----------------
   void _switchMode(String mode) async {
     if (_mode == mode) return;
-
 
     if (_mode == 'Sign') {
       await _cameraController?.dispose();
@@ -56,54 +68,78 @@ class _ConversationScreenState extends State<ConversationScreen> {
       _isRecording = false;
     }
 
-
     setState(() => _mode = mode);
 
-
     if (_mode == 'Sign') {
-      try {
-        _cameras = await availableCameras();
-        if (_cameras.isNotEmpty) {
-          _cameraController =
-              CameraController(_cameras.first, ResolutionPreset.medium);
-          await _cameraController?.initialize();
-          if (mounted) setState(() {});
-        }
-      } catch (e) {
-        debugPrint("Error initializing camera: $e");
-      }
+      _initCamera();
     }
   }
 
+  Future<void> _initCamera() async {
+    try {
+      _cameras = await availableCameras();
+      if (_cameras.isNotEmpty) {
+        _cameraController =
+            CameraController(_cameras.first, ResolutionPreset.medium);
+        await _cameraController?.initialize();
+        if (mounted) setState(() {});
+      }
+    } catch (e) {
+      debugPrint("Error initializing camera: $e");
+    }
+  }
+
+  // ---------------- Firestore Message Stream ----------------
+  Stream<List<Map<String, dynamic>>> _messageStream() {
+    // Note: Updated to 'conversation' (singular) to match ChatListScreen
+    return FirebaseFirestore.instance
+        .collection('conversation') 
+        .doc(widget.conversationId)
+        .collection('messages')
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snapshot) => snapshot.docs.map((doc) {
+              final data = doc.data();
+              data['isUser'] = data['senderId'] == currentUserId;
+              return data;
+            }).toList());
+  }
 
   // ---------------- Message Handling ----------------
-  void _sendTextMessage() {
+  void _sendTextMessage() async {
     final text = _textController.text.trim();
     if (text.isEmpty) return;
 
+    // Note: Updated to 'conversation' (singular)
+    final messageRef = FirebaseFirestore.instance
+        .collection('conversation')
+        .doc(widget.conversationId)
+        .collection('messages')
+        .doc();
 
-    setState(() {
-      _messages.add({
-        'type': 'text',
-        'content': text,
-        'isUser': true,
-      });
-      _textController.clear();
+    await messageRef.set({
+      'messageId': messageRef.id,
+      'senderId': currentUserId,
+      'content': text,
+      'type': 'text',
+      'isRead': false,
+      'createdAt': FieldValue.serverTimestamp(),
     });
 
+    // --- CRITICAL FIX: Ensure userIDs are saved so ChatListScreen can find this chat ---
+    final conversationIds = widget.conversationId.split('_'); 
+    
+    await FirebaseFirestore.instance
+        .collection('conversation')
+        .doc(widget.conversationId)
+        .set({
+      'lastMessage': text,
+      'lastMessageAt': FieldValue.serverTimestamp(),
+      'userIDs': conversationIds, // This allows the query in ChatListScreen to work
+    }, SetOptions(merge: true));
 
-    // Simulate the other user replying after 1.5 seconds
-    Future.delayed(const Duration(seconds: 1), () {
-      setState(() {
-        _messages.add({
-          'type': 'text',
-          'content': '$text 😄',
-          'isUser': false,
-        });
-      });
-    });
+    _textController.clear();
   }
-
 
   Future<void> _startSignRecording() async {
     if (_cameraController == null || _isRecording) return;
@@ -111,39 +147,97 @@ class _ConversationScreenState extends State<ConversationScreen> {
     setState(() => _isRecording = true);
   }
 
-
   Future<void> _stopSignRecording() async {
     if (_cameraController == null || !_isRecording) return;
     final video = await _cameraController!.stopVideoRecording();
     setState(() => _isRecording = false);
 
+    final videoFile = File(video.path);
 
-    final controller = VideoPlayerController.file(File(video.path))
+    // Upload video to Supabase
+    final videoURL = await _uploadVideoToSupabase(videoFile);
+    if (videoURL == null) return;
+
+    // Note: Updated to 'conversation' (singular)
+    final messageRef = FirebaseFirestore.instance
+        .collection('conversation')
+        .doc(widget.conversationId)
+        .collection('messages')
+        .doc();
+
+    await messageRef.set({
+      'messageId': messageRef.id,
+      'senderId': currentUserId,
+      'content': videoURL,
+      'type': 'video',
+      'isRead': false,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+
+    // Initialize video controller to play locally immediately
+    final controller = VideoPlayerController.networkUrl(Uri.parse(videoURL))
       ..initialize().then((_) => setState(() {}));
-    _videoControllers[video.path] = controller;
-
-
-    setState(() {
-      _messages.add({
-        'type': 'video',
-        'video': video,
-        'controller': controller,
-        'isUser': true,
-      });
-    });
+    _videoControllers[videoURL] = controller;
+    
+    // --- Update Main Conversation Document ---
+    final conversationIds = widget.conversationId.split('_'); 
+    await FirebaseFirestore.instance
+        .collection('conversation')
+        .doc(widget.conversationId)
+        .set({
+      'lastMessage': 'Sent a video',
+      'lastMessageAt': FieldValue.serverTimestamp(),
+      'userIDs': conversationIds,
+    }, SetOptions(merge: true));
   }
 
+  void _sendVoiceMessage() async {
+    // Placeholder logic from your original file
+    final messageRef = FirebaseFirestore.instance
+        .collection('conversation')
+        .doc(widget.conversationId)
+        .collection('messages')
+        .doc();
 
-  void _sendVoiceMessage() {
-    setState(() {
-      _messages.add({
-        'type': 'voice',
-        'content': '[Voice]',
-        'isUser': true,
-      });
+    await messageRef.set({
+      'messageId': messageRef.id,
+      'senderId': currentUserId,
+      'content': '[Voice]',
+      'type': 'voice',
+      'isRead': false,
+      'createdAt': FieldValue.serverTimestamp(),
     });
+    
+    // --- Update Main Conversation Document ---
+    final conversationIds = widget.conversationId.split('_'); 
+    await FirebaseFirestore.instance
+        .collection('conversation')
+        .doc(widget.conversationId)
+        .set({
+      'lastMessage': 'Sent a voice message',
+      'lastMessageAt': FieldValue.serverTimestamp(),
+      'userIDs': conversationIds,
+    }, SetOptions(merge: true));
   }
 
+  Future<String?> _uploadVideoToSupabase(File videoFile) async {
+    try {
+      final fileName = 'videos/${DateTime.now().millisecondsSinceEpoch}.mp4';
+
+      await Supabase.instance.client.storage
+          .from('videoMessage')
+          .upload(fileName, videoFile);
+
+      final url = Supabase.instance.client.storage
+          .from('videoMessage')
+          .getPublicUrl(fileName);
+
+      return url;
+    } catch (e) {
+      debugPrint('Supabase upload exception: $e');
+      return null;
+    }
+  }
 
   // ---------------- UI Components ----------------
   Widget _buildModeSelector() {
@@ -157,8 +251,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
           return GestureDetector(
             onTap: () => _switchMode(mode),
             child: Container(
-              padding:
-                  const EdgeInsets.symmetric(vertical: 10, horizontal: 28), //here
+              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 28),
               decoration: BoxDecoration(
                 color: isSelected ? Colors.purple[50] : Colors.white,
                 borderRadius: BorderRadius.circular(20),
@@ -182,12 +275,10 @@ class _ConversationScreenState extends State<ConversationScreen> {
     );
   }
 
-
   Widget _buildCameraOverlay() {
     if (!_isRecording || _cameraController == null || !_cameraController!.value.isInitialized) {
       return const SizedBox.shrink();
     }
-
 
     return Center(
       child: Container(
@@ -196,7 +287,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           border: Border.all(color: Colors.white70, width: 3),
-          boxShadow: [
+          boxShadow: const [
             BoxShadow(color: Colors.black26, blurRadius: 6, offset: Offset(0, 3))
           ],
         ),
@@ -206,7 +297,6 @@ class _ConversationScreenState extends State<ConversationScreen> {
       ),
     );
   }
-
 
   Widget _buildInputBar() {
     if (_mode == 'Text') {
@@ -224,8 +314,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
                   fillColor: const Color(0xFFF9FAFB),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(20),
-                    borderSide:
-                        const BorderSide(color: Color(0xFFE5E7EB), width: 1.2),
+                    borderSide: const BorderSide(color: Color(0xFFE5E7EB), width: 1.2),
                   ),
                 ),
               ),
@@ -252,7 +341,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
       return Container(
         padding: const EdgeInsets.all(12),
         color: Colors.white,
-        child:GestureDetector(
+        child: GestureDetector(
           onTap: _sendVoiceMessage,
           child: Container(
             width: double.infinity,
@@ -274,27 +363,26 @@ class _ConversationScreenState extends State<ConversationScreen> {
         child: GestureDetector(
           onTap: _isRecording ? _stopSignRecording : _startSignRecording,
           child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFFAC46FF), Color(0xFFE50076)],
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFFAC46FF), Color(0xFFE50076)],
+              ),
+              borderRadius: BorderRadius.circular(20),
             ),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          alignment: Alignment.center,
-          child: Icon(
-            _isRecording ? Icons.stop : Icons.videocam, // change icon based on state
-            color: Colors.white,
-            size: 28,
+            alignment: Alignment.center,
+            child: Icon(
+              _isRecording ? Icons.stop : Icons.videocam,
+              color: Colors.white,
+              size: 28,
+            ),
           ),
         ),
-      ),
-    );
-  }
+      );
+    }
     return const SizedBox.shrink();
   }
-
 
   Widget _buildTextBubble(String text, bool isUser) {
     return Align(
@@ -315,8 +403,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
     );
   }
 
-
-  Widget _buildVideoBubble (VideoPlayerController controller, bool isUser) {
+  Widget _buildVideoBubble(VideoPlayerController controller, bool isUser) {
     final width = MediaQuery.of(context).size.width * 0.55;
     return Align(
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
@@ -328,85 +415,39 @@ class _ConversationScreenState extends State<ConversationScreen> {
           color: isUser ? Colors.blue[50] : Colors.grey[200],
           borderRadius: BorderRadius.circular(16),
         ),
-        child: Column(
-          crossAxisAlignment:
-              isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-          children: [
-            SizedBox(
-              height: 150,
-              child: controller.value.isInitialized
-                  ? Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(16),
-                          child: VideoPlayer(controller),
-                        ),
-                        IconButton(
-                          icon: Icon(
-                            controller.value.isPlaying
-                                ? Icons.pause_circle
-                                : Icons.play_circle,
-                            size: 48,
-                            color: Colors.white70,
-                          ),
-                          onPressed: () {
-                            setState(() {
-                              controller.value.isPlaying
-                                  ? controller.pause()
-                                  : controller.play();
-                            });
-                          },
-                        )
-                      ],
+        child: SizedBox(
+          height: 150,
+          child: controller.value.isInitialized
+              ? Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: VideoPlayer(controller),
+                    ),
+                    IconButton(
+                      icon: Icon(
+                        controller.value.isPlaying
+                            ? Icons.pause_circle
+                            : Icons.play_circle,
+                        size: 48,
+                        color: Colors.white70,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          controller.value.isPlaying
+                              ? controller.pause()
+                              : controller.play();
+                        });
+                      },
                     )
-                  : const Center(child: CircularProgressIndicator()),
-            ),
-          ],
+                  ],
+                )
+              : const Center(child: CircularProgressIndicator()),
         ),
       ),
     );
   }
-
-
-  Widget _buildBotMessage(Map<String, dynamic> msg) {
-    msg.putIfAbsent('showSign', () => false);
-
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildTextBubble(msg['content'], false), // always bot bubble
-        if (msg['showSign'] && msg['signVideo'] != null)
-          _buildVideoBubble(msg['signVideo'], false),
-        Container(
-          margin: const EdgeInsets.only(top: 4),
-          child: GestureDetector(
-            onTap: () {
-              setState(() {
-                msg['showSign'] = !(msg['showSign'] ?? false);
-                if (msg['showSign'] && msg['signVideo'] == null) {
-                  final controller = VideoPlayerController.asset(
-                    'assets/sample_sign.mp4', // replace with actual sign video
-                  )..initialize().then((_) => setState(() {}));
-                  _videoControllers['bot_${msg.hashCode}'] = controller;
-                  msg['signVideo'] = controller;
-                }
-              });
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              child: Text(
-                msg['showSign'] == true ? 'Hide Sign' : 'Show Sign',
-                style: const TextStyle(color: Color(0xFFAC46FF)),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
 
   Widget _buildVoiceBubble(String content, bool isUser) {
     return Align(
@@ -418,83 +459,80 @@ class _ConversationScreenState extends State<ConversationScreen> {
           color: isUser ? Colors.blue[50] : Colors.grey[200],
           borderRadius: BorderRadius.circular(16),
         ),
-        child: Column(
-          crossAxisAlignment:
-              isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-        ),
+        child: Text(content),
       ),
     );
   }
 
-
   Widget _buildUserMessage(Map<String, dynamic> msg) {
     final bool isUser = msg['isUser'];
-    if (msg['type'] == 'text') {
-      return _buildTextBubble(msg['content'], isUser);
-    } else if (msg['type'] == 'video') {
-      return _buildVideoBubble(msg['controller'], isUser);
-    } else if (msg['type'] == 'voice') {
-      return _buildVoiceBubble(msg['content'], isUser);
+    switch (msg['type']) {
+      case 'text':
+        return _buildTextBubble(msg['content'], isUser);
+      case 'video':
+        final videoURL = msg['content'] as String;
+        final controller = _videoControllers[videoURL] ??
+            VideoPlayerController.networkUrl(Uri.parse(videoURL))
+              ..initialize().then((_) => setState(() {}));
+        _videoControllers[videoURL] = controller;
+        return _buildVideoBubble(controller, isUser);
+      case 'voice':
+        return _buildVoiceBubble(msg['content'], isUser);
+      default:
+        return const SizedBox.shrink();
     }
-    return const SizedBox.shrink();
   }
 
+  Widget _buildBotMessage(Map<String, dynamic> msg) {
+    return _buildUserMessage(msg); // Treat other user messages the same way
+  }
 
-  // ---------------- Build ----------------
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-      backgroundColor: Colors.white,
-      elevation: 1,
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back, color: Colors.black87),
-        onPressed: () => Navigator.pop(context),
-      ),
-      title: Row(
-        children: [
-          Stack(
-            children: [
-              CircleAvatar(
-                backgroundColor: const Color(0xFF980FFA),
-                child: Text(
-                  widget.avatar,
-                  style: const TextStyle(color: Colors.white),
+        backgroundColor: Colors.white,
+        elevation: 1,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.black87),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Row(
+          children: [
+            Stack(
+              children: [
+                CircleAvatar(
+                  backgroundColor: const Color(0xFF980FFA),
+                  child: Text(widget.avatar, style: const TextStyle(color: Colors.white)),
                 ),
-              ),
-              if (widget.isOnline)
-                Positioned(
-                  bottom: 0,
-                  right: 0,
-                  child: Container(
-                    width: 12,
-                    height: 12,
-                    decoration: BoxDecoration(
-                      color: Colors.green,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
+                if (widget.isOnline)
+                  Positioned(
+                    bottom: 0,
+                    right: 0,
+                    child: Container(
+                      width: 12,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: Colors.green,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
                     ),
                   ),
-                ),
-            ],
-          ),
-          const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                widget.chatName,
-                style: const TextStyle(color: Colors.black, fontSize: 18),
-              ),
-              Text(
-                widget.isOnline ? "Online" : "Offline",
-                style: const TextStyle(color: Colors.grey, fontSize: 14),
-              ),
-            ],
-          ),
-        ],
+              ],
+            ),
+            const SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(widget.chatName, style: const TextStyle(color: Colors.black, fontSize: 18)),
+                Text(widget.isOnline ? "Online" : "Offline",
+                    style: const TextStyle(color: Colors.grey, fontSize: 14)),
+              ],
+            ),
+          ],
+        ),
       ),
-    ),
       backgroundColor: Colors.white,
       body: Stack(
         children: [
@@ -502,16 +540,20 @@ class _ConversationScreenState extends State<ConversationScreen> {
             children: [
               _buildModeSelector(),
               Expanded(
-                child: ListView.builder(
-                  reverse: true,
-                  padding: const EdgeInsets.all(12),
-                  itemCount: _messages.length,
-                  itemBuilder: (context, index) {
-                    final reversedIndex = _messages.length - 1 - index;
-                    final msg = _messages[reversedIndex];
-                    return msg['isUser']
-                      ? _buildUserMessage(msg)
-                      : _buildBotMessage(msg);
+                child: StreamBuilder<List<Map<String, dynamic>>>(
+                  stream: _messageStream(),
+                  builder: (context, snapshot) {
+                    if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+                    final messages = snapshot.data!;
+                    return ListView.builder(
+                      reverse: true,
+                      padding: const EdgeInsets.all(12),
+                      itemCount: messages.length,
+                      itemBuilder: (context, index) {
+                        final msg = messages[index];
+                        return msg['isUser'] ? _buildUserMessage(msg) : _buildBotMessage(msg);
+                      },
+                    );
                   },
                 ),
               ),

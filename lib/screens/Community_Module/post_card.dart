@@ -8,11 +8,10 @@ import 'package:video_player/video_player.dart';
 import 'package:share_plus/share_plus.dart'; 
 import 'package:path_provider/path_provider.dart'; 
 import 'package:http/http.dart' as http;
-import 'package:firebase_auth/firebase_auth.dart'; // <--- IMPORT AUTH
+import 'package:firebase_auth/firebase_auth.dart'; 
 import 'post_data.dart'; 
 import 'video_player_widget.dart'; 
 import 'package:signlinggo/screens/conversation_mode/conversation_mode_screen.dart';
-import 'package:signlinggo/screens/conversation_mode/mock_chat_service.dart';
 import 'real_time_widget.dart'; 
 
 class PostCard extends StatefulWidget {
@@ -31,7 +30,6 @@ class PostCard extends StatefulWidget {
     this.onCommentTap,
   });
 
-  
   @override
   State<PostCard> createState() => _PostCardState();
 }
@@ -40,10 +38,8 @@ class _PostCardState extends State<PostCard> {
   VideoPlayerController? _videoController;
   bool _isSharing = false; 
 
-  // --- NEW: CHECK IF I OWN THIS POST ---
   bool get _isOwner {
     final currentUser = FirebaseAuth.instance.currentUser;
-    // Note: If authorId is empty (old post), assume NOT owner
     return currentUser != null && widget.post.authorId == currentUser.uid;
   }
 
@@ -56,11 +52,24 @@ class _PostCardState extends State<PostCard> {
     }
   }
 
+  // --- UPDATED METHOD TO FIX THE ERROR ---
   void _navigateToDirectMessage() {
     if (_videoController != null && _videoController!.value.isPlaying) {
       _videoController!.pause();
     }
-    MockChatService.startChat(widget.post.author, widget.post.initials);
+
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) return;
+
+    final String currentUserId = currentUser.uid;
+    final String targetUserId = widget.post.authorId;
+
+    // Generate a consistent Conversation ID
+    // We sort the IDs so "A talking to B" is the same ID as "B talking to A"
+    final List<String> ids = [currentUserId, targetUserId];
+    ids.sort(); 
+    final String conversationId = ids.join("_");
+
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -68,6 +77,9 @@ class _PostCardState extends State<PostCard> {
           chatName: widget.post.author,
           avatar: widget.post.initials,
           isOnline: true, 
+          // --- NEW PARAMETERS ADDED ---
+          conversationId: conversationId,
+          currentUserID: currentUserId,
         ),
       ),
     );
@@ -252,8 +264,6 @@ class _PostCardState extends State<PostCard> {
             ),
           ),
           
-          // --- UPDATED LOGIC HERE ---
-          // Only show 'More' if I am the owner
           if (_isOwner)
             InkWell(
               onTap: widget.onMoreOptionsTap,
@@ -267,7 +277,6 @@ class _PostCardState extends State<PostCard> {
                 ),
               ),
             )
-          // Only show 'Follow' if I am NOT the owner
           else if (widget.post.showFollowButton)
             InkWell(
               onTap: widget.onFollowTap,
@@ -298,7 +307,6 @@ class _PostCardState extends State<PostCard> {
     );
   }
 
-  // --- UPDATED: IMAGE LOGIC IS HERE ---
   Widget _buildContent() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(0, 20, 0, 0),
@@ -306,7 +314,6 @@ class _PostCardState extends State<PostCard> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // VIDEO
           if (widget.post.videoUrl != null)
             Padding(
               padding: const EdgeInsets.only(bottom: 20.0),
@@ -320,7 +327,6 @@ class _PostCardState extends State<PostCard> {
               ),
             ),
 
-          // IMAGE
           if (widget.post.imageUrl != null)
             Padding(
               padding: const EdgeInsets.only(bottom: 20.0),
@@ -369,7 +375,6 @@ class _PostCardState extends State<PostCard> {
     );
   }
 
-  // Helper to choose the right Image provider
   Widget _buildImageWidget(String path) {
     if (path.startsWith('http') || path.startsWith('https')) {
       return Image.network(
@@ -399,7 +404,6 @@ class _PostCardState extends State<PostCard> {
           mainAxisAlignment: MainAxisAlignment.start, 
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // 1. LIKE
             _buildFooterIcon(
               icon: widget.post.isLiked ? Icons.favorite : Icons.favorite_border,
               label: widget.post.likes.toString(),
@@ -409,7 +413,6 @@ class _PostCardState extends State<PostCard> {
             
             const SizedBox(width: 24), 
             
-            // 2. COMMENT
             _buildFooterIcon(
               icon: Icons.chat_bubble_outline,
               label: (widget.post.commentCount < 0 ? 0 : widget.post.commentCount).toString(),
@@ -417,8 +420,7 @@ class _PostCardState extends State<PostCard> {
               onTap: _navigateToCommentScreen,
             ),
 
-            // 3. MESSAGE
-            if (!_isOwner) ...[ // --- Only message if not owner
+            if (!_isOwner) ...[ 
               const SizedBox(width: 24), 
               InkWell(
                 onTap: _navigateToDirectMessage,
@@ -432,7 +434,6 @@ class _PostCardState extends State<PostCard> {
 
             const Spacer(),
             
-            // 4. SHARE
             InkWell(
               onTap: _isSharing ? null : _sharePost, 
               child: SizedBox(
