@@ -9,6 +9,7 @@ import 'routes/app_router.dart';
 import 'providers/app_provider.dart';
 import 'services/camera_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'; 
+import 'data/progress_manager.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -106,23 +107,30 @@ class AppInitializer extends StatelessWidget {
 
         // Initialization done, run the main app
         final isFirstTime = snapshot.data?['isFirstTime'] ?? true;
-
-        return ChangeNotifierProvider(
-          create: (_) => AppProvider(isFirstTime: isFirstTime),
-          child: Consumer<AppProvider>(
-            builder: (context, appProvider, _) {
-              return MaterialApp.router(
-                debugShowCheckedModeBanner: false,
-                title: 'SignLinggo',
-                theme: ThemeData(
-                  primarySwatch: Colors.blue,
-                  useMaterial3: true,
-                ),
-                routerConfig: AppRouter.router,
-              );
-            },
+        return MultiProvider(
+        providers: [
+          ChangeNotifierProvider(
+            create: (_) => AppProvider(isFirstTime: isFirstTime),
           ),
-        );
+          ChangeNotifierProvider(
+            create: (_) => ProgressManager(), // This creates a new instance
+            lazy: false, // Load immediately
+          ),
+        ],
+        child: Consumer<AppProvider>(
+          builder: (context, appProvider, _) {
+            return MaterialApp.router(
+              debugShowCheckedModeBanner: false,
+              title: 'SignLinggo',
+              theme: ThemeData(
+                primarySwatch: Colors.blue,
+                useMaterial3: true,
+              ),
+              routerConfig: AppRouter.router,
+            );
+          },
+        ),
+      );
       },
     );
   }

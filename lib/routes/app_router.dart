@@ -20,7 +20,7 @@ import '../screens/Offline_Mode/offline_view.dart' show OfflineMode;
 import '../screens/conversation_mode/conversation_mode_screen.dart' show ConversationScreen;
 import '../screens/text_to_sign/text_to_sign_screen.dart' show TextTranslationScreen;
 import '../screens/Offline_Mode/offline_file_list_screen.dart';
-import '../screens/profile/profile_screen.dart';
+import '../screens/daily_quiz/daily_quiz_screen.dart' show DailyQuizScreen;
 
 // Note: Speech output and onboarding screens are placeholders for future implementation
 
@@ -85,6 +85,11 @@ class AppRouter {
           // final category = state.uri.queryParameters['category'] ?? 'All';
           return CategoriesPage();
         },
+      ),
+      GoRoute(
+        path: '/daily-quiz',
+        name: 'daily-quiz',
+        builder: (context, state) => const DailyQuizScreen(),
       ),
       GoRoute(
         path: '/progress',
