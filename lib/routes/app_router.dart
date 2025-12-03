@@ -20,6 +20,7 @@ import '../screens/Offline_Mode/offline_view.dart' show OfflineMode;
 import '../screens/conversation_mode/conversation_mode_screen.dart' show ConversationScreen;
 import '../screens/text_to_sign/text_to_sign_screen.dart' show TextTranslationScreen;
 import '../screens/Offline_Mode/offline_file_list_screen.dart';
+import '../screens/Community_Module/notification_screen.dart';
 
 // Note: Speech output and onboarding screens are placeholders for future implementation
 
@@ -229,6 +230,13 @@ class AppRouter {
           body: Center(child: Text('Speech Output Screen - To be implemented')),
         ),
       ),
+
+      GoRoute(
+        path: '/notifications',
+        name: 'notifications',
+        builder: (context, state) => const NotificationScreen(),
+      ),
+      
     ],
   );
 }

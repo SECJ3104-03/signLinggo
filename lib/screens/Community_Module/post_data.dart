@@ -6,6 +6,7 @@ import 'comment_data.dart';
 
 class PostData {
   final String id;
+  final String authorId;
   final String initials;
   final String author;
   final DateTime timestamp;
@@ -13,23 +14,23 @@ class PostData {
   final String title;
   final String content;
   final int likes;
-  
-  // --- NEW: Dedicated Integer for Feed Display ---
   final int commentCount; 
-  
-  // We keep this for compatibility, but the feed will use commentCount
   final List<CommentData> commentList; 
   
+  // --- THESE ARE NOW CALCULATED ---
   final bool isLiked;
+  final bool isFollowed;
+  // --------------------------------
+
   final bool showFollowButton;
   final Gradient profileGradient;
-  final bool isFollowed;
   final String? videoUrl;
   final String? imageUrl;
   final bool isEdited;
 
   const PostData({
     required this.id,
+    required this.authorId,
     required this.initials,
     required this.author,
     required this.timestamp,
@@ -37,19 +38,16 @@ class PostData {
     required this.title,
     required this.content,
     required this.likes,
-    
-    // --- NEW: Add to constructor with default 0 ---
     this.commentCount = 0, 
-    
     this.commentList = const [],
     this.isLiked = false,
+    this.isFollowed = false,
     this.showFollowButton = true,
     this.profileGradient = const LinearGradient(
       begin: Alignment(0.00, 0.00),
       end: Alignment(1.00, 1.00),
       colors: [Color(0xFF155CFB), Color(0xFF980FFA)],
     ),
-    this.isFollowed = false,
     this.videoUrl,
     this.imageUrl,
     this.isEdited = false,
@@ -57,6 +55,7 @@ class PostData {
 
   Map<String, dynamic> toMap() {
     return {
+      'authorId': authorId,
       'initials': initials,
       'author': author,
       'timestamp': Timestamp.fromDate(timestamp),
@@ -64,19 +63,24 @@ class PostData {
       'title': title,
       'content': content,
       'likes': likes,
-      'commentCount': commentCount, // Save to DB
-      'isLiked': isLiked,
+      'commentCount': commentCount,
+      // We don't save booleans. The DB uses arrays 'likedBy' and 'followers'.
       'showFollowButton': showFollowButton,
-      'isFollowed': isFollowed,
       'videoUrl': videoUrl,
       'imageUrl': imageUrl,
       'isEdited': isEdited,
     };
   }
 
-  factory PostData.fromMap(Map<String, dynamic> map, String docId) {
+  // --- UPDATED: Receive currentUserId to calculate state ---
+  factory PostData.fromMap(Map<String, dynamic> map, String docId, String currentUserId) {
+    // 1. Get Lists
+    List<String> likedBy = List<String>.from(map['likedBy'] ?? []);
+    List<String> followers = List<String>.from(map['followers'] ?? []);
+
     return PostData(
       id: docId,
+      authorId: map['authorId'] ?? '',
       initials: map['initials'] ?? '',
       author: map['author'] ?? '',
       timestamp: (map['timestamp'] as Timestamp).toDate(),
@@ -84,11 +88,13 @@ class PostData {
       title: map['title'] ?? '',
       content: map['content'] ?? '',
       likes: map['likes'] ?? 0,
-      // Load from DB (Default to 0 if it doesn't exist yet)
-      commentCount: map['commentCount'] ?? 0, 
-      isLiked: map['isLiked'] ?? false,
+      commentCount: map['commentCount'] ?? 0,
+      
+      // 2. Calculate State based on ID
+      isLiked: likedBy.contains(currentUserId),
+      isFollowed: followers.contains(currentUserId),
+      
       showFollowButton: map['showFollowButton'] ?? true,
-      isFollowed: map['isFollowed'] ?? false,
       videoUrl: map['videoUrl'],
       imageUrl: map['imageUrl'],
       isEdited: map['isEdited'] ?? false,
@@ -98,6 +104,7 @@ class PostData {
 
   PostData copyWith({
     String? id,
+    String? authorId,
     String? initials,
     String? author,
     DateTime? timestamp,
@@ -105,7 +112,7 @@ class PostData {
     String? title,
     String? content,
     int? likes,
-    int? commentCount, // Add to copyWith
+    int? commentCount,
     List<CommentData>? commentList,
     bool? isLiked,
     bool? showFollowButton,
@@ -117,6 +124,7 @@ class PostData {
   }) {
     return PostData(
       id: id ?? this.id,
+      authorId: authorId ?? this.authorId,
       initials: initials ?? this.initials,
       author: author ?? this.author,
       timestamp: timestamp ?? this.timestamp,

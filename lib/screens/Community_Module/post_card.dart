@@ -1,12 +1,14 @@
 // lib/screens/Community_Module/post_card.dart
 
 import 'dart:io'; 
+import 'dart:core';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; 
 import 'package:video_player/video_player.dart';
 import 'package:share_plus/share_plus.dart'; 
 import 'package:path_provider/path_provider.dart'; 
-import 'package:http/http.dart' as http; // Add this import for downloading files
+import 'package:http/http.dart' as http;
+import 'package:firebase_auth/firebase_auth.dart'; // <--- IMPORT AUTH
 import 'post_data.dart'; 
 import 'video_player_widget.dart'; 
 import 'package:signlinggo/screens/conversation_mode/conversation_mode_screen.dart';
@@ -29,6 +31,7 @@ class PostCard extends StatefulWidget {
     this.onCommentTap,
   });
 
+  
   @override
   State<PostCard> createState() => _PostCardState();
 }
@@ -37,11 +40,17 @@ class _PostCardState extends State<PostCard> {
   VideoPlayerController? _videoController;
   bool _isSharing = false; 
 
+  // --- NEW: CHECK IF I OWN THIS POST ---
+  bool get _isOwner {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    // Note: If authorId is empty (old post), assume NOT owner
+    return currentUser != null && widget.post.authorId == currentUser.uid;
+  }
+
   void _navigateToCommentScreen() {
     if (_videoController != null && _videoController!.value.isPlaying) {
       _videoController!.pause();
     }
-    
     if (widget.onCommentTap != null) {
       widget.onCommentTap!();
     }
@@ -51,9 +60,7 @@ class _PostCardState extends State<PostCard> {
     if (_videoController != null && _videoController!.value.isPlaying) {
       _videoController!.pause();
     }
-
     MockChatService.startChat(widget.post.author, widget.post.initials);
-
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -68,30 +75,22 @@ class _PostCardState extends State<PostCard> {
 
   Future<void> _sharePost() async {
     final String shareText = '${widget.post.title}\n\n${widget.post.content}\n\nSent via SignLinggo App';
-    
     final String? mediaPath = widget.post.videoUrl ?? widget.post.imageUrl;
 
     if (mediaPath == null) {
       Share.share(shareText);
     } else {
-      setState(() {
-        _isSharing = true; 
-      });
-
+      setState(() { _isSharing = true; });
       try {
         XFile fileToShare;
-
         if (mediaPath.startsWith('http') || mediaPath.startsWith('https')) {
-          // --- NEW: Handle Network Files (Supabase) ---
           final response = await http.get(Uri.parse(mediaPath));
           final tempDir = await getTemporaryDirectory();
-          final String fileExtension = mediaPath.split('.').last.split('?').first; // Clean extension
+          final String fileExtension = mediaPath.split('.').last.split('?').first; 
           final File tempFile = File('${tempDir.path}/shared_file.$fileExtension');
           await tempFile.writeAsBytes(response.bodyBytes);
           fileToShare = XFile(tempFile.path);
-          
         } else if (mediaPath.startsWith('assets/')) {
-          // Handle Assets (Dummy Data)
           final byteData = await rootBundle.load(mediaPath);
           final tempDir = await getTemporaryDirectory();
           final String fileName = mediaPath.split('/').last;
@@ -101,26 +100,15 @@ class _PostCardState extends State<PostCard> {
             byteData.lengthInBytes
           ));
           fileToShare = XFile(tempFile.path);
-          
         } else {
-          // Handle Local Files
           fileToShare = XFile(mediaPath);
         }
-
-        await Share.shareXFiles(
-          [fileToShare],
-          text: shareText,
-        );
-
+        await Share.shareXFiles([fileToShare], text: shareText);
       } catch (e) {
         print("Error sharing file: $e");
         Share.share(shareText);
       } finally {
-        if (mounted) {
-          setState(() {
-            _isSharing = false; 
-          });
-        }
+        if (mounted) setState(() { _isSharing = false; });
       }
     }
   }
@@ -147,7 +135,6 @@ class _PostCardState extends State<PostCard> {
             children: [
               _buildHeader(),
               _buildContent(),
-              
               const Divider(
                 height: 1.24,
                 thickness: 1.24,
@@ -155,7 +142,6 @@ class _PostCardState extends State<PostCard> {
                 indent: 21.22,
                 endIndent: 21.22,
               ),
-
               _buildFooter(), 
             ],
           ),
@@ -222,7 +208,6 @@ class _PostCardState extends State<PostCard> {
                         height: 1.50,
                       ),
                     ),
-                    
                     if (widget.post.isEdited)
                       const Padding(
                         padding: EdgeInsets.only(left: 7.99),
@@ -238,7 +223,6 @@ class _PostCardState extends State<PostCard> {
                           ),
                         ),
                       ),
-                    
                     const SizedBox(width: 7.99),
                     const Text(
                       '•',
@@ -268,7 +252,9 @@ class _PostCardState extends State<PostCard> {
             ),
           ),
           
-          if (widget.post.author == 'You')
+          // --- UPDATED LOGIC HERE ---
+          // Only show 'More' if I am the owner
+          if (_isOwner)
             InkWell(
               onTap: widget.onMoreOptionsTap,
               borderRadius: BorderRadius.circular(20),
@@ -281,6 +267,7 @@ class _PostCardState extends State<PostCard> {
                 ),
               ),
             )
+          // Only show 'Follow' if I am NOT the owner
           else if (widget.post.showFollowButton)
             InkWell(
               onTap: widget.onFollowTap,
@@ -431,7 +418,7 @@ class _PostCardState extends State<PostCard> {
             ),
 
             // 3. MESSAGE
-            if (widget.post.author != 'You') ...[
+            if (!_isOwner) ...[ // --- Only message if not owner
               const SizedBox(width: 24), 
               InkWell(
                 onTap: _navigateToDirectMessage,
