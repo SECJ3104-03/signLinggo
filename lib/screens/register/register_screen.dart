@@ -1,5 +1,3 @@
-library;
-
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -156,7 +154,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         Provider.of<AppProvider>(context, listen: false);
                     appProvider.setGuestMode(true);
                     appProvider.setLoggedIn(false);
-                    context.go('/home');
+                    context.go('/profile');
                   },
                   child: const Text(
                     "Continue as Guest",
@@ -219,7 +217,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       appProvider.setLoggedIn(true);
       appProvider.setGuestMode(false);
 
-      context.go('/home');
+      context.go('/profile');
 
     } else {
       // error

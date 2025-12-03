@@ -200,7 +200,7 @@ class _SignInScreenState extends State<SignInScreen> {
                         Provider.of<AppProvider>(context, listen: false);
                     appProvider.setGuestMode(true);
                     appProvider.setLoggedIn(false);
-                    context.go('/home');
+                    context.go('/profile');
                   },
                   child: const Text(
                     "Continue as Guest",
@@ -225,25 +225,32 @@ class _SignInScreenState extends State<SignInScreen> {
 
     setState(() => _loading = true);
 
-    // Sign out any previous session
-    await _authService.signOut();
+    try {
+      // Sign out any previous session
+      await _authService.signOut();
 
-    final user = await _authService.login(
-      email: emailController.text.trim(),
-      password: passwordController.text.trim(),
-    );
-
-    setState(() => _loading = false);
-
-    if (user != null) {
-      final appProvider = Provider.of<AppProvider>(context, listen: false);
-      appProvider.setLoggedIn(true);
-      appProvider.setGuestMode(false);
-      context.go('/home');
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Login failed: Invalid email or password")),
+      // Attempt login
+      final user = await _authService.login(
+        email: emailController.text.trim(),
+        password: passwordController.text.trim(),
       );
+
+      if (user != null) {
+        final appProvider = Provider.of<AppProvider>(context, listen: false);
+        appProvider.setLoggedIn(true);
+        appProvider.setGuestMode(false);
+        context.go('/profile');
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Login failed: Invalid email or password")),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Login error: $e")),
+      );
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -258,7 +265,9 @@ class _SignInScreenState extends State<SignInScreen> {
         final appProvider = Provider.of<AppProvider>(context, listen: false);
         appProvider.setLoggedIn(true);
         appProvider.setGuestMode(false);
-        context.go('/home');
+
+        // Navigate to profile
+        context.go('/profile');
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Google Sign-In cancelled")),
@@ -269,7 +278,7 @@ class _SignInScreenState extends State<SignInScreen> {
         SnackBar(content: Text("Google Sign-In failed: $e")),
       );
     } finally {
-      if (mounted) setState(() => _loading = false); // Always reset loading
+      if (mounted) setState(() => _loading = false);
     }
   }
 
