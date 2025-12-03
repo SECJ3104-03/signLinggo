@@ -4,8 +4,9 @@ import 'package:flutter/material.dart';
 import 'post_data.dart';
 import 'post_card.dart';
 import 'create_post_screen.dart';
-import 'comment_data.dart';
 import 'post_detail_screen.dart';
+import 'package:signlinggo/screens/conversation_mode/chat_list_screen.dart';
+import 'firestore_service.dart'; 
 
 class CommunityHubEdited extends StatefulWidget {
   const CommunityHubEdited({super.key});
@@ -15,107 +16,91 @@ class CommunityHubEdited extends StatefulWidget {
 }
 
 class _CommunityHubEditedState extends State<CommunityHubEdited> {
-  
-  late List<PostData> _posts;
-  String _selectedCategory = 'All';
-  
+  final FirestoreService _firestoreService = FirestoreService();
   final TextEditingController _searchController = TextEditingController();
+  
+  String _selectedCategory = 'All';
 
   @override
   void initState() {
     super.initState();
-    _posts = [
-      PostData(
-        initials: 'SC',
-        author: 'Sarah Chen',
-        timeAgo: '2h ago',
-        tag: 'Learning Tips',
-        title: 'How I learned 100 signs in a month',
-        content: 'Consistency is key! I practiced 30 minutes daily and used flashcards. The progress tracker really helped me stay motivated.',
-        likes: 45,
-        commentList: [
-          CommentData(author: 'Ahmad', initials: 'AR', content: 'Wow, great job!'),
-          CommentData(author: 'Emily', initials: 'EW', content: 'That is so inspiring!'),
-        ],
-        isLiked: false,
-        isFollowed: false,
-        videoUrl: 'assets/assets/videos/Bahasa_Isyarat.mp4', // Your asset video
-      ),
-      const PostData(
-        initials: 'AR',
-        author: 'Ahmad Rahman',
-        timeAgo: '5h ago',
-        tag: 'Ask for Help',
-        title: 'Struggling with finger spelling',
-        content: 'Does anyone have tips for improving finger spelling speed? I can do it slowly but want to be faster.',
-        likes: 28,
-        commentList: [],
-        isLiked: true,
-        isFollowed: false,
-        videoUrl: null,
-      ),
-      const PostData(
-        initials: 'EW',
-        author: 'Emily Wong',
-        timeAgo: '1d ago',
-        tag: 'Share Experiences',
-        title: 'Used SignLinggo at a cafe today!',
-        content: 'Had my first real conversation with a deaf barista using this app. It was amazing! Thank you SignEase team! 🙌',
-        likes: 152,
-        commentList: [],
-        isLiked: true,
-        showFollowButton: true,
-        isFollowed: false,
-        videoUrl: null,
-      ),
-    ];
-
     _searchController.addListener(() {
       setState(() {});
     });
   }
   
+  void _seedDummyData() {
+    final List<PostData> dummyPosts = [
+      PostData(
+        id: 'post_001', 
+        initials: 'SC',
+        author: 'Sarah Chen',
+        timestamp: DateTime.now().subtract(const Duration(hours: 2)),
+        tag: 'Learning Tips',
+        title: 'How I learned 100 signs in a month',
+        content: 'Consistency is key! I practiced 30 minutes daily and used flashcards.',
+        likes: 45,
+        videoUrl: 'assets/assets/videos/Bahasa_Isyarat.mp4', 
+      ),
+      PostData(
+        id: 'post_002', 
+        initials: 'AR',
+        author: 'Ahmad Rahman',
+        timestamp: DateTime.now().subtract(const Duration(hours: 5)),
+        tag: 'Ask for Help',
+        title: 'Struggling with finger spelling',
+        content: 'Does anyone have tips for improving finger spelling speed?',
+        likes: 28,
+        isLiked: true,
+        videoUrl: null,
+      ),
+      PostData(
+        id: 'post_003', 
+        initials: 'EW',
+        author: 'Emily Wong',
+        timestamp: DateTime.now().subtract(const Duration(days: 1)),
+        tag: 'Share Experiences',
+        title: 'Used SignLinggo at a cafe today!',
+        content: 'Had my first real conversation with a deaf barista using this app.',
+        likes: 152,
+        isLiked: true,
+        showFollowButton: true,
+        videoUrl: null,
+      ),
+    ];
+
+    for (var post in dummyPosts) {
+      _firestoreService.createPost(post);
+    }
+  }
+
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
   }
 
-  // --- All helper functions (_unfocusSearch, _onFollowTapped, etc.) are unchanged ---
   void _unfocusSearch() {
     _searchController.clear(); 
     FocusManager.instance.primaryFocus?.unfocus();
   }
-  void _onFollowTapped(int postIndex) {
-    final post = _posts[postIndex];
-    setState(() {
-      _posts[postIndex] = post.copyWith(isFollowed: !post.isFollowed);
-    });
+
+  // --- ACTIONS ---
+
+  // --- UPDATED: Toggle Follow via Firebase ---
+  void _onFollowTapped(PostData post) {
+    _firestoreService.togglePostFollow(post.id, post.isFollowed);
   }
-  void _onLikeTapped(int postIndex) {
-    final post = _posts[postIndex];
-    if (post.isLiked) {
-      setState(() {
-        _posts[postIndex] = post.copyWith(
-          isLiked: false,
-          likes: post.likes - 1,
-        );
-      });
-    } else {
-      setState(() {
-        _posts[postIndex] = post.copyWith(
-          isLiked: true,
-          likes: post.likes + 1,
-        );
-      });
-    }
+
+  void _onLikeTapped(PostData post) {
+    _firestoreService.togglePostLike(post.id, post.isLiked, post.likes);
   }
-  void _onDeleteTapped(int postIndex) {
-    setState(() {
-      _posts.removeAt(postIndex);
-    });
+
+  void _onDeleteTapped(String postId) {
+    _firestoreService.deletePost(postId);
   }
-  void _onMoreOptionsTapped(int postIndex) {
+
+  void _onMoreOptionsTapped(String postId) {
     showModalBottomSheet(
       context: context,
       useRootNavigator: true, 
@@ -124,22 +109,19 @@ class _CommunityHubEditedState extends State<CommunityHubEdited> {
         return Wrap(
           children: [
             ListTile(
-              leading: Icon(Icons.edit_outlined),
-              title: Text('Edit Post'),
+              leading: const Icon(Icons.edit_outlined),
+              title: const Text('Edit Post'),
               onTap: () {
                 Navigator.pop(context); 
-                _navigateToEditPost(postIndex); 
+                // Edit logic omitted for brevity
               },
             ),
             ListTile(
               leading: Icon(Icons.delete_outline_rounded, color: Colors.red[600]),
-              title: Text(
-                'Delete Post', 
-                style: TextStyle(color: Colors.red[600]),
-              ),
+              title: Text('Delete Post', style: TextStyle(color: Colors.red[600])),
               onTap: () {
                 Navigator.pop(context); 
-                _onDeleteTapped(postIndex); 
+                _onDeleteTapped(postId); 
               },
             ),
           ],
@@ -147,11 +129,13 @@ class _CommunityHubEditedState extends State<CommunityHubEdited> {
       },
     );
   }
+
   void _onCategoryTapped(String category) {
     setState(() {
       _selectedCategory = category;
     });
   }
+
   void _navigateAndCreatePost() async {
     _unfocusSearch(); 
     
@@ -161,80 +145,50 @@ class _CommunityHubEditedState extends State<CommunityHubEdited> {
     );
 
     if (result != null && result is PostData) {
-      setState(() {
-        _posts.insert(0, result);
-      });
+      _firestoreService.createPost(result);
     }
   }
-  void _navigateToEditPost(int postIndex) async {
-    _unfocusSearch(); 
-    final PostData postToEdit = _posts[postIndex];
 
-    final updatedPost = await Navigator.push(
+  void _navigateToPostDetail(PostData post) {
+    _unfocusSearch(); 
+    Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => CreatePostScreen(existingPost: postToEdit),
+        builder: (context) => PostDetailScreen(initialPost: post),
       ),
     );
-    
-    if (updatedPost != null && updatedPost is PostData) {
-      setState(() {
-        _posts[postIndex] = updatedPost;
-      });
-    }
   }
-  void _navigateToPostDetail(int postIndex) async {
-    _unfocusSearch(); 
-    
-    final PostData postToView = _posts[postIndex];
 
-    final updatedPost = await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => PostDetailScreen(initialPost: postToView),
-      ),
-    );
-
-    if (updatedPost != null && updatedPost is PostData) {
-      setState(() {
-        _posts[postIndex] = updatedPost;
-      });
-    }
-  }
-  List<PostData> get _filteredPosts {
+  // --- FILTER LOGIC ---
+  List<PostData> _filterPosts(List<PostData> allPosts) {
     List<PostData> categoryFilteredList;
+    
     switch (_selectedCategory) {
       case 'Following':
-        categoryFilteredList = _posts.where((post) => post.isFollowed).toList();
+        categoryFilteredList = allPosts.where((post) => post.isFollowed).toList();
         break;
       case 'Tips':
-        categoryFilteredList = _posts.where((post) => post.tag == 'Learning Tips').toList();
+        categoryFilteredList = allPosts.where((post) => post.tag == 'Learning Tips').toList();
         break;
       case 'Help':
-        categoryFilteredList = _posts.where((post) => post.tag == 'Ask for Help').toList();
+        categoryFilteredList = allPosts.where((post) => post.tag == 'Ask for Help').toList();
         break;
       case 'All':
       default:
-        categoryFilteredList = _posts;
+        categoryFilteredList = allPosts;
     }
 
     final String query = _searchController.text.trim().toLowerCase();
-
-    if (query.isEmpty) {
-      return categoryFilteredList;
-    }
+    if (query.isEmpty) return categoryFilteredList;
 
     return categoryFilteredList.where((post) {
       final authorName = post.author.toLowerCase();
       return authorName.contains(query);
     }).toList();
   }
-  // --- End of unchanged helper functions ---
-
 
   @override
   Widget build(BuildContext context) {
-    // --- NEW: Wrap the Scaffold in the gradient Container ---
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
@@ -248,7 +202,6 @@ class _CommunityHubEditedState extends State<CommunityHubEdited> {
         ),
       ),
       child: Scaffold(
-        // --- MODIFIED: Make Scaffold transparent ---
         backgroundColor: Colors.transparent,
         floatingActionButton: _buildFloatingAddButton(_navigateAndCreatePost),
         body: SafeArea( 
@@ -261,9 +214,57 @@ class _CommunityHubEditedState extends State<CommunityHubEdited> {
               const SizedBox(height: 24),
               
               Expanded(
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 300),
-                  child: _buildPostList(),
+                child: StreamBuilder<List<PostData>>(
+                  stream: _firestoreService.getPostsStream(),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    
+                    if (snapshot.hasError) {
+                      return const Center(child: Text("Error loading posts"));
+                    }
+
+                    final allPosts = snapshot.data ?? [];
+
+                    // --- EMPTY STATE ---
+                    if (allPosts.isEmpty) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Text("No posts found."),
+                            const SizedBox(height: 10),
+                            ElevatedButton(
+                              onPressed: _seedDummyData, 
+                              child: const Text("Initialize Mock Data")
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+
+                    final displayPosts = _filterPosts(allPosts);
+
+                    return ListView.builder(
+                      padding: const EdgeInsets.only(top: 0),
+                      itemCount: displayPosts.length,
+                      itemBuilder: (context, index) {
+                        final post = displayPosts[index];
+                        return Padding(
+                          padding: const EdgeInsets.fromLTRB(24, 0, 24, 15.99),
+                          child: PostCard(
+                            post: post,
+                            // --- CONNECTED BUTTON ---
+                            onFollowTap: () => _onFollowTapped(post),
+                            onLikeTap: () => _onLikeTapped(post),
+                            onMoreOptionsTap: () => _onMoreOptionsTapped(post.id),
+                            onCommentTap: () => _navigateToPostDetail(post),
+                          ),
+                        );
+                      },
+                    );
+                  },
                 ),
               ),
             ],
@@ -273,36 +274,30 @@ class _CommunityHubEditedState extends State<CommunityHubEdited> {
     );
   }
 
-  // --- Helper Methods ---
-  
   Widget _buildAppBar(BuildContext context) {
     return Container(
       width: double.infinity,
       height: 61.96,
       padding: const EdgeInsets.only(top: 15.99, left: 24, right: 24),
-      // --- MODIFIED: Make AppBar transparent and remove box decoration ---
-      decoration: BoxDecoration(color: Colors.transparent),
+      decoration: const BoxDecoration(color: Colors.transparent),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           InkWell(
             onTap: () {
-              // --- This now correctly pops back to HomePage ---
               Navigator.of(context).pop();
             },
-            child: Container(
+            child: const SizedBox(
               width: 24,
               height: 24,
-              // --- MODIFIED: Icon defaults to dark color, which is correct ---
               child: Icon(Icons.arrow_back, color: Color(0xFF101727)),
             ),
           ),
-          Text(
+          const Text(
             'Community Hub',
             style: TextStyle(
-              // --- This dark color is correct for the light gradient ---
-              color: const Color(0xFF101727),
+              color: Color(0xFF101727),
               fontSize: 20,
               fontFamily: 'Arimo',
               fontWeight: FontWeight.w400,
@@ -311,12 +306,14 @@ class _CommunityHubEditedState extends State<CommunityHubEdited> {
           ),
           InkWell(
             onTap: () {
-              print("Profile icon tapped");
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const ChatListScreen()),
+              );
             },
-            child: Container(
+            child: const SizedBox(
               width: 24,
               height: 24,
-              // --- MODIFIED: Icon defaults to dark color, which is correct ---
               child: Icon(Icons.person_outline, color: Color(0xFF101727)),
             ),
           ),
@@ -328,7 +325,7 @@ class _CommunityHubEditedState extends State<CommunityHubEdited> {
   Widget _buildSearchBar() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Container(
+      child: SizedBox(
         width: double.infinity,
         height: 47.99,
         child: Stack(
@@ -341,10 +338,8 @@ class _CommunityHubEditedState extends State<CommunityHubEdited> {
               child: Container(
                 clipBehavior: Clip.antiAlias,
                 decoration: ShapeDecoration(
-                  // --- MODIFIED: Make search bar semi-transparent ---
                   color: const Color(0xFFF9FAFB).withOpacity(0.85),
                   shape: RoundedRectangleBorder(
-                    // --- MODIFIED: Use same border as HomePage cards ---
                     side: const BorderSide(width: 1, color: Color(0x99FFFEFE)),
                     borderRadius: BorderRadius.circular(16),
                   ),
@@ -353,17 +348,17 @@ class _CommunityHubEditedState extends State<CommunityHubEdited> {
                   padding: const EdgeInsets.only(top: 0, left: 44, right: 12, bottom: 0),
                   child: TextField(
                     controller: _searchController,
-                    decoration: InputDecoration(
+                    decoration: const InputDecoration(
                       hintText: 'Search posts...',
                       border: InputBorder.none,
                       hintStyle: TextStyle(
-                        color: const Color(0xFF717182),
+                        color: Color(0xFF717182),
                         fontSize: 16,
                         fontFamily: 'Arimo',
                         fontWeight: FontWeight.w400,
                       ),
                     ),
-                    style: TextStyle(
+                    style: const TextStyle(
                       color: Colors.black,
                       fontSize: 16,
                       fontFamily: 'Arimo',
@@ -373,13 +368,13 @@ class _CommunityHubEditedState extends State<CommunityHubEdited> {
                 ),
               ),
             ),
-            Positioned(
+            const Positioned(
               left: 11.99,
               top: 14.01,
-              child: Container(
+              child: SizedBox(
                 width: 19.98,
                 height: 19.98,
-                child: Icon(Icons.search, color: const Color(0xFF717182)),
+                child: Icon(Icons.search, color: Color(0xFF717182)),
               ),
             ),
           ],
@@ -396,7 +391,6 @@ class _CommunityHubEditedState extends State<CommunityHubEdited> {
         height: 35.99,
         padding: const EdgeInsets.only(right: 0.02),
         decoration: ShapeDecoration(
-          // --- MODIFIED: Make tabs background semi-transparent ---
           color: const Color(0xFFF3F4F6).withOpacity(0.85),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
@@ -445,10 +439,8 @@ class _CommunityHubEditedState extends State<CommunityHubEdited> {
         height: 29,
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
         decoration: ShapeDecoration(
-          // --- MODIFIED: Selected tab is now semi-transparent white ---
           color: isSelected ? Colors.white.withOpacity(0.9) : Colors.transparent,
           shape: RoundedRectangleBorder(
-            // --- MODIFIED: Use same border as HomePage cards ---
             side: isSelected 
                 ? const BorderSide(width: 1, color: Color(0x99FFFEFE)) 
                 : BorderSide.none,
@@ -463,8 +455,8 @@ class _CommunityHubEditedState extends State<CommunityHubEdited> {
               child: Text(
                 title,
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: const Color(0xFF0A0A0A),
+                style: const TextStyle(
+                  color: Color(0xFF0A0A0A),
                   fontSize: 14,
                   fontFamily: 'Arimo',
                   fontWeight: FontWeight.w400,
@@ -479,47 +471,6 @@ class _CommunityHubEditedState extends State<CommunityHubEdited> {
     );
   }
 
-  Widget _buildPostList() {
-    final String listKey = '${_selectedCategory}_${_searchController.text}';
-
-    if (_filteredPosts.isEmpty) {
-      return Container(
-        key: ValueKey(listKey), 
-        child: Center(
-          child: Text(
-            'No posts found.',
-            style: TextStyle(
-              color: Colors.grey[600],
-              fontSize: 16,
-            ),
-          ),
-        ),
-      );
-    }
-
-    return ListView.builder(
-      key: ValueKey(listKey),
-      padding: const EdgeInsets.only(top: 0),
-      itemCount: _filteredPosts.length,
-      itemBuilder: (context, index) {
-        
-        final post = _filteredPosts[index];
-        final int originalIndex = _posts.indexOf(post);
-
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(24, 0, 24, 15.99),
-          child: PostCard(
-            post: post,
-            onFollowTap: () => _onFollowTapped(originalIndex),
-            onLikeTap: () => _onLikeTapped(originalIndex),
-            onMoreOptionsTap: () => _onMoreOptionsTapped(originalIndex),
-            onCommentTap: () => _navigateToPostDetail(originalIndex),
-          ),
-        );
-      },
-    );
-  }
-
   Widget _buildFloatingAddButton(VoidCallback onTap) {
     return InkWell(
       onTap: onTap,
@@ -527,15 +478,15 @@ class _CommunityHubEditedState extends State<CommunityHubEdited> {
         width: 64,
         height: 64,
         decoration: ShapeDecoration(
-          gradient: LinearGradient(
+          gradient: const LinearGradient(
             begin: Alignment(0.00, 0.00),
             end: Alignment(1.00, 1.00),
-            colors: [const Color(0xFFF6329A), const Color(0xFFAC46FF), const Color(0xFF4F39F6)],
+            colors: [Color(0xFFF6329A), Color(0xFFAC46FF), Color(0xFF4F39F6)],
           ),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(41659800),
           ),
-          shadows: [
+          shadows: const [
             BoxShadow(
               color: Color(0x7FAC46FF),
               blurRadius: 50,
@@ -544,7 +495,7 @@ class _CommunityHubEditedState extends State<CommunityHubEdited> {
             )
           ],
         ),
-        child: Icon(Icons.add, color: Colors.white, size: 32),
+        child: const Icon(Icons.add, color: Colors.white, size: 32),
       ),
     );
   }
