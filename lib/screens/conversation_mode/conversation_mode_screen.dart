@@ -1,3 +1,5 @@
+// lib/screens/conversation_mode/conversation_mode_screen.dart
+
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
@@ -10,6 +12,8 @@ class ConversationScreen extends StatefulWidget {
   final String chatName;
   final String avatar;
   final bool isOnline;
+  
+  // These are required to link the chat to the correct database document
   final String conversationId;
   final String currentUserID;
 
@@ -22,28 +26,26 @@ class ConversationScreen extends StatefulWidget {
     this.isOnline = false,
   });
 
-
   @override
   State<ConversationScreen> createState() => _ConversationScreenState();
 }
 
-
 class _ConversationScreenState extends State<ConversationScreen> {
   String _mode = "Text";
   final TextEditingController _textController = TextEditingController();
-
 
   CameraController? _cameraController;
   List<CameraDescription> _cameras = [];
   bool _isRecording = false;
   final Map<String, VideoPlayerController> _videoControllers = {};
 
+  // We use the ID passed from the parent widget
   late final String currentUserId;
 
   @override
   void initState() {
     super.initState();
-    currentUserId = FirebaseAuth.instance.currentUser?.uid ?? "user1"; // Initialize Firebase Auth user ID
+    currentUserId = widget.currentUserID; 
     if (_mode == 'Sign') _initCamera();
   }
 
@@ -58,7 +60,6 @@ class _ConversationScreenState extends State<ConversationScreen> {
   // ---------------- Mode Switching ----------------
   void _switchMode(String mode) async {
     if (_mode == mode) return;
-
 
     if (_mode == 'Sign') {
       await _cameraController?.dispose();
@@ -90,8 +91,9 @@ class _ConversationScreenState extends State<ConversationScreen> {
 
   // ---------------- Firestore Message Stream ----------------
   Stream<List<Map<String, dynamic>>> _messageStream() {
+    // Note: Updated to 'conversation' (singular) to match ChatListScreen
     return FirebaseFirestore.instance
-        .collection('conversations')
+        .collection('conversation') 
         .doc(widget.conversationId)
         .collection('messages')
         .orderBy('createdAt', descending: true)
@@ -108,8 +110,9 @@ class _ConversationScreenState extends State<ConversationScreen> {
     final text = _textController.text.trim();
     if (text.isEmpty) return;
 
+    // Note: Updated to 'conversation' (singular)
     final messageRef = FirebaseFirestore.instance
-        .collection('conversations')
+        .collection('conversation')
         .doc(widget.conversationId)
         .collection('messages')
         .doc();
@@ -123,13 +126,16 @@ class _ConversationScreenState extends State<ConversationScreen> {
       'createdAt': FieldValue.serverTimestamp(),
     });
 
-    // Update conversation lastMessage
+    // --- CRITICAL FIX: Ensure userIDs are saved so ChatListScreen can find this chat ---
+    final conversationIds = widget.conversationId.split('_'); 
+    
     await FirebaseFirestore.instance
-        .collection('conversations')
+        .collection('conversation')
         .doc(widget.conversationId)
         .set({
       'lastMessage': text,
       'lastMessageAt': FieldValue.serverTimestamp(),
+      'userIDs': conversationIds, // This allows the query in ChatListScreen to work
     }, SetOptions(merge: true));
 
     _textController.clear();
@@ -142,43 +148,53 @@ class _ConversationScreenState extends State<ConversationScreen> {
   }
 
   Future<void> _stopSignRecording() async {
-  if (_cameraController == null || !_isRecording) return;
-  final video = await _cameraController!.stopVideoRecording();
-  setState(() => _isRecording = false);
+    if (_cameraController == null || !_isRecording) return;
+    final video = await _cameraController!.stopVideoRecording();
+    setState(() => _isRecording = false);
 
-  final videoFile = File(video.path);
+    final videoFile = File(video.path);
 
-  //Upload video to Supabase
-  final videoURL = await _uploadVideoToSupabase(videoFile);
-  if (videoURL == null) return;
+    // Upload video to Supabase
+    final videoURL = await _uploadVideoToSupabase(videoFile);
+    if (videoURL == null) return;
 
-  //Store message in Firestore
-  final messageRef = FirebaseFirestore.instance
-      .collection('conversations')
-      .doc(widget.conversationId)
-      .collection('messages')
-      .doc();
+    // Note: Updated to 'conversation' (singular)
+    final messageRef = FirebaseFirestore.instance
+        .collection('conversation')
+        .doc(widget.conversationId)
+        .collection('messages')
+        .doc();
 
-  await messageRef.set({
-    'messageId': messageRef.id,
-    'senderId': currentUserId,
-    'content': videoURL,
-    'type': 'video',
-    'isRead': false,
-    'createdAt': FieldValue.serverTimestamp(),
-  });
+    await messageRef.set({
+      'messageId': messageRef.id,
+      'senderId': currentUserId,
+      'content': videoURL,
+      'type': 'video',
+      'isRead': false,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
 
-  //Initialize video controller to play
-  final controller = VideoPlayerController.networkUrl(Uri.parse(videoURL))
-    ..initialize().then((_) => setState(() {}));
-  _videoControllers[videoURL] = controller;
-}
+    // Initialize video controller to play locally immediately
+    final controller = VideoPlayerController.networkUrl(Uri.parse(videoURL))
+      ..initialize().then((_) => setState(() {}));
+    _videoControllers[videoURL] = controller;
+    
+    // --- Update Main Conversation Document ---
+    final conversationIds = widget.conversationId.split('_'); 
+    await FirebaseFirestore.instance
+        .collection('conversation')
+        .doc(widget.conversationId)
+        .set({
+      'lastMessage': 'Sent a video',
+      'lastMessageAt': FieldValue.serverTimestamp(),
+      'userIDs': conversationIds,
+    }, SetOptions(merge: true));
+  }
 
   void _sendVoiceMessage() async {
-    // Implement voice recording + upload if needed
-    // For now, just a placeholder message
+    // Placeholder logic from your original file
     final messageRef = FirebaseFirestore.instance
-        .collection('conversations')
+        .collection('conversation')
         .doc(widget.conversationId)
         .collection('messages')
         .doc();
@@ -191,6 +207,17 @@ class _ConversationScreenState extends State<ConversationScreen> {
       'isRead': false,
       'createdAt': FieldValue.serverTimestamp(),
     });
+    
+    // --- Update Main Conversation Document ---
+    final conversationIds = widget.conversationId.split('_'); 
+    await FirebaseFirestore.instance
+        .collection('conversation')
+        .doc(widget.conversationId)
+        .set({
+      'lastMessage': 'Sent a voice message',
+      'lastMessageAt': FieldValue.serverTimestamp(),
+      'userIDs': conversationIds,
+    }, SetOptions(merge: true));
   }
 
   Future<String?> _uploadVideoToSupabase(File videoFile) async {
@@ -260,7 +287,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           border: Border.all(color: Colors.white70, width: 3),
-          boxShadow: [
+          boxShadow: const [
             BoxShadow(color: Colors.black26, blurRadius: 6, offset: Offset(0, 3))
           ],
         ),
@@ -445,7 +472,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
       case 'video':
         final videoURL = msg['content'] as String;
         final controller = _videoControllers[videoURL] ??
-            VideoPlayerController.network(videoURL)
+            VideoPlayerController.networkUrl(Uri.parse(videoURL))
               ..initialize().then((_) => setState(() {}));
         _videoControllers[videoURL] = controller;
         return _buildVideoBubble(controller, isUser);

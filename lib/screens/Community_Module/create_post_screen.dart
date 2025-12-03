@@ -1,12 +1,13 @@
 // lib/screens/Community_Module/create_post_screen.dart
 
 import 'dart:io'; 
+import 'dart:core';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart'; 
 import 'post_data.dart';
 import 'video_player_widget.dart';
-// Import the new service
 import 'package:signlinggo/services/supabase_storage_service.dart'; 
+import 'package:firebase_auth/firebase_auth.dart'; 
 
 class CreatePostScreen extends StatefulWidget {
   final PostData? existingPost;
@@ -23,20 +24,35 @@ class CreatePostScreen extends StatefulWidget {
 class _CreatePostScreenState extends State<CreatePostScreen> {
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _contentController = TextEditingController();
-  
-  // Instance of our new Storage Service
   final SupabaseStorageService _storageService = SupabaseStorageService();
+  final ImagePicker _picker = ImagePicker();
 
   final List<String> _postTags = ['Learning Tips', 'Ask for Help', 'Share Experiences'];
   String _selectedTag = 'Learning Tips';
   
   File? _videoFile;
   File? _imageFile; 
-  
-  final ImagePicker _picker = ImagePicker();
-
   bool _isPosting = false;
   late bool _isEditMode;
+
+  // Helper to get Real User Name
+  String _getCurrentUserName() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      if (user.displayName != null && user.displayName!.isNotEmpty) {
+        return user.displayName!;
+      }
+      if (user.email != null) {
+        return user.email!.split('@')[0];
+      }
+    }
+    return "Anonymous";
+  }
+
+  String _getInitials(String name) {
+    if (name.isEmpty) return "?";
+    return name[0].toUpperCase();
+  }
 
   @override
   void initState() {
@@ -89,35 +105,36 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     }
 
     setState(() {
-      _isPosting = true; // Show loading spinner
+      _isPosting = true; 
     });
 
     try {
-      // 1. UPLOAD MEDIA TO SUPABASE (If selected)
       String? finalVideoUrl;
       String? finalImageUrl;
 
       if (_videoFile != null) {
-        // Upload Video
         finalVideoUrl = await _storageService.uploadFile(_videoFile!, 'vid');
         if (finalVideoUrl == null) throw Exception("Video upload failed");
       }
       
       if (_imageFile != null) {
-        // Upload Image
         finalImageUrl = await _storageService.uploadFile(_imageFile!, 'img');
         if (finalImageUrl == null) throw Exception("Image upload failed");
       }
 
-      // 2. CREATE / UPDATE POST OBJECT
+      // --- GET REAL USER INFO ---
+      final String realAuthor = _getCurrentUserName();
+      final String realInitials = _getInitials(realAuthor);
+      // --- GET USER ID ---
+      final String currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
+
       if (_isEditMode) {
-        // --- EDIT LOGIC ---
         PostData updatedPost;
 
-        // Check if we have NEW media to update
         if (finalVideoUrl != null || finalImageUrl != null) {
           updatedPost = PostData(
             id: widget.existingPost!.id,
+            authorId: widget.existingPost!.authorId, // Keep original ID
             initials: widget.existingPost!.initials,
             author: widget.existingPost!.author,
             timestamp: widget.existingPost!.timestamp,
@@ -129,22 +146,14 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
             isFollowed: widget.existingPost!.isFollowed,
             commentCount: widget.existingPost!.commentCount,
             
-            // Text Fields
             title: title,
             content: content,
             tag: _selectedTag,
             isEdited: true,
-
-            // Media Logic: If new upload exists, use it. Otherwise check if we should keep old one.
-            // If user removed media (_videoFile & _imageFile are null), we set these to null.
             videoUrl: finalVideoUrl,
             imageUrl: finalImageUrl, 
           );
         } else {
-          // No new uploads, but did user remove existing media?
-          // If _videoFile/ImageFile are null AND we didn't upload anything, 
-          // we assume the user kept the original UNLESS they explicitly clicked remove (which we can't easily track here without extra state).
-          // For MVP: simple copyWith updates text.
           updatedPost = widget.existingPost!.copyWith(
             title: title,
             content: content,
@@ -156,22 +165,22 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         if (mounted) Navigator.pop(context, updatedPost);
         
       } else {
-        // --- NEW POST LOGIC ---
+        // --- NEW POST ---
         final newPost = PostData(
-          id: DateTime.now().millisecondsSinceEpoch.toString(), // Temp ID until Firestore sets one
+          id: DateTime.now().millisecondsSinceEpoch.toString(), 
+          authorId: currentUserId, // <--- SAVE UID HERE
           title: title,
           content: content,
           tag: _selectedTag,
-          author: 'You',
-          initials: 'U',
+          author: realAuthor,      
+          initials: realInitials, 
           timestamp: DateTime.now(),
           likes: 0,
           commentCount: 0,
           commentList: [],
           isLiked: false,
-          showFollowButton: false,
-          isFollowed: true,
-          // Save the SUPABASE URL here, not local path
+          showFollowButton: true, // Everyone else can follow
+          isFollowed: false,
           videoUrl: finalVideoUrl, 
           imageUrl: finalImageUrl, 
         );
@@ -201,7 +210,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   Widget build(BuildContext context) {
     Widget? mediaPreview;
     
-    // Logic: Show New Local File -> OR Show Existing URL
     if (_videoFile != null) {
       mediaPreview = _buildVideoPreview();
     } else if (_imageFile != null) {
@@ -305,6 +313,9 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   }
 
   Widget _buildUserHeader() {
+    final String currentName = _getCurrentUserName();
+    final String currentInitials = _getInitials(currentName);
+
     return Row(
       children: [
         Container(
@@ -313,13 +324,13 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
             gradient: LinearGradient(colors: [Color(0xFF155CFB), Color(0xFF980FFA)]),
             shape: BoxShape.circle,
           ),
-          child: const Center(child: Text('U', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
+          child: Center(child: Text(currentInitials, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
         ),
         const SizedBox(width: 12),
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('You', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black)),
+            Text(currentName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black)),
             const SizedBox(height: 2),
             Container(
               height: 26,
@@ -360,7 +371,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
             height: 300, 
             width: double.infinity,
             child: PostVideoPlayer(
-              videoUrl: _videoFile!.path, // Local file path for preview
+              videoUrl: _videoFile!.path,
               isSquare: false,
               onControllerInitialized: (controller) {
                 controller.setVolume(1.0);
@@ -400,7 +411,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
             height: 300, 
             width: double.infinity,
             child: PostVideoPlayer(
-              videoUrl: url, // This will be the remote URL
+              videoUrl: url, 
               isSquare: false,
               onControllerInitialized: (_) {},
             ),
@@ -420,7 +431,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
             aspectRatio: 4/3,
             child: url.startsWith('assets/') 
               ? Image.asset(url, fit: BoxFit.cover) 
-              // If it's a URL (http/https), Image.network handles it automatically
               : (url.startsWith('http') ? Image.network(url, fit: BoxFit.cover) : Image.file(File(url), fit: BoxFit.cover)),
           ),
         ),
