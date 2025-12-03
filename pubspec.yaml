@@ -67,6 +67,7 @@ flutter:
 
   assets:
     - assets/assets/icons/
+    - assets/assets/icons/google_logo.png
     - assets/assets/videos/
     - assets/assets/placeholder.png
     - assets/assets/offline_materials/ 

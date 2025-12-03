@@ -24,6 +24,14 @@ class ProfileScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Back Button
+              IconButton(
+                icon: const Icon(Icons.arrow_back, size: 28),
+                onPressed: () {
+                  context.go('/home'); // <-- GoRouter navigation to Home
+                },
+              ),
+              const SizedBox(height: 10),
               const Text(
                 "My Profile",
                 style: TextStyle(fontSize: 24, fontWeight: FontWeight.w600),

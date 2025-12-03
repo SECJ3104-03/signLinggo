@@ -170,21 +170,35 @@ class _SignInScreenState extends State<SignInScreen> {
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.9),
+                      color: Colors.white,
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.white70),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.08),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Image.asset('assets/icons/google_logo.png', height: 24),
-                        const SizedBox(width: 10),
+                        SizedBox(
+                          width: 26,
+                          height: 26,
+                          child: Image.asset(
+                            'assets/assets/icons/google_logo.png',
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
                         const Text(
                           "Sign in with Google",
                           style: TextStyle(
-                              color: Color(0xFF495565),
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600),
+                            color: Color(0xFF495565),
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ],
                     ),
