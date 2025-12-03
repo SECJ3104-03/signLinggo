@@ -60,6 +60,11 @@ class AppRouter {
           body: Center(child: Text('Welcome Screen - To be implemented')),
         ),
       ),
+      GoRoute(
+        path: '/profile',
+        name: 'profile',
+        builder: (context, state) => const ProfileScreen(),
+      ),
 
       // Main App Routes
       GoRoute(
