@@ -1,9 +1,7 @@
-// lib/screens/conversation_mode/chat_list_screen.dart
-
 import 'package:flutter/material.dart';
 import 'package:signlinggo/screens/conversation_mode/conversation_mode_screen.dart';
-// 1. IMPORT THE SERVICE
-import 'mock_chat_service.dart'; 
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class ChatListScreen extends StatefulWidget {
   const ChatListScreen({super.key});
@@ -13,89 +11,145 @@ class ChatListScreen extends StatefulWidget {
 }
 
 class _ChatListScreenState extends State<ChatListScreen> {
-  // 2. REMOVE THE OLD HARDCODED LIST HERE
-  
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
   @override
   Widget build(BuildContext context) {
-    // 3. GET THE DATA FROM OUR SERVICE
-    final List<Map<String, dynamic>> currentChats = MockChatService.chats;
-
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 1,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black87),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          "Chats",
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
-        ),
-      ),
-      backgroundColor: Colors.white,
-      body: ListView.builder(
-        itemCount: currentChats.length, // Use currentChats
-        itemBuilder: (context, index) {
-          final chat = currentChats[index]; // Use currentChats
-          return ListTile(
-            leading: Stack(
-              children: [
-                CircleAvatar(
-                  backgroundColor: const Color(0xFF980FFA),
-                  child: Text(
-                    chat['avatar'],
-                    style: const TextStyle(color: Colors.white),
-                  ),
-                ),
-                if (chat['isOnline'])
-                  Positioned(
-                    bottom: 0,
-                    right: 0,
-                    child: Container(
-                      width: 12,
-                      height: 12,
-                      decoration: BoxDecoration(
-                        color: Colors.green,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 2),
-                      ),
-                    ),
-                  ),
-              ],
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (context, snapshot) {
+        // User not logged in
+        if (!snapshot.hasData || snapshot.data == null) {
+          return const Scaffold(
+            body: Center(
+              child: Text('Please log in'),
             ),
-            title: Text(
-              chat['name'],
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
-            subtitle: Text(
-              chat['lastMessage'],
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Colors.grey),
-            ),
-            trailing: Text(
-              chat['time'],
-              style: const TextStyle(color: Colors.grey, fontSize: 12),
-            ),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => ConversationScreen(
-                    chatName: chat['name'],
-                    avatar: chat['avatar'],
-                    isOnline: chat['isOnline'],
-                  ),
-                ),
-              ).then((_) {
-                 // Optional: When coming back from chat, refresh this list
-                 setState(() {});
-              });
-            },
           );
-        },
-      ),
+        }
+
+        final currentUserID = snapshot.data!.uid;
+
+        return Scaffold(
+          appBar: AppBar(
+            backgroundColor: Colors.white,
+            elevation: 1,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back, color: Colors.black87),
+              onPressed: () => Navigator.pop(context),
+            ),
+            title: const Text(
+              "Chats",
+              style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+            ),
+          ),
+          backgroundColor: Colors.white,
+          body: StreamBuilder<QuerySnapshot>(
+            stream: _firestore
+                .collection('conversation')
+                .where('userIDs', arrayContains: currentUserID)
+                .snapshots(),
+            builder: (context, snapshot) {
+              if (snapshot.hasError) {
+                return Center(child: Text('Error: ${snapshot.error}'));
+              }
+
+              if (!snapshot.hasData) {
+                return const Center(child: CircularProgressIndicator());
+              }
+
+              final conversations = snapshot.data!.docs;
+
+              if (conversations.isEmpty) {
+                return const Center(child: Text('No chats yet'));
+              }
+
+              // Sort conversations by lastMessageAt descending
+              conversations.sort((a, b) {
+                final aTime = (a['lastMessageAt'] as Timestamp?)?.toDate() ?? DateTime.now();
+                final bTime = (b['lastMessageAt'] as Timestamp?)?.toDate() ?? DateTime.now();
+                return bTime.compareTo(aTime);
+              });
+
+              return ListView.builder(
+                itemCount: conversations.length,
+                itemBuilder: (context, index) {
+                  final chatDoc = conversations[index];
+                  final data = chatDoc.data() as Map<String, dynamic>? ?? {};
+                  final conversationId = chatDoc.id;
+
+                  // Get the other user ID
+                  final otherUserID = (data['userIDs'] as List<dynamic>?)
+                          ?.firstWhere((id) => id != currentUserID, orElse: () => '')
+                          .toString() ??
+                      '';
+
+                  if (otherUserID.isEmpty) return const SizedBox.shrink();
+
+                  // Fetch other user's display name from users collection
+                  return FutureBuilder<DocumentSnapshot>(
+                    future: _firestore.collection('users').doc(otherUserID).get(),
+                    builder: (context, userSnapshot) {
+                      String chatName = otherUserID; // fallback
+                      String avatar = '?';
+
+                      if (userSnapshot.hasData && userSnapshot.data!.exists) {
+                        final userData = userSnapshot.data!.data() as Map<String, dynamic>? ?? {};
+                        chatName = userData['name'] ?? userData['email'];
+                        avatar = chatName.isNotEmpty ? chatName[0].toUpperCase() : '?';
+                      }
+
+                      final lastMessage = data['lastMessage'] ?? '';
+                      final lastMessageAt = data['lastMessageAt'] != null
+                          ? (data['lastMessageAt'] as Timestamp).toDate()
+                          : DateTime.now();
+                      final timeString =
+                          "${lastMessageAt.hour.toString().padLeft(2, '0')}:${lastMessageAt.minute.toString().padLeft(2, '0')}";
+
+                      return ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: const Color(0xFF980FFA),
+                          child: Text(
+                            avatar,
+                            style: const TextStyle(color: Colors.white),
+                          ),
+                        ),
+                        title: Text(
+                          chatName,
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        subtitle: Text(
+                          lastMessage,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(color: Colors.grey),
+                        ),
+                        trailing: Text(
+                          timeString,
+                          style: const TextStyle(color: Colors.grey, fontSize: 12),
+                        ),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => ConversationScreen(
+                                chatName: chatName,
+                                avatar: avatar,
+                                isOnline: true,
+                                conversationId: conversationId,
+                                currentUserID: currentUserID,
+                              ),
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  );
+                },
+              );
+            },
+          ),
+        );
+      },
     );
   }
 }
