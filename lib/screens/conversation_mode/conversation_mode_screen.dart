@@ -11,9 +11,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 class ConversationScreen extends StatefulWidget {
   final String chatName;
   final String avatar;
-  final bool isOnline;
   
-  // These are required to link the chat to the correct database document
   final String conversationId;
   final String currentUserID;
 
@@ -23,7 +21,6 @@ class ConversationScreen extends StatefulWidget {
     required this.avatar,
     required this.conversationId,
     required this.currentUserID,
-    this.isOnline = false,
   });
 
   @override
@@ -39,7 +36,6 @@ class _ConversationScreenState extends State<ConversationScreen> {
   bool _isRecording = false;
   final Map<String, VideoPlayerController> _videoControllers = {};
 
-  // We use the ID passed from the parent widget
   late final String currentUserId;
 
   @override
@@ -91,7 +87,6 @@ class _ConversationScreenState extends State<ConversationScreen> {
 
   // ---------------- Firestore Message Stream ----------------
   Stream<List<Map<String, dynamic>>> _messageStream() {
-    // Note: Updated to 'conversation' (singular) to match ChatListScreen
     return FirebaseFirestore.instance
         .collection('conversation') 
         .doc(widget.conversationId)
@@ -105,12 +100,10 @@ class _ConversationScreenState extends State<ConversationScreen> {
             }).toList());
   }
 
-  // ---------------- Message Handling ----------------
   void _sendTextMessage() async {
     final text = _textController.text.trim();
     if (text.isEmpty) return;
 
-    // Note: Updated to 'conversation' (singular)
     final messageRef = FirebaseFirestore.instance
         .collection('conversation')
         .doc(widget.conversationId)
@@ -126,18 +119,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
       'createdAt': FieldValue.serverTimestamp(),
     });
 
-    // --- CRITICAL FIX: Ensure userIDs are saved so ChatListScreen can find this chat ---
-    final conversationIds = widget.conversationId.split('_'); 
-    
-    await FirebaseFirestore.instance
-        .collection('conversation')
-        .doc(widget.conversationId)
-        .set({
-      'lastMessage': text,
-      'lastMessageAt': FieldValue.serverTimestamp(),
-      'userIDs': conversationIds, // This allows the query in ChatListScreen to work
-    }, SetOptions(merge: true));
-
+    await _updateConversationDocument(text);
     _textController.clear();
   }
 
@@ -154,11 +136,9 @@ class _ConversationScreenState extends State<ConversationScreen> {
 
     final videoFile = File(video.path);
 
-    // Upload video to Supabase
     final videoURL = await _uploadVideoToSupabase(videoFile);
     if (videoURL == null) return;
 
-    // Note: Updated to 'conversation' (singular)
     final messageRef = FirebaseFirestore.instance
         .collection('conversation')
         .doc(widget.conversationId)
@@ -174,25 +154,14 @@ class _ConversationScreenState extends State<ConversationScreen> {
       'createdAt': FieldValue.serverTimestamp(),
     });
 
-    // Initialize video controller to play locally immediately
     final controller = VideoPlayerController.networkUrl(Uri.parse(videoURL))
       ..initialize().then((_) => setState(() {}));
     _videoControllers[videoURL] = controller;
-    
-    // --- Update Main Conversation Document ---
-    final conversationIds = widget.conversationId.split('_'); 
-    await FirebaseFirestore.instance
-        .collection('conversation')
-        .doc(widget.conversationId)
-        .set({
-      'lastMessage': 'Sent a video',
-      'lastMessageAt': FieldValue.serverTimestamp(),
-      'userIDs': conversationIds,
-    }, SetOptions(merge: true));
+
+    await _updateConversationDocument('Sent a video');
   }
 
   void _sendVoiceMessage() async {
-    // Placeholder logic from your original file
     final messageRef = FirebaseFirestore.instance
         .collection('conversation')
         .doc(widget.conversationId)
@@ -208,16 +177,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
       'createdAt': FieldValue.serverTimestamp(),
     });
     
-    // --- Update Main Conversation Document ---
-    final conversationIds = widget.conversationId.split('_'); 
-    await FirebaseFirestore.instance
-        .collection('conversation')
-        .doc(widget.conversationId)
-        .set({
-      'lastMessage': 'Sent a voice message',
-      'lastMessageAt': FieldValue.serverTimestamp(),
-      'userIDs': conversationIds,
-    }, SetOptions(merge: true));
+    await _updateConversationDocument('Sent a voice message');
   }
 
   Future<String?> _uploadVideoToSupabase(File videoFile) async {
@@ -237,6 +197,24 @@ class _ConversationScreenState extends State<ConversationScreen> {
       debugPrint('Supabase upload exception: $e');
       return null;
     }
+  }
+
+  Future<void> _updateConversationDocument(String lastMessage) async {
+    final conversationIds = widget.conversationId.split('_'); 
+    
+    final otherUserID = conversationIds.firstWhere((id) => id != widget.currentUserID, orElse: () => '');
+
+    final updateData = {
+      'lastMessage': lastMessage,
+      'lastMessageAt': FieldValue.serverTimestamp(),
+      'userIDs': conversationIds, 
+      'otherUserID': otherUserID,
+    };
+
+    await FirebaseFirestore.instance
+        .collection('conversation')
+        .doc(widget.conversationId)
+        .set(updateData, SetOptions(merge: true));
   }
 
   // ---------------- UI Components ----------------
@@ -484,7 +462,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
   }
 
   Widget _buildBotMessage(Map<String, dynamic> msg) {
-    return _buildUserMessage(msg); // Treat other user messages the same way
+    return _buildUserMessage(msg);
   }
 
   @override
@@ -502,23 +480,9 @@ class _ConversationScreenState extends State<ConversationScreen> {
             Stack(
               children: [
                 CircleAvatar(
-                  backgroundColor: const Color(0xFF980FFA),
+                  backgroundColor:Colors.grey,
                   child: Text(widget.avatar, style: const TextStyle(color: Colors.white)),
                 ),
-                if (widget.isOnline)
-                  Positioned(
-                    bottom: 0,
-                    right: 0,
-                    child: Container(
-                      width: 12,
-                      height: 12,
-                      decoration: BoxDecoration(
-                        color: Colors.green,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 2),
-                      ),
-                    ),
-                  ),
               ],
             ),
             const SizedBox(width: 12),
@@ -526,11 +490,9 @@ class _ConversationScreenState extends State<ConversationScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(widget.chatName, style: const TextStyle(color: Colors.black, fontSize: 18)),
-                Text(widget.isOnline ? "Online" : "Offline",
-                    style: const TextStyle(color: Colors.grey, fontSize: 14)),
               ],
             ),
-          ],
+          ]
         ),
       ),
       backgroundColor: Colors.white,
