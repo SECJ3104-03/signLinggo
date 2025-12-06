@@ -1,14 +1,14 @@
 // lib/main.dart
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // Add this import
 import 'routes/app_router.dart';
 import 'providers/app_provider.dart';
 import 'services/camera_service.dart';
-import 'package:supabase_flutter/supabase_flutter.dart'; 
+import 'package:supabase_flutter/supabase_flutter.dart' hide User; 
 import 'data/progress_manager.dart';
 
 Future<void> main() async {
@@ -24,7 +24,7 @@ class AppInitializer extends StatelessWidget {
     Map<String, dynamic> result = {
       'firebaseInitialized': false,
       'camerasInitialized': false,
-      'supabaseInitialized': false, // Track Supabase status
+      'supabaseInitialized': false,
       'isFirstTime': true,
     };
 
@@ -50,10 +50,9 @@ class AppInitializer extends StatelessWidget {
       debugPrint('Firebase init error: $e');
     }
 
-    // 2. Initialize Supabase (NEW)
+    // 2. Initialize Supabase
     try {
       await Supabase.initialize(
-        // TODO: Replace these with your actual keys from Supabase Dashboard -> Settings -> API
         url: 'https://tdtosjyrvwtnrmkjiwav.supabase.co', 
         anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRkdG9zanlydnd0bnJta2ppd2F2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ2NDYxODQsImV4cCI6MjA4MDIyMjE4NH0.c1-c8kRdLIjWT3LvC7NaP5Bd4nKMxQw6YcFGJuetgSc',
       );
@@ -108,29 +107,42 @@ class AppInitializer extends StatelessWidget {
         // Initialization done, run the main app
         final isFirstTime = snapshot.data?['isFirstTime'] ?? true;
         return MultiProvider(
-        providers: [
-          ChangeNotifierProvider(
-            create: (_) => AppProvider(isFirstTime: isFirstTime),
+          providers: [
+            ChangeNotifierProvider(
+              create: (_) => AppProvider(isFirstTime: isFirstTime),
+            ),
+            ChangeNotifierProvider(
+              create: (_) => ProgressManager(),
+              lazy: false,
+            ),
+          ],
+          child: StreamBuilder<User?>(
+            // Listen to Firebase auth state changes
+            stream: FirebaseAuth.instance.authStateChanges(),
+            builder: (context, authSnapshot) {
+              // Update ProgressManager when auth state changes
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                final progressManager = context.read<ProgressManager>();
+                // ProgressManager now automatically detects Firebase user
+                // No need to manually update it
+              });
+              
+              return Consumer<AppProvider>(
+                builder: (context, appProvider, _) {
+                  return MaterialApp.router(
+                    debugShowCheckedModeBanner: false,
+                    title: 'SignLingo',
+                    theme: ThemeData(
+                      primarySwatch: Colors.blue,
+                      useMaterial3: true,
+                    ),
+                    routerConfig: AppRouter.router,
+                  );
+                },
+              );
+            },
           ),
-          ChangeNotifierProvider(
-            create: (_) => ProgressManager(), // This creates a new instance
-            lazy: false, // Load immediately
-          ),
-        ],
-        child: Consumer<AppProvider>(
-          builder: (context, appProvider, _) {
-            return MaterialApp.router(
-              debugShowCheckedModeBanner: false,
-              title: 'SignLinggo',
-              theme: ThemeData(
-                primarySwatch: Colors.blue,
-                useMaterial3: true,
-              ),
-              routerConfig: AppRouter.router,
-            );
-          },
-        ),
-      );
+        );
       },
     );
   }

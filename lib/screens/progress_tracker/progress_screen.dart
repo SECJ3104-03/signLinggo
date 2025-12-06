@@ -66,6 +66,28 @@ class _ProgressScreenState extends State<ProgressScreen> {
           style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w600),
         ),
         actions: [
+          Consumer<ProgressManager>(
+      builder: (context, progressManager, child) {
+        if (progressManager.isSignedIn && progressManager.userName != null) {
+          return Padding(
+            padding: const EdgeInsets.only(right: 8.0),
+            child: CircleAvatar(
+              backgroundColor: Colors.blue.shade100,
+              radius: 16,
+              child: Text(
+                progressManager.userName!.substring(0, 1).toUpperCase(),
+                style: const TextStyle(
+                  color: Colors.blue,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+          );
+        }
+        return const SizedBox(); // Don't show anything if not signed in
+      },
+    ),
           IconButton(
             icon: Badge(
               smallSize: 8,
