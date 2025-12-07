@@ -2,6 +2,7 @@
 
 import 'dart:io'; 
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart'; 
 import 'post_data.dart';
 import 'comment_data.dart';
 import 'video_player_widget.dart';
@@ -25,6 +26,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   late PostData _post;
 
   String? _replyingToName;
+  String? _replyingToId; 
   int _currentCommentCount = 0;
 
   @override
@@ -40,17 +42,28 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     super.dispose();
   }
 
-  // --- NEW: AUTO-FIX DATABASE COUNT ---
+  String _getCurrentUserName() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      if (user.displayName != null && user.displayName!.isNotEmpty) {
+        return user.displayName!;
+      }
+      if (user.email != null) {
+        return user.email!.split('@')[0];
+      }
+    }
+    return "Anonymous";
+  }
+
+  String _getInitials(String name) {
+    if (name.isEmpty) return "?";
+    return name[0].toUpperCase();
+  }
+
   void _syncCommentCount(int realCount) {
-    // If the database number (on the dashboard) doesn't match the real number (here),
-    // Update the database to match reality!
     if (_post.commentCount != realCount) {
-      // Update local state so it doesn't loop forever
       _post = _post.copyWith(commentCount: realCount);
-      
-      // Update Firebase quietly
       _firestoreService.updatePostCommentCount(_post.id, realCount);
-      print("Fixed comment count for ${_post.id}: From ${_post.commentCount} to $realCount");
     }
   }
 
@@ -58,22 +71,34 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     final String text = _commentController.text;
     if (text.isEmpty) return;
 
+    final String realAuthor = _getCurrentUserName();
+    final String realInitials = _getInitials(realAuthor);
+    final String myUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+
     final newComment = CommentData(
-      author: 'You', 
-      initials: 'U',
+      authorId: myUid, 
+      author: realAuthor,
+      initials: realInitials,
       content: text,
       timestamp: DateTime.now(), 
       likeCount: 0,
-      isReply: _replyingToName != null, 
+      isReply: _replyingToId != null, 
     );
 
-    _firestoreService.addComment(_post.id, newComment);
+    // --- CALLS THE SERVICE USING NAMED PARAMETERS ---
+    _firestoreService.addComment(
+      postId: _post.id, 
+      postAuthorId: _post.authorId, 
+      comment: newComment,
+      replyToUserId: _replyingToId,
+    );
     
     _commentController.clear();
     FocusManager.instance.primaryFocus?.unfocus();
     
     setState(() {
       _replyingToName = null;
+      _replyingToId = null;
     });
   }
 
@@ -104,17 +129,20 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
 
   void _toggleLike(CommentData comment) {
     if (comment.id == null) return;
+    
+    // --- CALLS THE SERVICE USING NAMED PARAMETERS ---
     _firestoreService.toggleCommentLike(
-      _post.id, 
-      comment.id!, 
-      comment.isLiked, 
-      comment.likeCount
+      postId: _post.id, 
+      commentId: comment.id!, 
+      commentAuthorId: comment.authorId, 
+      isLiked: comment.isLiked,
     );
   }
 
   void _replyToComment(CommentData comment) {
     setState(() {
       _replyingToName = comment.author;
+      _replyingToId = comment.authorId; 
     });
     FocusScope.of(context).requestFocus(_commentFocusNode);
   }
@@ -122,6 +150,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   void _cancelReply() {
     setState(() {
       _replyingToName = null;
+      _replyingToId = null;
     });
     FocusManager.instance.primaryFocus?.unfocus();
   }
@@ -176,8 +205,6 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                       final comments = snapshot.data ?? [];
                       _currentCommentCount = comments.length;
 
-                      // --- TRIGGER THE AUTO-FIX ---
-                      // We use WidgetsBinding to avoid "setState during build" errors
                       WidgetsBinding.instance.addPostFrameCallback((_) {
                         _syncCommentCount(comments.length);
                       });
@@ -200,8 +227,9 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       ),
     );
   }
-  
-  // ... (Paste the rest: _buildPostContent, _buildCommentSectionHeader, etc. - no changes below here)
+
+  // ... (Rest of UI Helpers: _buildPostContent, _buildCommentSectionHeader, etc.)
+  // Copy them from your existing file or previous response (no changes needed below this point)
   
   Widget _buildPostContent() {
     return Padding(
@@ -248,9 +276,9 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 borderRadius: BorderRadius.circular(12),
                 child: AspectRatio(
                   aspectRatio: 4 / 3,
-                  child: _post.imageUrl!.startsWith('assets/')
-                    ? Image.asset(_post.imageUrl!, fit: BoxFit.cover)
-                    : Image.file(File(_post.imageUrl!), fit: BoxFit.cover),
+                  child: _post.imageUrl!.startsWith('assets/') 
+                    ? Image.asset(_post.imageUrl!, fit: BoxFit.cover) 
+                    : (_post.imageUrl!.startsWith('http') ? Image.network(_post.imageUrl!, fit: BoxFit.cover) : Image.file(File(_post.imageUrl!), fit: BoxFit.cover)),
                 ),
               ),
             ),
@@ -289,6 +317,9 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   Widget _buildInstagramStyleComment(CommentData comment) {
     final double leftPadding = comment.isReply ? 54.0 : 16.0;
     final double avatarRadius = comment.isReply ? 12.0 : 16.0;
+    
+    final currentUser = _getCurrentUserName();
+    final bool isMyComment = comment.author == currentUser;
 
     return Padding(
       padding: EdgeInsets.fromLTRB(leftPadding, 12, 16, 12),
@@ -305,7 +336,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
           Expanded(
             child: GestureDetector(
               onLongPress: () {
-                if (comment.author == 'You') {
+                if (isMyComment) {
                   _confirmDeleteComment(comment);
                 }
               },
@@ -359,6 +390,8 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   }
 
   Widget _buildInputArea() {
+    final String currentInitials = _getInitials(_getCurrentUserName());
+
     return Container(
       decoration: BoxDecoration(color: Colors.white, border: Border(top: BorderSide(color: Colors.grey[200]!, width: 1))),
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewPadding.bottom),
@@ -385,7 +418,11 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
             child: Row(
               children: [
-                CircleAvatar(radius: 18, backgroundColor: const Color(0xFFF2E7FE), child: const Text('U', style: TextStyle(fontSize: 14, color: Color(0xFF980FFA)))),
+                CircleAvatar(
+                  radius: 18, 
+                  backgroundColor: const Color(0xFFF2E7FE), 
+                  child: Text(currentInitials, style: const TextStyle(fontSize: 14, color: Color(0xFF980FFA)))
+                ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Container(

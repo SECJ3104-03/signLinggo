@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "724828186533-67vcgbk4m7fn2s8d84ru56bu2ii2chmb.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.signlinggo",
+            "certificate_hash": "be076c49ee0b8c81f1771227835e30c787de2731"
+          }
+        },
+        {
           "client_id": "724828186533-jmt6iucm4np1qt8hi27s6ttajbf8o1ti.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
