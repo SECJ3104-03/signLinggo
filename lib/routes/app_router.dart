@@ -6,6 +6,8 @@ library;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:signlinggo/screens/conversation_mode/chat_list_screen.dart';
+import 'package:signlinggo/screens/profile/profile_screen.dart';
+import 'package:signlinggo/screens/profile/edit_profile_screen.dart';
 import '../screens/landing/landing_screen.dart';
 import '../screens/sign_in/signin_screen.dart';
 import '../screens/register/register_screen.dart';
@@ -64,6 +66,11 @@ class AppRouter {
         path: '/profile',
         name: 'profile',
         builder: (context, state) => const ProfileScreen(),
+      ),
+      GoRoute(
+        path: '/edit-profile',
+        name: 'edit-profile',
+        builder: (context, state) => const EditProfileScreen(),
       ),
 
       // Main App Routes
