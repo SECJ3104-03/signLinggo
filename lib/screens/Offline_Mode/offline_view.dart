@@ -131,9 +131,8 @@ class _OfflineModeState extends State<OfflineMode> with SingleTickerProviderStat
       icon: Icons.waving_hand_outlined,
       iconColor: Color(0xFFE5890A),
       backgroundColor: Color(0xFFFFF2DE),
-      //downloadUrl: 'https://drive.google.com/uc?export=download&id=1IVY1gC2ebZkIhNT0CYqkbiynAZSulVKQ', 
       downloadUrl: 'assets/assets/offline_materials/basic_greetings.zip', 
-      includedVideos: ['Minum', 'Roti', 'Hello', 'Goodbye', 'Thank You'],
+      includedVideos: ['Hello', 'I Love You', 'Morning', 'Night', 'No', 'Noon', 'Greet', 'Sorry',  'Thank You', 'Today', 'Yes' ],
     ),
 
     // 3. Food & Drink (OFFLINE ASSET MODE)
@@ -145,7 +144,7 @@ class _OfflineModeState extends State<OfflineMode> with SingleTickerProviderStat
       backgroundColor: Color(0xFFFFD6D1),
       // Points to local asset
       downloadUrl: 'assets/assets/offline_materials/Foof_Drink_Signs.zip',
-      includedVideos: ['Chicken', 'Rice', 'Water', 'Coffee'],
+      includedVideos: ['Bread', 'Drink', 'Eat', 'Hungry', 'Juice', 'Thirsty', 'Water'],
     ),
 
     // 4. Medical
@@ -167,7 +166,7 @@ class _OfflineModeState extends State<OfflineMode> with SingleTickerProviderStat
       iconColor: Color(0xFFD60B95),
       backgroundColor: Color(0xFFFFDFF2),
       downloadUrl: 'assets/assets/offline_materials/Family_People.zip', 
-      includedVideos: ['Father', 'Mother', 'Friend'],
+      includedVideos: ['Father', 'Mother', 'Friend', 'Brother', 'Sister', 'I/Me'],
     ),
 
     // 6. Travel
@@ -178,7 +177,7 @@ class _OfflineModeState extends State<OfflineMode> with SingleTickerProviderStat
       iconColor: Color(0xFF5E0BD6),
       backgroundColor: Color(0xFFF5F1FF),
       downloadUrl: 'assets/assets/offline_materials/Travel_Transport.zip', 
-      includedVideos: ['Car', 'Train', 'Go'],
+      includedVideos: ['Bus', 'Help', 'Hotel', 'How much?', 'Toilet'],
     ),
   ];
 
