@@ -264,23 +264,34 @@ class _ProgressScreenState extends State<ProgressScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Achievements',
-                      style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
+                  const Text(
+                    'Achievements',
+                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+                  ),
                   const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      _AchievementDot(
-                          icon: '🎯', label: 'First Sign', completed: totalWatched >= 1),
-                      _AchievementDot(
-                          icon: '🔥', label: 'Week Streak', completed: dayStreak >= 7),
-                      _AchievementDot(
-                          icon: '⭐', label: '50 Signs', completed: totalWatched >= 50),
-                      _AchievementDot(
-                          icon: '💎', label: '100 Signs', completed: totalWatched >= 100),
-                      _AchievementDot(
-                          icon: '👑', label: 'Master', completed: totalWatched >= totalSigns),
-                    ],
+                  
+                  // FIX: Wrapped Row in FittedBox to prevent overflow
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        _AchievementDot(
+                            icon: '🎯', label: 'First Sign', completed: totalWatched >= 1),
+                        const SizedBox(width: 8), // Optional spacing
+                        _AchievementDot(
+                            icon: '🔥', label: 'Week Streak', completed: dayStreak >= 7),
+                        const SizedBox(width: 8),
+                        _AchievementDot(
+                            icon: '⭐', label: '50 Signs', completed: totalWatched >= 50),
+                        const SizedBox(width: 8),
+                        _AchievementDot(
+                            icon: '💎', label: '100 Signs', completed: totalWatched >= 100),
+                        const SizedBox(width: 8),
+                        _AchievementDot(
+                            icon: '👑', label: 'Master', completed: totalWatched >= totalSigns),
+                      ],
+                    ),
                   ),
                 ],
               ),
