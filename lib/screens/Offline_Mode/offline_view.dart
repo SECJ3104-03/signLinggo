@@ -251,7 +251,8 @@ class _OfflineModeState extends State<OfflineMode> with SingleTickerProviderStat
           elevation: 0,
           leading: IconButton(
             icon: const Icon(Icons.arrow_back, color: Color(0xFF101727)),
-            onPressed: () => Navigator.of(context).pop(),
+            // onPressed: () => Navigator.of(context).pop(),
+            onPressed: () => context.go('/home'),
           ),
           title: const Text(
             'Offline Downloads',
