@@ -1,202 +1,444 @@
-import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:image_picker/image_picker.dart';
-import 'dart:io';
+// lib/screens/profile/edit_profile_screen.dart
 
-class EditProfileScreen extends StatefulWidget {
-  const EditProfileScreen({super.key});
+import 'dart:io';
+import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:signlinggo/services/supabase_storage_service.dart';
+
+class EditProfilePage extends StatefulWidget {
+  const EditProfilePage({super.key});
 
   @override
-  State<EditProfileScreen> createState() => _EditProfileScreenState();
+  State<EditProfilePage> createState() => _EditProfilePageState();
 }
 
-class _EditProfileScreenState extends State<EditProfileScreen> {
-  final supabase = Supabase.instance.client;
+class _EditProfilePageState extends State<EditProfilePage> {
+  final User user = FirebaseAuth.instance.currentUser!;
+  final ImagePicker picker = ImagePicker();
+  final SupabaseStorageService supabaseService = SupabaseStorageService();
+  final FirebaseFirestore firestore = FirebaseFirestore.instance;
 
-  final TextEditingController fullNameCtrl = TextEditingController();
-  final TextEditingController usernameCtrl = TextEditingController();
-  final TextEditingController phoneCtrl = TextEditingController();
-  final TextEditingController birthCtrl = TextEditingController();
-  String gender = 'Male';
-  File? profileImage;
-  bool isLoading = false;
+  final TextEditingController nameC = TextEditingController();
+  final TextEditingController usernameC = TextEditingController();
+  final TextEditingController emailC = TextEditingController();
+  final TextEditingController phoneC = TextEditingController();
 
-  Map<String, dynamic> initialData = {};
-  bool hasChanges = false;
+  String? gender;
+  DateTime? birthday;
+  String? profileUrl;
+  File? imageFile;
+  bool isSaving = false;
+  bool hasNewImage = false;
+  bool isLoading = true;
 
   @override
   void initState() {
     super.initState();
     _loadUserData();
-    fullNameCtrl.addListener(_checkChanges);
-    usernameCtrl.addListener(_checkChanges);
-    phoneCtrl.addListener(_checkChanges);
-    birthCtrl.addListener(_checkChanges);
-  }
-
-  void _checkChanges() {
-    bool changed = fullNameCtrl.text != (initialData['fullName'] ?? '') ||
-        usernameCtrl.text != (initialData['username'] ?? '') ||
-        phoneCtrl.text != (initialData['phone'] ?? '') ||
-        birthCtrl.text != (initialData['birth'] ?? '') ||
-        gender != (initialData['gender'] ?? 'Male') ||
-        profileImage != null;
-
-    setState(() => hasChanges = changed);
   }
 
   Future<void> _loadUserData() async {
-    final userId = supabase.auth.currentUser?.id;
-    if (userId == null) return;
+    try {
+      final DocumentSnapshot doc = await firestore
+          .collection("users")
+          .doc(user.uid)
+          .get();
 
-    final response =
-        await supabase.from('profiles').select().eq('id', userId).single();
-    if (response != null) {
-      setState(() {
-        fullNameCtrl.text = response['full_name'] ?? '';
-        usernameCtrl.text = response['username'] ?? '';
-        phoneCtrl.text = response['phone'] ?? '';
-        birthCtrl.text = response['birth'] ?? '';
-        gender = response['gender'] ?? 'Male';
-
-        initialData = {
-          'fullName': fullNameCtrl.text,
-          'username': usernameCtrl.text,
-          'phone': phoneCtrl.text,
-          'birth': birthCtrl.text,
-          'gender': gender,
-        };
-      });
+      if (doc.exists) {
+        final data = doc.data() as Map<String, dynamic>;
+        
+        nameC.text = data["fullName"]?.toString() ?? "";
+        usernameC.text = data["username"]?.toString() ?? "";
+        emailC.text = data["email"]?.toString() ?? user.email ?? "";
+        phoneC.text = data["phone"]?.toString() ?? "";
+        gender = data["gender"]?.toString();
+        profileUrl = data["profileUrl"]?.toString();
+        
+        if (data["birthday"] != null) {
+          birthday = (data["birthday"] as Timestamp).toDate();
+        }
+      } else {
+        // Initialize with Firebase auth data if no Firestore document exists
+        nameC.text = user.displayName ?? "";
+        emailC.text = user.email ?? "";
+        profileUrl = user.photoURL;
+      }
+    } catch (e) {
+      print("❌ Error loading user data: $e");
+    } finally {
+      setState(() => isLoading = false);
     }
   }
 
-  Future<String?> _uploadProfileImage() async {
-    if (profileImage == null) return null;
-    final userId = supabase.auth.currentUser?.id;
-    if (userId == null) return null;
-
-    final fileName = '$userId-${DateTime.now().millisecondsSinceEpoch}.jpg';
-    final fileBytes = await profileImage!.readAsBytes();
-
-    final response = await supabase.storage
-        .from('avatars')
-        .uploadBinary(fileName, fileBytes);
-
-    final publicUrl = supabase.storage.from('avatars').getPublicUrl(fileName);
-    return publicUrl;
+  Future<void> _pickImage() async {
+    try {
+      final XFile? image = await picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 85,
+        maxWidth: 800,
+      );
+      
+      if (image != null) {
+        setState(() {
+          imageFile = File(image.path);
+          hasNewImage = true;
+        });
+      }
+    } catch (e) {
+      print("❌ Image picker error: $e");
+      _showErrorSnackbar("Failed to pick image");
+    }
   }
 
   Future<void> _saveProfile() async {
-    setState(() => isLoading = true);
-    final userId = supabase.auth.currentUser?.id;
-    if (userId == null) return;
+    if (isSaving) return;
+    
+    // Validate required fields
+    if (nameC.text.trim().isEmpty) {
+      _showErrorSnackbar("Full name is required");
+      return;
+    }
+
+    if (usernameC.text.trim().isEmpty) {
+      _showErrorSnackbar("Username is required");
+      return;
+    }
+
+    setState(() => isSaving = true);
 
     try {
-      final imageUrl = await _uploadProfileImage();
+      String? imageUrl = profileUrl;
 
-      await supabase.from('profiles').upsert({
-        'id': userId,
-        'full_name': fullNameCtrl.text,
-        'username': usernameCtrl.text,
-        'phone': phoneCtrl.text,
-        'birth': birthCtrl.text,
-        'gender': gender,
-        'avatar_url': imageUrl ?? initialData['avatar_url'],
-      });
+      // If new image picked → upload to Supabase
+      if (hasNewImage && imageFile != null) {
+        print("📤 Uploading new profile image...");
+        
+        final uploadedUrl = await supabaseService.uploadProfileImage(imageFile!);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Profile updated successfully!')),
-      );
+        if (uploadedUrl != null) {
+          imageUrl = uploadedUrl;
+          print("✅ Image uploaded successfully: $imageUrl");
 
-      setState(() {
-        hasChanges = false;
-        profileImage = null;
-      });
+          // Update Firebase Auth Photo URL (optional but good for consistency)
+          try {
+            await user.updateProfile(photoURL: imageUrl);
+            await user.reload();
+          } catch (e) {
+            print("⚠️ Firebase Auth update failed: $e");
+            // Continue anyway - Firestore is our primary storage
+          }
+        } else {
+          throw Exception("Failed to upload profile picture to Supabase");
+        }
+      }
+
+      // Prepare update data
+      final Map<String, dynamic> updateData = {
+        "fullName": nameC.text.trim(),
+        "username": usernameC.text.trim(),
+        "email": emailC.text.trim(),
+        "phone": phoneC.text.trim(),
+        "gender": gender,
+        "profileUrl": imageUrl,
+        "updatedAt": FieldValue.serverTimestamp(),
+      };
+
+      // Add birthday if selected
+      if (birthday != null) {
+        updateData["birthday"] = Timestamp.fromDate(birthday!);
+      }
+
+      // Update Firestore - using set with merge to create if doesn't exist
+      await firestore
+          .collection("users")
+          .doc(user.uid)
+          .set(updateData, SetOptions(merge: true));
+
+      print("✅ Profile saved successfully!");
+
+      if (mounted) {
+        Navigator.of(context).pop(true);
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Error: $e')));
+      print("❌ Error saving profile: $e");
+      if (mounted) {
+        _showErrorSnackbar("Error saving profile: ${e.toString()}");
+      }
+    } finally {
+      if (mounted) {
+        setState(() => isSaving = false);
+      }
     }
-
-    setState(() => isLoading = false);
   }
 
-  Future<void> _pickProfileImage() async {
-    final picker = ImagePicker();
-    final picked = await picker.pickImage(source: ImageSource.gallery);
-    if (picked != null) {
-      setState(() => profileImage = File(picked.path));
-      _checkChanges();
+  void _showErrorSnackbar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  Future<void> _showBirthdayPicker() async {
+    final DateTime? pickedDate = await showDatePicker(
+      context: context,
+      initialDate: birthday ?? DateTime.now().subtract(const Duration(days: 365 * 18)),
+      firstDate: DateTime(1900),
+      lastDate: DateTime.now(),
+      initialEntryMode: DatePickerEntryMode.calendarOnly,
+    );
+    
+    if (pickedDate != null && pickedDate != birthday) {
+      setState(() => birthday = pickedDate);
     }
+  }
+
+  String _formatBirthday(DateTime? date) {
+    if (date == null) return "Select your birthday";
+    return "${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}";
   }
 
   @override
   Widget build(BuildContext context) {
+    if (isLoading) {
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Edit Profile')),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                children: [
-                  // Avatar
-                  Center(
-                    child: Stack(
-                      children: [
-                        CircleAvatar(
-                          radius: 50,
-                          backgroundImage: profileImage != null
-                              ? FileImage(profileImage!)
-                              : (initialData['avatar_url'] != null
-                                  ? NetworkImage(initialData['avatar_url'])
-                                  : const AssetImage('assets/profile.png')
-                                      as ImageProvider),
+      backgroundColor: Colors.grey.shade200,
+      body: SafeArea(
+        child: Stack(
+          children: [
+            ListView(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
+              children: [
+                // Profile Image Section
+                Center(
+                  child: Stack(
+                    children: [
+                      GestureDetector(
+                        onTap: _pickImage,
+                        child: CircleAvatar(
+                          radius: 60,
+                          backgroundColor: Colors.grey.shade300,
+                          backgroundImage: _getProfileImage(),
                         ),
-                        Positioned(
-                          bottom: 0,
-                          right: 0,
-                          child: GestureDetector(
-                            onTap: _pickProfileImage,
-                            child: const CircleAvatar(
-                              radius: 16,
-                              backgroundColor: Color(0xFF11497C),
-                              child: Icon(Icons.edit, color: Colors.white),
+                      ),
+                      Positioned(
+                        bottom: 0,
+                        right: 0,
+                        child: GestureDetector(
+                          onTap: _pickImage,
+                          child: Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: Colors.blue.shade700,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 3),
+                            ),
+                            child: const Icon(
+                              Icons.edit,
+                              color: Colors.white,
+                              size: 18,
                             ),
                           ),
                         ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                
+                // Edit Form Card
+                Card(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  elevation: 4,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 25),
+                    child: Column(
+                      children: [
+                        // Header with Save Button
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              "Edit Profile",
+                              style: TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            isSaving
+                                ? const CircularProgressIndicator()
+                                : ElevatedButton(
+                                    onPressed: _saveProfile,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.green.shade600,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 24,
+                                        vertical: 12,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(15),
+                                      ),
+                                    ),
+                                    child: const Text(
+                                      "SAVE",
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+                        
+                        // Form Fields
+                        _buildTextField("Full Name", nameC, TextInputType.name),
+                        const SizedBox(height: 12),
+                        _buildTextField("Username", usernameC, TextInputType.text),
+                        const SizedBox(height: 12),
+                        _buildTextField("Email", emailC, TextInputType.emailAddress),
+                        const SizedBox(height: 12),
+                        _buildTextField("Phone Number", phoneC, TextInputType.phone),
+                        const SizedBox(height: 12),
+                        _buildGenderDropdown(),
+                        const SizedBox(height: 12),
+                        _buildBirthdayPicker(),
+                        const SizedBox(height: 25),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 20),
-                  buildTextField('Full Name', fullNameCtrl),
-                  buildTextField('Username', usernameCtrl),
-                  buildTextField('Phone', phoneCtrl),
-                  buildTextField('Birth', birthCtrl),
-                  buildTextField('Gender', TextEditingController(text: gender),
-                      enabled: false),
-                  const SizedBox(height: 20),
-                  ElevatedButton(
-                    onPressed: hasChanges ? _saveProfile : null,
-                    child: const Text('SAVE'),
-                  ),
-                ],
+                ),
+                const SizedBox(height: 30),
+              ],
+            ),
+            
+            // Back Button
+            Positioned(
+              left: 20,
+              top: 40,
+              child: CircleAvatar(
+                backgroundColor: Colors.white,
+                radius: 20,
+                child: IconButton(
+                  icon: const Icon(Icons.arrow_back, size: 20, color: Colors.black),
+                  onPressed: () => Navigator.of(context).pop(false),
+                ),
               ),
             ),
-    );
-  }
-
-  Widget buildTextField(String label, TextEditingController ctrl,
-      {bool enabled = true}) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: TextField(
-        controller: ctrl,
-        enabled: enabled,
-        decoration: InputDecoration(
-          labelText: label,
-          border: const OutlineInputBorder(),
+          ],
         ),
       ),
     );
+  }
+
+  ImageProvider? _getProfileImage() {
+    if (imageFile != null) {
+      return FileImage(imageFile!);
+    } else if (profileUrl != null && profileUrl!.isNotEmpty) {
+      return NetworkImage(profileUrl!);
+    }
+    return null;
+  }
+
+  Widget _buildTextField(String label, TextEditingController controller, TextInputType keyboardType) {
+    return TextField(
+      controller: controller,
+      keyboardType: keyboardType,
+      decoration: InputDecoration(
+        labelText: label,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      ),
+    );
+  }
+
+  Widget _buildGenderDropdown() {
+    return DropdownButtonFormField<String>(
+      value: gender,
+      decoration: InputDecoration(
+        labelText: "Gender",
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      ),
+      items: const [
+        DropdownMenuItem(value: "Male", child: Text("Male")),
+        DropdownMenuItem(value: "Female", child: Text("Female")),
+        DropdownMenuItem(value: "Other", child: Text("Other")),
+        DropdownMenuItem(value: "Prefer not to say", child: Text("Prefer not to say")),
+      ],
+      onChanged: (value) => setState(() => gender = value),
+    );
+  }
+
+  Widget _buildBirthdayPicker() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          "Birthday",
+          style: TextStyle(
+            fontSize: 16,
+            color: Colors.black87,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 8),
+        GestureDetector(
+          onTap: _showBirthdayPicker,
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey.shade400),
+              borderRadius: BorderRadius.circular(12),
+              color: Colors.white,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  _formatBirthday(birthday),
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: birthday == null ? Colors.grey.shade500 : Colors.black87,
+                  ),
+                ),
+                Icon(
+                  Icons.calendar_today,
+                  color: Colors.grey.shade600,
+                  size: 20,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  @override
+  void dispose() {
+    nameC.dispose();
+    usernameC.dispose();
+    emailC.dispose();
+    phoneC.dispose();
+    super.dispose();
   }
 }
