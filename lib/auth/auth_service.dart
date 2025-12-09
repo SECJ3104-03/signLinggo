@@ -4,7 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-
+  
   /// Register a new user and save to Firestore
   Future<String?> register({
     required String name,
@@ -27,6 +27,11 @@ class AuthService {
         'name': name,
         'email': email,
         'createdAt': FieldValue.serverTimestamp(),
+      
+        'points': 0,
+        'dayStreak': 0,
+        'totalWatched': 0,
+        'dailyQuizDone': false,
       });
 
       return null; // success
