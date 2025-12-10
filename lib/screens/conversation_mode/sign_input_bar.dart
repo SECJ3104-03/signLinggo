@@ -42,7 +42,7 @@ class SignInputBar extends StatefulWidget {
 class _SignInputBarState extends State<SignInputBar> {
   CameraController? _cameraController;
   List<CameraDescription> _cameras = [];
-  bool _isRecording = false; // This state controls visibility of camera preview vs start button
+  bool _isRecording = false;
   int _currentDuration = 0;
   static const int _maxDuration = 60;
   Timer? _timer;
@@ -50,11 +50,12 @@ class _SignInputBarState extends State<SignInputBar> {
   XFile? _recordedFile;
   VideoPlayerController? _reviewController;
 
-  Future<void>? _initializeControllerFuture; // Future to track camera initialization
+  Future<void>? _initializeControllerFuture;
   final SupabaseClient _supabase = Supabase.instance.client;
   final Uuid _uuid = const Uuid();
 
   bool _isUploading = false;
+  bool _isFrontCamera = false; // Track which camera is active
 
   @override
   void initState() {
@@ -73,26 +74,56 @@ class _SignInputBarState extends State<SignInputBar> {
   Future<void> _initCamera() async {
     _cameras = await availableCameras();
     if (_cameras.isNotEmpty) {
-      _cameraController = CameraController(
-          _cameras.first, ResolutionPreset.medium,
-          enableAudio: true); // Initialize the controller
-      _initializeControllerFuture = _cameraController!.initialize(); // Assign the future
-      if (mounted) setState(() {});
+      // Default to the first camera (usually back)
+      _setCamera(_cameras.first);
     }
+  }
+
+  Future<void> _setCamera(CameraDescription cameraDescription) async {
+    final prevController = _cameraController;
+    
+    // Create new controller
+    final newController = CameraController(
+      cameraDescription,
+      ResolutionPreset.medium,
+      enableAudio: true,
+    );
+    
+    _cameraController = newController;
+    
+    // Initialize
+    _initializeControllerFuture = _cameraController!.initialize().then((_) {
+       if (mounted) {
+         setState(() {
+           _isFrontCamera = cameraDescription.lensDirection == CameraLensDirection.front;
+         });
+       }
+    });
+
+    if (prevController != null) {
+      await prevController.dispose();
+    }
+    
+    if (mounted) setState(() {});
   }
 
   Future<void> _startRecording() async {
     if (_cameraController == null || !_cameraController!.value.isInitialized) return;
     _resetProgress();
-    await _cameraController!.startVideoRecording();
-    widget.onRecordingStateChanged(true);
-    setState(() => _isRecording = true);
+    
+    try {
+      await _cameraController!.startVideoRecording();
+      widget.onRecordingStateChanged(true);
+      setState(() => _isRecording = true);
 
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      _currentDuration++;
-      if (_currentDuration >= _maxDuration) _stopRecording();
-      setState(() {});
-    });
+      _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        _currentDuration++;
+        if (_currentDuration >= _maxDuration) _stopRecording();
+        setState(() {});
+      });
+    } catch (e) {
+      debugPrint("Error starting recording: $e");
+    }
   }
 
   Future<void> _stopRecording() async {
@@ -100,28 +131,46 @@ class _SignInputBarState extends State<SignInputBar> {
     _timer?.cancel();
     _timer = null;
 
-    _recordedFile = await _cameraController!.stopVideoRecording();
-    widget.onRecordingStateChanged(false);
-    setState(() => _isRecording = false);
+    try {
+      _recordedFile = await _cameraController!.stopVideoRecording();
+      widget.onRecordingStateChanged(false);
+      setState(() => _isRecording = false);
 
-    _reviewController = VideoPlayerController.file(File(_recordedFile!.path))
-      ..initialize().then((_) => setState(() {}));
+      _reviewController = VideoPlayerController.file(File(_recordedFile!.path))
+        ..initialize().then((_) => setState(() {}));
 
-    _showReviewDialog();
+      _showReviewDialog();
+    } catch (e) {
+      debugPrint("Error stopping recording: $e");
+    }
   }
 
   void _flipCamera() async {
-    if (_isRecording || _cameras.length < 2) return;
+    if (_cameras.length < 2) return;
 
-    final newLens = _cameraController!.description.lensDirection == CameraLensDirection.front
-        ? CameraLensDirection.back
+    // 1. Calculate new lens direction
+    final newLens = _isFrontCamera 
+        ? CameraLensDirection.back 
         : CameraLensDirection.front;
 
-    final newCamera = _cameras.firstWhere((c) => c.lensDirection == newLens);
-    await _cameraController!.dispose();
-    _cameraController = CameraController(newCamera, ResolutionPreset.medium, enableAudio: true); // Re-initialize controller
-    _initializeControllerFuture = _cameraController!.initialize(); // Update the future
-    setState(() {});
+    // 2. Find the camera with that direction
+    final newCamera = _cameras.firstWhere(
+      (c) => c.lensDirection == newLens,
+      orElse: () => _cameras.first,
+    );
+
+    // 3. Set the new camera
+    await _setCamera(newCamera);
+    
+    // Optional: Show a message so user knows it flipped
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(newLens == CameraLensDirection.front ? "Selfie Mode" : "Back Camera"),
+          duration: const Duration(seconds: 1),
+        ),
+      );
+    }
   }
 
   void _resetProgress() {
@@ -131,32 +180,31 @@ class _SignInputBarState extends State<SignInputBar> {
   void _showReviewDialog() {
     showDialog(
       context: context,
+      barrierDismissible: false, // Force user to choose an action
       builder: (_) => AlertDialog(
         content: _reviewController != null && _reviewController!.value.isInitialized
             ? AspectRatio(
                 aspectRatio: _reviewController!.value.aspectRatio,
                 child: VideoPlayer(_reviewController!),
               )
-            : const SizedBox.shrink(),
+            : const SizedBox(height: 100, child: Center(child: CircularProgressIndicator())),
         actions: [
           TextButton(
             onPressed: () {
               Navigator.pop(context);
-              _recordedFile = null;
-              _reviewController?.dispose();
-              _reviewController = null;
+              _cleanupReview();
             },
-            child: const Icon(Icons.delete_rounded),
+            child: const Text('Discard', style: TextStyle(color: Colors.red)),
           ),
           ElevatedButton(
             onPressed: () {
+              Navigator.pop(context); // Close dialog first
               if (_recordedFile != null) {
                 _uploadAndSendVideo(File(_recordedFile!.path));
               }
-              Navigator.pop(context);
               _cleanupReview();
             },
-            child: const Icon(Icons.send_rounded),
+            child: const Text('Send'),
           ),
         ],
       ),
@@ -168,7 +216,6 @@ class _SignInputBarState extends State<SignInputBar> {
     try {
       const String bucketName = 'videoMessage';
       final String fileExtension = videoFile.path.split('.').last;
-      
       final String fileName = '${_uuid.v4()}.$fileExtension';
       final String storagePath = 'user_uploads/$fileName';
 
@@ -186,12 +233,6 @@ class _SignInputBarState extends State<SignInputBar> {
 
       await widget.onVideoRecorded(publicUrl);
       
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Video uploaded successfully!')),
-        );
-      }
-      
     } on StorageException catch (e) {
       log('Supabase Storage Error: ${e.message}', name: 'SignInputBar');
       if (mounted) {
@@ -201,11 +242,6 @@ class _SignInputBarState extends State<SignInputBar> {
       }
     } catch (e) {
       log('General Error: $e', name: 'SignInputBar');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('An unknown error occurred during upload.')),
-        );
-      }
     } finally {
       if (mounted) {
         setState(() => _isUploading = false);
@@ -222,23 +258,23 @@ class _SignInputBarState extends State<SignInputBar> {
     }
   }
 
- @override
-Widget build(BuildContext context) {
-  final double previewSize = MediaQuery.of(context).size.width * 0.7;
+  @override
+  Widget build(BuildContext context) {
+    final double previewSize = MediaQuery.of(context).size.width * 0.7;
 
-  return LayoutBuilder(builder: (context, constraints) {
-    return SizedBox(
-      height: _isRecording ? constraints.maxHeight : 104,
-      child: Stack(
-        children: [
-          // ---------- CAMERA PREVIEW ----------
-          if (_isRecording && _cameraController != null && _initializeControllerFuture != null)
-            Center(
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  // Circular progress ring
-                  if (_isRecording)
+    return LayoutBuilder(builder: (context, constraints) {
+      return SizedBox(
+        height: _isRecording ? constraints.maxHeight : 104,
+        child: Stack(
+          children: [
+            // ---------- CAMERA PREVIEW ----------
+            // We show the preview if we are recording OR if we are initializing
+            if (_isRecording && _cameraController != null && _cameraController!.value.isInitialized)
+              Center(
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    // Circular progress ring
                     TweenAnimationBuilder<double>(
                       tween: Tween<double>(end: _currentDuration / _maxDuration),
                       duration: const Duration(milliseconds: 500),
@@ -256,26 +292,16 @@ Widget build(BuildContext context) {
                       },
                     ),
     
-                  // Camera preview
-                  FutureBuilder<void>(
-                    future: _initializeControllerFuture,
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.done) {
-                        return ClipOval(
-                          child: SizedBox(
-                            width: previewSize,
-                            height: previewSize,
-                            child: CameraPreview(_cameraController!),
-                          ),
-                        );
-                      } else {
-                        return const Center(child: CircularProgressIndicator());
-                      }
-                    },
-                  ),
+                    // Camera preview
+                    ClipOval(
+                      child: SizedBox(
+                        width: previewSize,
+                        height: previewSize,
+                        child: CameraPreview(_cameraController!),
+                      ),
+                    ),
     
-                  // Timer overlay
-                  if (_isRecording)
+                    // Timer overlay
                     Positioned(
                       top: -40,
                       child: Container(
@@ -290,75 +316,94 @@ Widget build(BuildContext context) {
                         ),
                       ),
                     ),
-                ],
+                  ],
+                ),
               ),
-            ),
     
-          // ---------- FLIP & STOP BUTTONS (overlay) ----------
-          if (_isRecording)
-            Positioned(
-              bottom: 120,
-              left: 0,
-              right: 0,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  FloatingActionButton(
-                    heroTag: 'flipCamera',
-                    backgroundColor: Colors.purpleAccent,
-                    onPressed: _flipCamera,
-                    child: const Icon(Icons.cameraswitch),
-                  ),
-                  const SizedBox(width: 40),
-                  FloatingActionButton(
+            // ---------- STOP BUTTON (During Recording) ----------
+            if (_isRecording)
+              Positioned(
+                bottom: 120,
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: FloatingActionButton(
                     heroTag: 'stopRecording',
                     backgroundColor: Colors.red,
                     onPressed: _stopRecording,
                     child: const Icon(Icons.stop),
                   ),
-                ],
-              ),
-            ),
-    
-          // ---------- START RECORDING BUTTON (bottom of screen) ----------
-          if (!_isRecording)
-            Positioned(
-              left: 20,
-              right: 20,
-              bottom: 20,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(24),
-                child: Container(
-                  height: 64,
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Color(0xFFAC46FF), Color(0xFFE50076)],
-                      begin: Alignment.centerLeft,
-                      end: Alignment.centerRight,
-                    ),
-                  ),
-                  child: GestureDetector(
-                    onTap: _isUploading ? null : _startRecording,
-                    child: Container(
-                      width: 56,
-                      height: 56,
-                      decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFFAC46FF), Color(0xFFE50076)],
-                      ),
-                      borderRadius: BorderRadius.circular(24),
-                    ),
-                    child: _isUploading
-                        ? const CircularProgressIndicator(color: Colors.white)
-                        : const Icon(Icons.videocam, color: Colors.white, size: 28),
-                  ),
                 ),
               ),
-            ),
-            ),
-        ],
-      ),
-    );
-  });
-}
+    
+            // ---------- CONTROL BAR (Before Recording) ----------
+            if (!_isRecording)
+              Positioned(
+                left: 20,
+                right: 20,
+                bottom: 20,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    // 1. FLIP CAMERA BUTTON (Added here!)
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.grey[200],
+                        shape: BoxShape.circle,
+                      ),
+                      child: IconButton(
+                        icon: Icon(
+                          _isFrontCamera ? Icons.camera_front : Icons.camera_rear,
+                          color: Colors.black87,
+                        ),
+                        onPressed: _flipCamera,
+                      ),
+                    ),
+                    
+                    // 2. START RECORDING BUTTON
+                    Expanded(
+                      child: Center(
+                        child: GestureDetector(
+                          onTap: _isUploading ? null : _startRecording,
+                          child: Container(
+                            width: 64,
+                            height: 64,
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFFAC46FF), Color(0xFFE50076)],
+                                begin: Alignment.centerLeft,
+                                end: Alignment.centerRight,
+                              ),
+                              borderRadius: BorderRadius.circular(32),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.pink.withOpacity(0.3),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 4),
+                                )
+                              ],
+                            ),
+                            child: _isUploading
+                                ? const Padding(
+                                    padding: EdgeInsets.all(16.0),
+                                    child: CircularProgressIndicator(
+                                        color: Colors.white, strokeWidth: 3),
+                                  )
+                                : const Icon(Icons.videocam,
+                                    color: Colors.white, size: 32),
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    // 3. SPACER (To balance the row visually)
+                    const SizedBox(width: 48), 
+                  ],
+                ),
+              ),
+          ],
+        ),
+      );
+    });
+  }
 }
