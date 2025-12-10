@@ -1,0 +1,14 @@
+{
+  "modules": [
+    {
+      "name": "app",
+      "path": "c:\\Users\\User\\Documents\\APPLICATION DEVELOPMENT\\signLinggo\\android\\app\\",
+      "sources": [
+        "c:\\Users\\User\\Documents\\APPLICATION DEVELOPMENT\\signLinggo\\android\\app\\src\\main\\java\\io\\flutter\\plugins\\GeneratedPluginRegistrant.java"
+      ],
+      "testSources": [],
+      "generatedSources": [],
+      "classpath": []
+    }
+  ]
+}

@@ -34,7 +34,10 @@ android {
         }
     }
 
-    // <--- PASTE IT HERE (Inside android, but at the end) ---
+    
+}
+
+// <--- PASTE IT HERE (Inside android, but at the end) ---
     configurations.all {
         resolutionStrategy {
             force("androidx.browser:browser:1.8.0")
@@ -42,8 +45,7 @@ android {
             force("androidx.core:core:1.15.0")
         }
     }
-}
-
+    
 flutter {
     source = "../.."
 }

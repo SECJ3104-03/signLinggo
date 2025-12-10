@@ -7,6 +7,8 @@ import 'package:flutter/material.dart';
 import '../screens/profile/profile_screen.dart' show ProfileScreen;
 import 'package:go_router/go_router.dart';
 import 'package:signlinggo/screens/conversation_mode/chat_list_screen.dart';
+import 'package:signlinggo/screens/profile/profile_screen.dart';
+import 'package:signlinggo/screens/profile/edit_profile_screen.dart';
 import '../screens/landing/landing_screen.dart';
 import '../screens/sign_in/signin_screen.dart';
 import '../screens/register/register_screen.dart';
@@ -65,7 +67,23 @@ class AppRouter {
       GoRoute(
         path: '/profile',
         name: 'profile',
-        builder: (context, state) => const ProfileScreen(),
+        pageBuilder: (context, state) {
+          return CustomTransitionPage(
+            key: state.pageKey,
+            child: const ProfileScreen(),
+            transitionsBuilder: (context, animation, secondaryAnimation, child) {
+              return FadeTransition(
+                opacity: animation,
+                child: child,
+              );
+            },
+          );
+        },
+      ),
+      GoRoute(
+        path: '/edit-profile',
+        name: 'edit-profile',
+        builder: (context, state) => const EditProfilePage(),
       ),
 
       // Main App Routes

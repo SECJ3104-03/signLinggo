@@ -1,287 +1,241 @@
-// data/progress_manager.dart
+// lib/data/progress_manager.dart
+import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; // 1. Add Firestore Import
 
-class ProgressManager extends ChangeNotifier {
-  // Storage keys
-  static const String _totalWatchedKey = 'total_watched';
-  static const String _pointsKey = 'user_points';
-  static const String _streakKey = 'day_streak';
-  static const String _lastQuizDateKey = 'last_quiz_date';
-  static const String _dailyQuizDoneKey = 'daily_quiz_done';
-  static const String _streakHistoryKey = 'streak_history';
-  static const String _lastAppOpenDateKey = 'last_app_open_date';
-  static const String _watchedSignsKey = 'watched_signs';
-
+class ProgressManager with ChangeNotifier {
+  // ─── STATE VARIABLES ───────────────────────────────────────────────
   int _totalWatched = 0;
-  int _points = 0;
   int _dayStreak = 0;
+  int _points = 0;
   bool _dailyQuizDone = false;
-  List<String> _streakHistory = [];
-  Set<String> _watchedSigns = {};
+  Set<String> _watchedVideos = {};
+  DateTime? _lastActiveDate;
+  
+  // ─── DEPENDENCIES ──────────────────────────────────────────────────
+  SharedPreferences? _prefs;
+  StreamSubscription<User?>? _authSubscription;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance; // 2. Firestore Instance
 
+  // ─── GETTERS ───────────────────────────────────────────────────────
+  User? get currentUser => FirebaseAuth.instance.currentUser;
+  bool get isSignedIn => currentUser != null;
+  String? get userId => currentUser?.uid;
+  String? get userName => currentUser?.displayName ?? currentUser?.email?.split('@').first;
+  
+  int get totalWatched => _totalWatched;
+  int get dayStreak => _dayStreak;
+  int get points => _points;
+  bool get dailyQuizDone => _dailyQuizDone;
+  
+  bool isWatched(String videoTitle) => _watchedVideos.contains(videoTitle);
+  
+  // ─── INITIALIZATION ────────────────────────────────────────────────
   ProgressManager() {
-    _initialize();
+    _init();
   }
 
-  Future<void> _initialize() async {
-    await _loadProgress();
-    await _checkStreakOnAppOpen();
+  @override
+  void dispose() {
+    _authSubscription?.cancel();
+    super.dispose();
   }
-
-  // Helper: Convert DateTime to date string (YYYY-MM-DD)
-  String _dateToString(DateTime date) {
-    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-  }
-
-  // Helper: Get today's date string
-  String _getTodayString() {
-    return _dateToString(DateTime.now());
-  }
-
-  // Helper: Get yesterday's date string
-  String _getYesterdayString() {
-    final yesterday = DateTime.now().subtract(const Duration(days: 1));
-    return _dateToString(yesterday);
-  }
-
-  // Helper: Parse date string to DateTime
-  DateTime _stringToDate(String dateStr) {
-    final parts = dateStr.split('-');
-    return DateTime(
-      int.parse(parts[0]),
-      int.parse(parts[1]),
-      int.parse(parts[2]),
-    );
-  }
-
-  // Helper: Check if date is today
-  bool _isToday(String dateStr) {
-    return dateStr == _getTodayString();
-  }
-
-  // Helper: Check if date is yesterday
-  bool _isYesterday(String dateStr) {
-    return dateStr == _getYesterdayString();
-  }
-
   
+  Future<void> _init() async {
+    _prefs = await SharedPreferences.getInstance();
 
-  
- 
-  // Load all data from storage
-  Future<void> _loadProgress() async {
-    final prefs = await SharedPreferences.getInstance();
-    
-    _totalWatched = prefs.getInt(_totalWatchedKey) ?? 0;
-    _points = prefs.getInt(_pointsKey) ?? 0;
-    _dayStreak = prefs.getInt(_streakKey) ?? 0;
-    _dailyQuizDone = prefs.getBool(_dailyQuizDoneKey) ?? false;
-    _streakHistory = prefs.getStringList(_streakHistoryKey) ?? [];
-    
-    // Load watched signs
-    final watchedList = prefs.getStringList(_watchedSignsKey) ?? [];
-    _watchedSigns = watchedList.toSet();
-    
-    notifyListeners();
-  }
-
-  // Check streak whenever app opens
-  Future<void> _checkStreakOnAppOpen() async {
-    final prefs = await SharedPreferences.getInstance();
-    final today = _getTodayString();
-    
-    // Update last app open date
-    await prefs.setString(_lastAppOpenDateKey, today);
-    
-    // Check if we need to update daily quiz status
-    if (_streakHistory.isNotEmpty) {
-      final lastQuizDate = _streakHistory.last;
-      
-      // Check if last quiz was today
-      _dailyQuizDone = _isToday(lastQuizDate);
-      
-      // Calculate current streak
-      _dayStreak = _calculateCurrentStreak();
-      
-      // Save updates
-      await prefs.setInt(_streakKey, _dayStreak);
-      await prefs.setBool(_dailyQuizDoneKey, _dailyQuizDone);
-    }
-    
-    notifyListeners();
-  }
-
-  // Calculate current streak from history
-  int _calculateCurrentStreak() {
-    if (_streakHistory.isEmpty) return 0;
-    
-    // Sort dates (newest first)
-    _streakHistory.sort((a, b) => b.compareTo(a));
-    
-    int streak = 0;
-    DateTime? previousDate;
-    final today = _getTodayString();
-    final yesterday = _getYesterdayString();
-    
-    for (final dateStr in _streakHistory) {
-      if (streak == 0) {
-        // First check: must be today or yesterday to start streak
-        if (_isToday(dateStr) || _isYesterday(dateStr)) {
-          streak = 1;
-          previousDate = _stringToDate(dateStr);
-        } else {
-          // No recent activity
-          break;
-        }
+    // Listen for Login/Logout events
+    _authSubscription = FirebaseAuth.instance.authStateChanges().listen((User? user) {
+      if (user != null) {
+        // User Logged In: Load Cloud Data
+        _loadUserData(user.uid);
       } else {
-        // Check consecutive days
-        if (previousDate != null) {
-          final currentDate = _stringToDate(dateStr);
-          final daysDifference = previousDate.difference(currentDate).inDays.abs();
-          
-          if (daysDifference == 1) {
-            streak++;
-            previousDate = currentDate;
-          } else {
-            break; // Gap found, streak ends
-          }
-        }
+        // User Logged Out: Clear Screen
+        _clearInMemoryState();
       }
-    }
-    
-    return streak;
+    });
   }
+  
+  // ─── DATA SYNC (CLOUD + LOCAL) ─────────────────────────────────────
+  
+  String _getUserStorageKey(String uid) => 'progress_data_$uid';
+  
+  Future<void> _loadUserData(String uid) async {
+    bool dataLoaded = false;
 
-  // Complete daily quiz
-  Future<void> completeDailyQuiz({required bool isCorrect}) async {
-    final prefs = await SharedPreferences.getInstance();
-    final today = _getTodayString();
-    
-    // Check if quiz already completed today
-    if (_dailyQuizDone) {
-      throw Exception('Daily quiz already completed today');
-    }
-    
-    // Add today to streak history
-    if (!_streakHistory.contains(today)) {
-      _streakHistory.add(today);
+    // 1. Try Loading from Cloud (Firestore)
+    try {
+      final docSnapshot = await _firestore.collection('users').doc(uid).get();
       
-      // Keep only last 365 days to save storage
-      if (_streakHistory.length > 365) {
-        _streakHistory = _streakHistory.sublist(_streakHistory.length - 365);
+      if (docSnapshot.exists && docSnapshot.data() != null) {
+        final data = docSnapshot.data()!;
+        _parseAndApplyData(data);
+        dataLoaded = true;
+        
+        // Update local cache to match cloud
+        await _saveToLocalCache(uid, data); 
+        if (kDebugMode) print('☁️ Loaded data from Cloud Firestore');
       }
-      
-      // Save updated history
-      await prefs.setStringList(_streakHistoryKey, _streakHistory);
+    } catch (e) {
+      if (kDebugMode) print('⚠️ Cloud load failed (Offline?): $e');
     }
-    
-    // Update streak
-    _dayStreak = _calculateCurrentStreak();
-    _dailyQuizDone = true;
-    
-    // Award points if correct
-    if (isCorrect) {
-      _points += 10;
+
+    // 2. Fallback: Load from Local Storage if Cloud failed or didn't exist
+    if (!dataLoaded) {
+      final key = _getUserStorageKey(uid);
+      final localJson = _prefs?.getString(key);
+      if (localJson != null) {
+        _parseAndApplyData(jsonDecode(localJson));
+        if (kDebugMode) print('📱 Loaded data from Local Cache');
+      } else {
+        _clearInMemoryState(); // New user
+      }
     }
-    
-    // Save all changes
-    await prefs.setInt(_totalWatchedKey, _totalWatched);
-    await prefs.setInt(_pointsKey, _points);
-    await prefs.setInt(_streakKey, _dayStreak);
-    await prefs.setBool(_dailyQuizDoneKey, _dailyQuizDone);
-    
+
+    // 3. Logic Checks (Reset daily quiz if new day)
+    await _checkAndResetDailyQuiz();
     notifyListeners();
   }
-
-  // Get streak calendar for display (last 30 days)
-  Map<String, bool> getStreakCalendar() {
-    final calendar = <String, bool>{};
-    final today = DateTime.now();
+  
+  /// Helper to parse raw JSON/Map data into variables
+  void _parseAndApplyData(Map<String, dynamic> data) {
+    _totalWatched = data['totalWatched'] ?? 0;
+    _dayStreak = data['dayStreak'] ?? 0;
+    _points = data['points'] ?? 0;
+    _dailyQuizDone = data['dailyQuizDone'] ?? false;
     
-    // Generate last 30 days
-    for (int i = 0; i < 30; i++) {
-      final date = today.subtract(Duration(days: i));
-      final dateStr = _dateToString(date);
-      calendar[dateStr] = _streakHistory.contains(dateStr);
+    final watchedList = List<String>.from(data['watchedVideos'] ?? []);
+    _watchedVideos = Set<String>.from(watchedList);
+    
+    final lastActiveString = data['lastActiveDate'];
+    if (lastActiveString != null) {
+      _lastActiveDate = DateTime.tryParse(lastActiveString);
+    }
+  }
+
+  /// Master Save Method: Saves to BOTH Local and Cloud
+  Future<void> _saveUserData() async {
+    if (!isSignedIn) return;
+    final uid = userId!;
+
+    // Prepare Data Object
+    final data = {
+      'userId': uid,
+      'userName': userName,
+      'totalWatched': _totalWatched,
+      'dayStreak': _dayStreak,
+      'points': _points,
+      'dailyQuizDone': _dailyQuizDone,
+      'watchedVideos': _watchedVideos.toList(),
+      'lastActiveDate': _lastActiveDate?.toIso8601String(),
+      'lastUpdated': DateTime.now().toIso8601String(),
+    };
+    
+    // 1. Save to Local Cache (Fast, works offline)
+    await _saveToLocalCache(uid, data);
+
+    // 2. Save to Cloud Firestore (Async background sync)
+    try {
+      await _firestore.collection('users').doc(uid).set(data, SetOptions(merge: true));
+      if (kDebugMode) print('☁️ Synced to Cloud');
+    } catch (e) {
+      if (kDebugMode) print('⚠️ Cloud sync failed (will retry next time): $e');
+    }
+  }
+
+  Future<void> _saveToLocalCache(String uid, Map<String, dynamic> data) async {
+     if (_prefs == null) return;
+     final key = _getUserStorageKey(uid);
+     await _prefs!.setString(key, jsonEncode(data));
+  }
+  
+  // ─── RESET STATE ──────────────────────────────────────────────────
+  
+  void _clearInMemoryState() {
+    _totalWatched = 0;
+    _dayStreak = 0;
+    _points = 0;
+    _dailyQuizDone = false;
+    _watchedVideos = {};
+    _lastActiveDate = null;
+    notifyListeners();
+  }
+  
+  // ─── USER ACTIONS ─────────────────────────────────────────────────
+  
+  Future<void> markAsWatched(String videoTitle) async {
+    if (!isSignedIn) return;
+    
+    if (!_watchedVideos.contains(videoTitle)) {
+      _watchedVideos.add(videoTitle);
+      _totalWatched++;
+      
+      await _updateStreak();
+      await _saveUserData(); // Triggers Cloud Sync
+      notifyListeners();
+    }
+  }
+  
+  Future<void> completeDailyQuiz({required bool isCorrect}) async {
+    if (!isSignedIn) throw Exception('Must be signed in');
+    if (_dailyQuizDone) throw Exception('Quiz already done');
+    
+    _dailyQuizDone = true;
+    if (isCorrect) _points += 10;
+    
+    await _updateStreak();
+    await _saveUserData(); // Triggers Cloud Sync
+    notifyListeners();
+  }
+  
+  // ─── INTERNAL LOGIC ───────────────────────────────────────────────
+  
+  Future<void> _checkAndResetDailyQuiz() async {
+    if (_lastActiveDate != null) {
+      final now = DateTime.now();
+      final last = _lastActiveDate!;
+      
+      // If day changed, reset flag (but don't save yet to reduce writes)
+      if (now.year != last.year || now.month != last.month || now.day != last.day) {
+        _dailyQuizDone = false;
+      }
+    }
+  }
+  
+  Future<void> _updateStreak() async {
+    final now = DateTime.now();
+    if (_lastActiveDate == null) {
+      _dayStreak = 1;
+      _lastActiveDate = now;
+      return;
     }
     
+    final last = _lastActiveDate!;
+    final dateNow = DateTime(now.year, now.month, now.day);
+    final dateLast = DateTime(last.year, last.month, last.day);
+    
+    final diff = dateNow.difference(dateLast).inDays;
+    
+    if (diff == 0) return; // Same day
+    
+    if (diff == 1) {
+      _dayStreak++; // Consecutive
+    } else {
+      _dayStreak = 1; // Broken
+    }
+    _lastActiveDate = now;
+  }
+  
+  Map<DateTime, bool> getStreakCalendar() {
+    final calendar = <DateTime, bool>{};
+    final now = DateTime.now();
+    for (int i = 29; i >= 0; i--) {
+      final date = now.subtract(Duration(days: i));
+      calendar[date] = i < _dayStreak;
+    }
     return calendar;
   }
-
-  // Get longest streak
-  int getLongestStreak() {
-    if (_streakHistory.isEmpty) return 0;
-    
-    final dates = _streakHistory.map(_stringToDate).toList();
-    dates.sort((a, b) => a.compareTo(b));
-    
-    int longestStreak = 0;
-    int currentStreak = 1;
-    
-    for (int i = 1; i < dates.length; i++) {
-      final daysDifference = dates[i].difference(dates[i - 1]).inDays.abs();
-      
-      if (daysDifference == 1) {
-        currentStreak++;
-      } else if (daysDifference > 1) {
-        longestStreak = longestStreak > currentStreak ? longestStreak : currentStreak;
-        currentStreak = 1;
-      }
-    }
-    
-    return longestStreak > currentStreak ? longestStreak : currentStreak;
-  }
-
-  // Mark sign as watched
-  void markAsWatched(String signTitle) {
-    _watchedSigns.add(signTitle);
-    _totalWatched = _watchedSigns.length;
-    
-    // Save to storage
-    _saveWatchedSigns();
-  }
-
-  bool isWatched(String signTitle) {
-    return _watchedSigns.contains(signTitle);
-  }
-
-  Future<void> _saveWatchedSigns() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList(_watchedSignsKey, _watchedSigns.toList());
-    await prefs.setInt(_totalWatchedKey, _totalWatched);
-    
-    notifyListeners();
-  }
-
-  // Reset for testing
-  Future<void> reset() async {
-    final prefs = await SharedPreferences.getInstance();
-    
-    _totalWatched = 0;
-    _points = 0;
-    _dayStreak = 0;
-    _dailyQuizDone = false;
-    _streakHistory.clear();
-    _watchedSigns.clear();
-    
-    await prefs.remove(_totalWatchedKey);
-    await prefs.remove(_pointsKey);
-    await prefs.remove(_streakKey);
-    await prefs.remove(_lastQuizDateKey);
-    await prefs.remove(_dailyQuizDoneKey);
-    await prefs.remove(_streakHistoryKey);
-    await prefs.remove(_lastAppOpenDateKey);
-    await prefs.remove(_watchedSignsKey);
-    
-    notifyListeners();
-  }
-
-  // Getters
-  int get totalWatched => _totalWatched;
-  int get points => _points;
-  int get dayStreak => _dayStreak;
-  bool get dailyQuizDone => _dailyQuizDone;
-  Set<String> get watchedSigns => _watchedSigns;
-  List<String> get streakHistory => List.unmodifiable(_streakHistory);
 }

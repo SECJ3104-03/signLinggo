@@ -13,13 +13,6 @@ class ProgressScreen extends StatefulWidget {
 }
 
 class _ProgressScreenState extends State<ProgressScreen> {
-  
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    
-  }
-
   // Example total counts for goals
   final int totalSigns = 100;
   final int dailyGoal = 10;
@@ -33,7 +26,10 @@ class _ProgressScreenState extends State<ProgressScreen> {
     final dayStreak = progressManager.dayStreak;
     final userPoints = progressManager.points;
     final dailyQuizDone = progressManager.dailyQuizDone;
+    
+    // 1. Get the calendar and reverse the keys so Today is first
     final streakCalendar = progressManager.getStreakCalendar();
+    final calendarKeys = streakCalendar.keys.toList().reversed.toList();
 
     // Compute progress for goals
     final dailyProgress = (totalWatched % dailyGoal) / dailyGoal;
@@ -66,6 +62,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
           style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w600),
         ),
         actions: [
+          // Profile Icon Removed Here
           IconButton(
             icon: Badge(
               smallSize: 8,
@@ -76,9 +73,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                 color: dailyQuizDone ? Colors.grey : Colors.blueAccent,
               ),
             ),
-            onPressed: dailyQuizDone
-                ? null
-                : () => _showDailyQuizDialog(context),
+            onPressed: dailyQuizDone ? null : () => _showDailyQuizDialog(context),
             tooltip: dailyQuizDone ? 'Quiz Completed Today' : 'Take Daily Quiz',
           ),
         ],
@@ -147,8 +142,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                       Icon(Icons.circle_outlined, color: Colors.blueAccent),
                       SizedBox(width: 8),
                       Text('Learning Goals',
-                          style: TextStyle(
-                              fontWeight: FontWeight.w600, fontSize: 16)),
+                          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
                     ],
                   ),
                   const SizedBox(height: 16),
@@ -174,7 +168,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
             ),
             const SizedBox(height: 28),
 
-            // ── Streak Calendar ──
+            // ── Streak Calendar (UPDATED) ──
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(16),
@@ -203,7 +197,9 @@ class _ProgressScreenState extends State<ProgressScreen> {
                     ),
                     itemCount: 30,
                     itemBuilder: (context, index) {
-                      final dateKey = streakCalendar.keys.elementAt(index);
+                      // 2. Use the reversed keys list here
+                      // Index 0 is now Today (Newest)
+                      final dateKey = calendarKeys[index];
                       final hasActivity = streakCalendar[dateKey] ?? false;
                       
                       return Container(
@@ -213,7 +209,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                         ),
                         child: Center(
                           child: Text(
-                            '${index + 1}',
+                            '${index + 1}', // Display 1, 2, 3...
                             style: TextStyle(
                               color: hasActivity ? Colors.white : Colors.grey.shade600,
                               fontWeight: FontWeight.w500,
@@ -226,6 +222,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                 ],
               ),
             ),
+            // ... (Rest of the file remains unchanged)
             const SizedBox(height: 28),
 
             // ── Achievements ──
@@ -242,23 +239,32 @@ class _ProgressScreenState extends State<ProgressScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Achievements',
-                      style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
+                  const Text(
+                    'Achievements',
+                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+                  ),
                   const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      _AchievementDot(
-                          icon: '🎯', label: 'First Sign', completed: totalWatched >= 1),
-                      _AchievementDot(
-                          icon: '🔥', label: 'Week Streak', completed: dayStreak >= 7),
-                      _AchievementDot(
-                          icon: '⭐', label: '50 Signs', completed: totalWatched >= 50),
-                      _AchievementDot(
-                          icon: '💎', label: '100 Signs', completed: totalWatched >= 100),
-                      _AchievementDot(
-                          icon: '👑', label: 'Master', completed: totalWatched >= totalSigns),
-                    ],
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        _AchievementDot(
+                            icon: '🎯', label: 'First Sign', completed: totalWatched >= 1),
+                        const SizedBox(width: 8),
+                        _AchievementDot(
+                            icon: '🔥', label: 'Week Streak', completed: dayStreak >= 7),
+                        const SizedBox(width: 8),
+                        _AchievementDot(
+                            icon: '⭐', label: '50 Signs', completed: totalWatched >= 50),
+                        const SizedBox(width: 8),
+                        _AchievementDot(
+                            icon: '💎', label: '100 Signs', completed: totalWatched >= 100),
+                        const SizedBox(width: 8),
+                        _AchievementDot(
+                            icon: '👑', label: 'Master', completed: totalWatched >= totalSigns),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -344,120 +350,119 @@ class _ProgressScreenState extends State<ProgressScreen> {
   }
 
   void _showDailyQuizDialog(BuildContext context) {
-  final progressManager = context.read<ProgressManager>();
-  final quizQuestion = QuizRepository.getRandomQuestion(); // Fixed: Use QuizRepository
-  
-  if (progressManager.dailyQuizDone) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('You have already completed today\'s quiz!'),
-        backgroundColor: Colors.orange,
-      ),
-    );
-    return;
-  }
+    final progressManager = context.read<ProgressManager>();
+    final quizQuestion = QuizRepository.getRandomQuestion();
+    
+    if (progressManager.dailyQuizDone) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('You have already completed today\'s quiz!'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
 
-  int? selectedIndex;
+    int? selectedIndex;
 
-  showDialog(
-    context: context,
-    builder: (context) => StatefulBuilder(
-      builder: (context, setState) {
-        return AlertDialog(
-          title: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Daily Quiz',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.blue.shade800,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Chip(
-                label: Text(quizQuestion.category),
-                backgroundColor: Colors.blue.shade50,
-              ),
-            ],
-          ),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) {
+          return AlertDialog(
+            title: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  quizQuestion.question,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w500,
+                  'Daily Quiz',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue.shade800,
                   ),
-                  textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 24),
-                
-                // Quiz Options
-                ...quizQuestion.options.asMap().entries.map((entry) {
-                  final index = entry.key;
-                  final option = entry.value;
-                  
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      side: BorderSide(
-                        color: selectedIndex == index 
-                          ? Colors.blue 
-                          : Colors.grey.shade300,
-                        width: selectedIndex == index ? 2 : 1,
-                      ),
+                const SizedBox(height: 8),
+                Chip(
+                  label: Text(quizQuestion.category),
+                  backgroundColor: Colors.blue.shade50,
+                ),
+              ],
+            ),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    quizQuestion.question,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w500,
                     ),
-                    child: ListTile(
-                      title: Text(option),
-                      leading: Radio<int>(
-                        value: index,
-                        groupValue: selectedIndex,
-                        onChanged: (value) {
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  
+                  ...quizQuestion.options.asMap().entries.map((entry) {
+                    final index = entry.key;
+                    final option = entry.value;
+                    
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        side: BorderSide(
+                          color: selectedIndex == index 
+                            ? Colors.blue 
+                            : Colors.grey.shade300,
+                          width: selectedIndex == index ? 2 : 1,
+                        ),
+                      ),
+                      child: ListTile(
+                        title: Text(option),
+                        leading: Radio<int>(
+                          value: index,
+                          groupValue: selectedIndex,
+                          onChanged: (value) {
+                            setState(() {
+                              selectedIndex = value;
+                            });
+                          },
+                        ),
+                        onTap: () {
                           setState(() {
-                            selectedIndex = value;
+                            selectedIndex = index;
                           });
                         },
                       ),
-                      onTap: () {
-                        setState(() {
-                          selectedIndex = index;
-                        });
+                    );
+                  }).toList(),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: selectedIndex == null
+                    ? null
+                    : () {
+                        Navigator.pop(context);
+                        _completeQuiz(
+                          context, 
+                          selectedIndex == quizQuestion.correctAnswerIndex
+                        );
                       },
-                    ),
-                  );
-                }).toList(),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: selectedIndex == null
-                  ? null
-                  : () {
-                      Navigator.pop(context);
-                      _completeQuiz(
-                        context, 
-                        selectedIndex == quizQuestion.correctAnswerIndex
-                      );
-                    },
-              child: const Text('Submit Answer'),
-            ),
-          ],
-        );
-      },
-    ),
-  );
-}
+                child: const Text('Submit Answer'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
 
   void _completeQuiz(BuildContext context, bool isCorrect) {
     final progressManager = context.read<ProgressManager>();
@@ -490,7 +495,6 @@ class _ProgressScreenState extends State<ProgressScreen> {
 // ──────────────────────────────
 // Supporting Widgets
 // ──────────────────────────────
-
 class _DailyQuizBanner extends StatelessWidget {
   final int dayStreak;
   final VoidCallback onTap;
@@ -576,7 +580,7 @@ class _StatCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Expanded(
       child: Container(
-        constraints: const BoxConstraints(minHeight: 120), // Changed from fixed height
+        constraints: const BoxConstraints(minHeight: 120),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           gradient: LinearGradient(
