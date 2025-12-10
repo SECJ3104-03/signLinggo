@@ -29,7 +29,7 @@ class _TextInputBarState extends State<TextInputBar> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
       color: Colors.white,
       child: Row(
         children: [

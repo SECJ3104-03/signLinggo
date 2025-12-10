@@ -4,7 +4,6 @@ import 'package:camera/camera.dart';
 import 'package:video_player/video_player.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:signlinggo/services/video_upload_service.dart';
 
 import 'text_input_bar.dart';
 import 'sign_input_bar.dart';
@@ -31,111 +30,12 @@ class ConversationScreen extends StatefulWidget {
 class _ConversationScreenState extends State<ConversationScreen> {
   String _mode = "Text";
   final Map<String, VideoPlayerController> _videoControllers = {};
-
-  CameraController? _cameraController;
-  List<CameraDescription> _cameras = [];
-  bool _isRecording = false;
-
   late final String currentUserId;
 
   @override
   void initState() {
     super.initState();
     currentUserId = widget.currentUserID;
-    if (_mode == 'Sign') _initCamera();
-  }
-
-  @override
-  void dispose() {
-    _cameraController?.dispose();
-    _videoControllers.forEach((k, v) => v.dispose());
-    super.dispose();
-  }
-
-  void _switchMode(String mode) async {
-    if (_mode == mode) return;
-
-    if (_mode == 'Sign') {
-      await _cameraController?.dispose();
-      _cameraController = null;
-      _cameras = [];
-      _isRecording = false;
-    }
-
-    setState(() => _mode = mode);
-
-    if (_mode == 'Sign') {
-      _initCamera();
-    }
-  }
-
-  Future<void> _initCamera() async {
-    try {
-      _cameras = await availableCameras();
-      if (_cameras.isNotEmpty) {
-        _cameraController =
-            CameraController(_cameras.first, ResolutionPreset.medium);
-        await _cameraController?.initialize();
-        if (mounted) setState(() {});
-      }
-    } catch (e) {
-      debugPrint("Error initializing camera: $e");
-    }
-  }
-
-  Future<void> _sendVideoMessage(File videoFile) async {
-    final videoURL = await uploadVideoViaSignedUrl(videoFile);
-    if (videoURL == null) return;
-
-    await _sendMessage(videoURL, 'video', 'Sent a video');
-
-    final controller = VideoPlayerController.networkUrl(Uri.parse(videoURL))
-      ..initialize().then((_) => setState(() {}));
-    _videoControllers[videoURL] = controller;
-  }
-
-  Future<void> _updateConversationDocument(String lastMessage) async {
-    final conversationIds = widget.conversationId.split('_');
-
-    final otherUserID = conversationIds.firstWhere(
-        (id) => id != widget.currentUserID,
-        orElse: () => '');
-
-    final updateData = {
-      'lastMessage': lastMessage,
-      'lastMessageAt': FieldValue.serverTimestamp(),
-      'userIDs': conversationIds,
-      'otherUserID': otherUserID,
-    };
-
-    await FirebaseFirestore.instance
-        .collection('conversation')
-        .doc(widget.conversationId)
-        .set(updateData, SetOptions(merge: true));
-  }
-  
-  Future<String?> _uploadVideoToSupabase(File videoFile) async {
-    try {
-      final fileName = 'videos/${DateTime.now().millisecondsSinceEpoch}.mp4';
-
-      await Supabase.instance.client.storage
-          .from('videoMessage')
-          .upload(
-            fileName,
-            videoFile,
-            fileOptions: const FileOptions(upsert: true),
-          );
-
-      final url = Supabase.instance.client.storage
-          .from('videoMessage')
-          .getPublicUrl(fileName);
-
-      debugPrint('Video uploaded: $url');
-      return url;
-    } catch (e) {
-      debugPrint('Video upload exception: $e');
-      return null;
-    }
   }
 
   Future<void> _sendMessage(
@@ -158,6 +58,29 @@ class _ConversationScreenState extends State<ConversationScreen> {
     await _updateConversationDocument(previewText);
   }
 
+  Future<void> _updateConversationDocument(String lastMessage) async {
+    final conversationIds = widget.conversationId.split('_');
+    final otherUserID = conversationIds.firstWhere(
+        (id) => id != widget.currentUserID,
+        orElse: () => '');
+
+    final updateData = {
+      'lastMessage': lastMessage,
+      'lastMessageAt': FieldValue.serverTimestamp(),
+      'userIDs': conversationIds,
+      'otherUserID': otherUserID,
+    };
+
+    await FirebaseFirestore.instance
+        .collection('conversation')
+        .doc(widget.conversationId)
+        .set(updateData, SetOptions(merge: true));
+  }
+
+  Future<void> _sendVideoMessage(String videoUrl) async {
+    await _sendMessage(videoUrl, 'video', 'Sent a video');
+  }
+
   Stream<List<Map<String, dynamic>>> _messageStream() {
     return FirebaseFirestore.instance
         .collection('conversation')
@@ -170,66 +93,6 @@ class _ConversationScreenState extends State<ConversationScreen> {
               data['isUser'] = data['senderId'] == currentUserId;
               return data;
             }).toList());
-  }
-
-  Widget _buildCameraOverlay() {
-    return const SizedBox.shrink(); 
-  }
-
-  Widget _buildModeSelector() {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
-      color: const Color(0xFFEFF6FF),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: ['Text', 'Sign', 'Voice'].map((mode) {
-          final isSelected = _mode == mode;
-          return GestureDetector(
-            onTap: () => _switchMode(mode),
-            child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 28),
-              decoration: BoxDecoration(
-                color: isSelected ? Colors.purple[50] : Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                    color: isSelected ? Colors.purple : Colors.transparent,
-                    width: 1.5),
-              ),
-              child: Text(
-                mode,
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                  color: isSelected ? Colors.purple[800] : Colors.black87,
-                ),
-              ),
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-
-  Widget _buildInputBar() {
-    switch (_mode) {
-      case 'Text':
-        return TextInputBar(onSend: _sendMessage);
-      case 'Voice':
-        return VoiceInputBar(onSend: _sendMessage);
-      case 'Sign':
-        return SignInputBar(
-          isParentRecording: _isRecording,
-          cameraController: _cameraController,
-          onVideoRecorded: _sendVideoMessage,
-          onRecordingStateChanged: (isRecording) {
-            setState(() {
-              _isRecording = isRecording;
-            });
-          },
-        );
-      default:
-        return const SizedBox.shrink();
-    }
   }
 
   Widget _buildTextBubble(String text, bool isUser) {
@@ -255,6 +118,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
     final controller = _videoControllers[videoURL] ??
         VideoPlayerController.networkUrl(Uri.parse(videoURL))
           ..initialize().then((_) => setState(() {}));
+
     _videoControllers[videoURL] = controller;
 
     final width = MediaQuery.of(context).size.width * 0.55;
@@ -331,6 +195,57 @@ class _ConversationScreenState extends State<ConversationScreen> {
     }
   }
 
+  Widget _buildModeSelector() {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+      color: const Color(0xFFEFF6FF),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: ['Text', 'Sign', 'Voice'].map((mode) {
+          final isSelected = _mode == mode;
+          return GestureDetector(
+            onTap: () => setState(() => _mode = mode),
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 28),
+              decoration: BoxDecoration(
+                color: isSelected ? Colors.purple[50] : Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                    color: isSelected ? Colors.purple : Colors.transparent,
+                    width: 1.5),
+              ),
+              child: Text(
+                mode,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                  color: isSelected ? Colors.purple[800] : Colors.black87,
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildInputBar() {
+    switch (_mode) {
+      case 'Text':
+        return TextInputBar(onSend: _sendMessage);
+      case 'Voice':
+        return VoiceInputBar(onSend: _sendMessage);
+      case 'Sign':
+        return SignInputBar(
+          onVideoRecorded: _sendVideoMessage,
+          isParentRecording: false,
+          onRecordingStateChanged: (_) {},
+        );
+      default:
+        return const SizedBox.shrink();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -341,56 +256,46 @@ class _ConversationScreenState extends State<ConversationScreen> {
           icon: const Icon(Icons.arrow_back, color: Colors.black87),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Row(children: [
-          Stack(
-            children: [
-              CircleAvatar(
-                backgroundColor: Colors.grey,
-                child:
-                    Text(widget.avatar, style: const TextStyle(color: Colors.white)),
-              ),
-            ],
-          ),
-          const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(widget.chatName,
-                  style: const TextStyle(color: Colors.black, fontSize: 18)),
-            ],
-          ),
-        ]),
+        title: Row(
+          children: [
+            CircleAvatar(
+              backgroundColor: Colors.grey,
+              child: Text(widget.avatar,
+                  style: const TextStyle(color: Colors.white)),
+            ),
+            const SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(widget.chatName,
+                    style: const TextStyle(color: Colors.black, fontSize: 18)),
+              ],
+            ),
+          ],
+        ),
       ),
       backgroundColor: Colors.white,
-      body: Stack(
+      body: Column(
         children: [
-          Column(
-            children: [
-              _buildModeSelector(),
-              Expanded(
-                child: StreamBuilder<List<Map<String, dynamic>>>(
-                  stream: _messageStream(),
-                  builder: (context, snapshot) {
-                    if (!snapshot.hasData) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
-                    final messages = snapshot.data!;
-                    return ListView.builder(
-                      reverse: true,
-                      padding: const EdgeInsets.all(12),
-                      itemCount: messages.length,
-                      itemBuilder: (context, index) {
-                        final msg = messages[index];
-                        return _buildUserMessage(msg);
-                      },
-                    );
-                  },
-                ),
-              ),
-              _buildInputBar(),
-            ],
+          _buildModeSelector(),
+          Expanded(
+            child: StreamBuilder<List<Map<String, dynamic>>>(
+              stream: _messageStream(),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                final messages = snapshot.data!;
+                return ListView.builder(
+                  reverse: true,
+                  itemCount: messages.length,
+                  itemBuilder: (context, index) =>
+                      _buildUserMessage(messages[index]),
+                );
+              },
+            ),
           ),
-          if (_mode == 'Sign') _buildCameraOverlay(),
+          _buildInputBar(),
         ],
       ),
     );
