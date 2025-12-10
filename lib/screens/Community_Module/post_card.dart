@@ -76,7 +76,6 @@ class _PostCardState extends State<PostCard> {
         builder: (context) => ConversationScreen(
           chatName: widget.post.author,
           avatar: widget.post.initials,
-          isOnline: true, 
           // --- NEW PARAMETERS ADDED ---
           conversationId: conversationId,
           currentUserID: currentUserId,
