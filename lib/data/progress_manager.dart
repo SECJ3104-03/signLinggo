@@ -214,6 +214,24 @@ class ProgressManager with ChangeNotifier {
     notifyListeners();
   }
 
+  // ─── LEADERBOARD LOGIC ───────────────────────────────────────────────
+
+  /// Fetches the top 20 users sorted by points (Descending)
+  Future<List<Map<String, dynamic>>> fetchLeaderboard() async {
+    try {
+      final snapshot = await _firestore
+          .collection('users')
+          .orderBy('points', descending: true)
+          .limit(20)
+          .get();
+
+      return snapshot.docs.map((doc) => doc.data()).toList();
+    } catch (e) {
+      if (kDebugMode) print('Error fetching leaderboard: $e');
+      return [];
+    }
+  }
+  
   // ─── INTERNAL LOGIC ───────────────────────────────────────────────
 
   /// [FIX 7] Renamed and updated to handle Daily Count Reset
