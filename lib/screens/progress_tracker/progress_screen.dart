@@ -23,6 +23,8 @@ class _ProgressScreenState extends State<ProgressScreen> {
   Widget build(BuildContext context) {
     final progressManager = context.watch<ProgressManager>();
     final totalWatched = progressManager.totalWatched;
+    // 1. GET THE REAL DAILY COUNT
+    final dailyWatchedCount = progressManager.dailyWatchedCount;
     final dayStreak = progressManager.dayStreak;
     final userPoints = progressManager.points;
     final dailyQuizDone = progressManager.dailyQuizDone;
@@ -32,7 +34,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
     final calendarKeys = streakCalendar.keys.toList().reversed.toList();
 
     // Compute progress for goals
-    final dailyProgress = (totalWatched % dailyGoal) / dailyGoal;
+    final dailyProgress = (dailyWatchedCount / dailyGoal).clamp(0.0, 1.0);
     final weeklyProgress = (totalWatched % weeklyGoal) / weeklyGoal;
     final monthlyProgress = totalWatched / monthlyGoal;
 
@@ -147,7 +149,8 @@ class _ProgressScreenState extends State<ProgressScreen> {
                   ),
                   const SizedBox(height: 16),
                   _GoalRow(
-                    title: 'Daily Goal (${totalWatched % dailyGoal}/$dailyGoal signs)',
+                    // Show Actual Count vs Daily Goal
+                    title: 'Daily Goal ($dailyWatchedCount/$dailyGoal signs)', 
                     percentLabel: '${(dailyProgress * 100).toStringAsFixed(0)}%',
                     progress: dailyProgress,
                   ),
