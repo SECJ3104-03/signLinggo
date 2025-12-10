@@ -31,11 +31,23 @@ class _ConversationScreenState extends State<ConversationScreen> {
   String _mode = "Text";
   final Map<String, VideoPlayerController> _videoControllers = {};
   late final String currentUserId;
+  
+  // FIX 1: Added the missing state variable here
+  bool _isRecording = false; 
 
   @override
   void initState() {
     super.initState();
     currentUserId = widget.currentUserID;
+  }
+  
+  // Clean up video controllers when screen closes to prevent memory leaks
+  @override
+  void dispose() {
+    for (var controller in _videoControllers.values) {
+      controller.dispose();
+    }
+    super.dispose();
   }
 
   Future<void> _sendMessage(
@@ -115,13 +127,17 @@ class _ConversationScreenState extends State<ConversationScreen> {
   }
 
   Widget _buildVideoBubble(String videoURL, bool isUser) {
-    final controller = _videoControllers[videoURL] ??
-        VideoPlayerController.networkUrl(Uri.parse(videoURL))
-          ..initialize().then((_) => setState(() {}));
-
-    _videoControllers[videoURL] = controller;
-
+    // Check if controller exists, if not create and initialize it
+    if (!_videoControllers.containsKey(videoURL)) {
+      _videoControllers[videoURL] = VideoPlayerController.networkUrl(Uri.parse(videoURL))
+        ..initialize().then((_) {
+          if (mounted) setState(() {});
+        });
+    }
+    
+    final controller = _videoControllers[videoURL]!;
     final width = MediaQuery.of(context).size.width * 0.55;
+    
     return Align(
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
@@ -140,7 +156,10 @@ class _ConversationScreenState extends State<ConversationScreen> {
                   children: [
                     ClipRRect(
                       borderRadius: BorderRadius.circular(16),
-                      child: VideoPlayer(controller),
+                      child: AspectRatio(
+                        aspectRatio: controller.value.aspectRatio,
+                        child: VideoPlayer(controller),
+                      ),
                     ),
                     IconButton(
                       icon: Icon(
@@ -185,11 +204,11 @@ class _ConversationScreenState extends State<ConversationScreen> {
     final bool isUser = msg['isUser'];
     switch (msg['type']) {
       case 'text':
-        return _buildTextBubble(msg['content'], isUser);
+        return _buildTextBubble(msg['content'] ?? '', isUser);
       case 'video':
         return _buildVideoBubble(msg['content'] as String, isUser);
       case 'voice':
-        return _buildVoiceBubble(msg['content'], isUser);
+        return _buildVoiceBubble(msg['content'] ?? '', isUser);
       default:
         return const SizedBox.shrink();
     }
@@ -239,7 +258,12 @@ class _ConversationScreenState extends State<ConversationScreen> {
         return SignInputBar(
           onVideoRecorded: _sendVideoMessage,
           isParentRecording: false,
-          onRecordingStateChanged: (_) {},
+          // Update the state when recording starts/stops
+          onRecordingStateChanged: (isRecording) {
+             setState(() {
+               _isRecording = isRecording;
+             });
+          },
         );
       default:
         return const SizedBox.shrink();
@@ -260,8 +284,10 @@ class _ConversationScreenState extends State<ConversationScreen> {
           children: [
             CircleAvatar(
               backgroundColor: Colors.grey,
-              child: Text(widget.avatar,
-                  style: const TextStyle(color: Colors.white)),
+              child: Text(
+                widget.avatar.isNotEmpty ? widget.avatar[0].toUpperCase() : '?', 
+                style: const TextStyle(color: Colors.white)
+              ),
             ),
             const SizedBox(width: 12),
             Column(
@@ -275,27 +301,43 @@ class _ConversationScreenState extends State<ConversationScreen> {
         ),
       ),
       backgroundColor: Colors.white,
-      body: Column(
+      
+      // Use a Stack instead of a Column for the body
+      body: Stack(
         children: [
-          _buildModeSelector(),
-          Expanded(
-            child: StreamBuilder<List<Map<String, dynamic>>>(
-              stream: _messageStream(),
-              builder: (context, snapshot) {
-                if (!snapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                final messages = snapshot.data!;
-                return ListView.builder(
-                  reverse: true,
-                  itemCount: messages.length,
-                  itemBuilder: (context, index) =>
-                      _buildUserMessage(messages[index]),
-                );
-              },
-            ),
+          // Layer 1: The Chat Content (Mode Selector + Messages)
+          Column(
+            children: [
+              _buildModeSelector(),
+              Expanded(
+                child: StreamBuilder<List<Map<String, dynamic>>>(
+                  stream: _messageStream(),
+                  builder: (context, snapshot) {
+                    if (!snapshot.hasData) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    final messages = snapshot.data!;
+                    return ListView.builder(
+                      reverse: true,
+                      padding: const EdgeInsets.only(bottom: 100), // Padding to avoid overlap
+                      itemCount: messages.length,
+                      itemBuilder: (context, index) =>
+                          _buildUserMessage(messages[index]),
+                    );
+                  },
+                ),
+              ),
+            ],
           ),
-          _buildInputBar(),
+
+          // Layer 2: The Input Bar (Positioned at the bottom)
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            top: _isRecording ? 0 : null, // Expands to full screen if recording
+            child: _buildInputBar(),
+          ),
         ],
       ),
     );
