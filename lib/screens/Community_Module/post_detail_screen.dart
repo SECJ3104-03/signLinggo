@@ -3,6 +3,7 @@
 import 'dart:io'; 
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart'; 
+import 'package:cloud_firestore/cloud_firestore.dart'; // Added for fetching user data
 import 'post_data.dart';
 import 'comment_data.dart';
 import 'video_player_widget.dart';
@@ -29,10 +30,50 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   String? _replyingToId; 
   int _currentCommentCount = 0;
 
+  // --- NEW: Variables to store current user's real profile ---
+  String _myRealName = "Loading...";
+  String _myInitials = "?";
+  String? _myProfileImage;
+
   @override
   void initState() {
     super.initState();
     _post = widget.initialPost;
+    _loadCurrentUser(); // Load the correct profile data immediately
+  }
+
+  // --- NEW: Fetch "Fluffy" and profileUrl from Firestore ---
+  Future<void> _loadCurrentUser() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    try {
+      final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      if (doc.exists) {
+        final data = doc.data()!;
+        final String fullName = data['fullName'] ?? data['username'] ?? user.displayName ?? "User";
+        final String? profileUrl = data['profileUrl'] ?? user.photoURL;
+        
+        if (mounted) {
+          setState(() {
+            _myRealName = fullName;
+            _myInitials = fullName.isNotEmpty ? fullName[0].toUpperCase() : "?";
+            _myProfileImage = profileUrl;
+          });
+        }
+      } else {
+        // Fallback
+        if (mounted) {
+          setState(() {
+            _myRealName = user.displayName ?? "User";
+            _myInitials = _myRealName.isNotEmpty ? _myRealName[0].toUpperCase() : "?";
+            _myProfileImage = user.photoURL;
+          });
+        }
+      }
+    } catch (e) {
+      print("Error loading user profile for comments: $e");
+    }
   }
 
   @override
@@ -40,24 +81,6 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     _commentController.dispose();
     _commentFocusNode.dispose();
     super.dispose();
-  }
-
-  String _getCurrentUserName() {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      if (user.displayName != null && user.displayName!.isNotEmpty) {
-        return user.displayName!;
-      }
-      if (user.email != null) {
-        return user.email!.split('@')[0];
-      }
-    }
-    return "Anonymous";
-  }
-
-  String _getInitials(String name) {
-    if (name.isEmpty) return "?";
-    return name[0].toUpperCase();
   }
 
   void _syncCommentCount(int realCount) {
@@ -71,21 +94,20 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     final String text = _commentController.text;
     if (text.isEmpty) return;
 
-    final String realAuthor = _getCurrentUserName();
-    final String realInitials = _getInitials(realAuthor);
     final String myUid = FirebaseAuth.instance.currentUser?.uid ?? '';
 
+    // --- UPDATED: Use the loaded real profile data ---
     final newComment = CommentData(
       authorId: myUid, 
-      author: realAuthor,
-      initials: realInitials,
+      author: _myRealName, // Uses "Fluffy"
+      initials: _myInitials,
       content: text,
       timestamp: DateTime.now(), 
       likeCount: 0,
-      isReply: _replyingToId != null, 
+      isReply: _replyingToId != null,
+      authorProfileImage: _myProfileImage, // Saves the picture!
     );
 
-    // --- CALLS THE SERVICE USING NAMED PARAMETERS ---
     _firestoreService.addComment(
       postId: _post.id, 
       postAuthorId: _post.authorId, 
@@ -130,7 +152,6 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   void _toggleLike(CommentData comment) {
     if (comment.id == null) return;
     
-    // --- CALLS THE SERVICE USING NAMED PARAMETERS ---
     _firestoreService.toggleCommentLike(
       postId: _post.id, 
       commentId: comment.id!, 
@@ -228,9 +249,6 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     );
   }
 
-  // ... (Rest of UI Helpers: _buildPostContent, _buildCommentSectionHeader, etc.)
-  // Copy them from your existing file or previous response (no changes needed below this point)
-  
   Widget _buildPostContent() {
     return Padding(
       padding: const EdgeInsets.all(16.0),
@@ -239,11 +257,28 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         children: [
           Row(
             children: [
-              Container(
-                width: 40, height: 40,
-                decoration: BoxDecoration(gradient: _post.profileGradient, shape: BoxShape.circle),
-                child: Center(child: Text(_post.initials, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14))),
-              ),
+              if (_post.authorProfileImage != null && _post.authorProfileImage!.isNotEmpty)
+                 Container(
+                  width: 40, height: 40,
+                  decoration: const BoxDecoration(shape: BoxShape.circle),
+                  clipBehavior: Clip.antiAlias,
+                  child: Image.network(
+                    _post.authorProfileImage!,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        decoration: BoxDecoration(gradient: _post.profileGradient, shape: BoxShape.circle),
+                        child: Center(child: Text(_post.initials, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14))),
+                      );
+                    },
+                  ),
+                )
+              else
+                Container(
+                  width: 40, height: 40,
+                  decoration: BoxDecoration(gradient: _post.profileGradient, shape: BoxShape.circle),
+                  child: Center(child: Text(_post.initials, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14))),
+                ),
               const SizedBox(width: 10),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -318,19 +353,30 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     final double leftPadding = comment.isReply ? 54.0 : 16.0;
     final double avatarRadius = comment.isReply ? 12.0 : 16.0;
     
-    final currentUser = _getCurrentUserName();
-    final bool isMyComment = comment.author == currentUser;
+    // We check if it is "my comment" by checking author name, but using UID is safer if you have it.
+    // For now we check name as in original code, or you could update to check UID if available in CommentData.
+    final currentUserUid = FirebaseAuth.instance.currentUser?.uid;
+    final bool isMyComment = comment.authorId == currentUserUid;
 
     return Padding(
       padding: EdgeInsets.fromLTRB(leftPadding, 12, 16, 12),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CircleAvatar(
-            radius: avatarRadius,
-            backgroundColor: Colors.grey[200],
-            child: Text(comment.initials, style: TextStyle(fontSize: avatarRadius * 0.75, color: Colors.black87, fontWeight: FontWeight.bold)),
-          ),
+          // --- UPDATED: Show Commenter's Profile Image ---
+          if (comment.authorProfileImage != null && comment.authorProfileImage!.isNotEmpty)
+            CircleAvatar(
+              radius: avatarRadius,
+              backgroundImage: NetworkImage(comment.authorProfileImage!),
+              backgroundColor: Colors.grey[200],
+            )
+          else
+            CircleAvatar(
+              radius: avatarRadius,
+              backgroundColor: Colors.grey[200],
+              child: Text(comment.initials, style: TextStyle(fontSize: avatarRadius * 0.75, color: Colors.black87, fontWeight: FontWeight.bold)),
+            ),
+          // ----------------------------------------------
           const SizedBox(width: 12),
           
           Expanded(
@@ -390,8 +436,6 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   }
 
   Widget _buildInputArea() {
-    final String currentInitials = _getInitials(_getCurrentUserName());
-
     return Container(
       decoration: BoxDecoration(color: Colors.white, border: Border(top: BorderSide(color: Colors.grey[200]!, width: 1))),
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewPadding.bottom),
@@ -418,11 +462,20 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
             child: Row(
               children: [
-                CircleAvatar(
-                  radius: 18, 
-                  backgroundColor: const Color(0xFFF2E7FE), 
-                  child: Text(currentInitials, style: const TextStyle(fontSize: 14, color: Color(0xFF980FFA)))
-                ),
+                // --- UPDATED: Show Current User's Profile Image in Input ---
+                if (_myProfileImage != null && _myProfileImage!.isNotEmpty)
+                  CircleAvatar(
+                    radius: 18,
+                    backgroundImage: NetworkImage(_myProfileImage!),
+                    backgroundColor: Colors.grey[200],
+                  )
+                else
+                  CircleAvatar(
+                    radius: 18, 
+                    backgroundColor: const Color(0xFFF2E7FE), 
+                    child: Text(_myInitials, style: const TextStyle(fontSize: 14, color: Color(0xFF980FFA)))
+                  ),
+                // -----------------------------------------------------------
                 const SizedBox(width: 12),
                 Expanded(
                   child: Container(
