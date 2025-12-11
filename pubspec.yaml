@@ -42,6 +42,10 @@ dependencies:
   video_player: ^2.8.6
   camera: ^0.11.3
   record: ^6.1.2
+  just_audio: ^0.9.36
+  audio_waveforms: ^1.1.1
+  flutter_sound: ^9.2.13
+  permission_handler: ^11.1.0
 
   # Networking
   http: ^1.2.2

@@ -65,7 +65,7 @@ class _AddChatScreenState extends State<AddChatScreen> {
 
   List<DocumentSnapshot> _filterUsers(List<DocumentSnapshot> allUsers) {
     if (_searchQuery.isEmpty) {
-      return []; // Do not show list before search
+      return [];
     }
 
     return allUsers.where((doc) {
@@ -84,7 +84,20 @@ class _AddChatScreenState extends State<AddChatScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return Scaffold(  
+      appBar: AppBar(
+      elevation: 1,
+      backgroundColor: Colors.white,
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back, color: Colors.black87),
+        onPressed: () => Navigator.pop(context),
+      ),
+      title: const Text(
+        "New Chat",
+        style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+      ),
+    ),
+
       body: Column(
         children: [
           Padding(

@@ -228,15 +228,19 @@ class _ChatListScreenState extends State<ChatListScreen> {
                         title: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(
-                              chatName,
-                              style:
-                                  const TextStyle(fontWeight: FontWeight.w600),
+                            Expanded(
+                              child: Text(
+                                chatName,
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w600),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
+                            const SizedBox(width: 8),
                             Text(
                               timeString,
-                              style: const TextStyle(
-                                  color: Colors.grey, fontSize: 12),
+                              style: const TextStyle(color: Colors.grey, fontSize: 12),
                             ),
                           ],
                         ),
@@ -257,7 +261,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                             PopupMenuItem<String>(
                               value: 'delete',
                               child: Text(
-                                'Delete Conversation',
+                                'Delete chat for everyone',
                                 style: TextStyle(color: Colors.red),
                               ),
                             ),
