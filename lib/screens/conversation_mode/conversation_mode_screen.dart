@@ -37,7 +37,6 @@ class _ConversationScreenState extends State<ConversationScreen> {
   final Map<String, String> _audioLocalPaths = {};
   late final String currentUserId;
   
-  // FIX 1: Added the missing state variable here
   bool _isRecording = false; 
 
   @override
@@ -46,19 +45,15 @@ class _ConversationScreenState extends State<ConversationScreen> {
     currentUserId = widget.currentUserID;
   }
   
-  // Clean up video controllers when screen closes to prevent memory leaks
+  // Clean up all controllers to prevent memory leaks
   @override
   void dispose() {
     for (var controller in _videoControllers.values) {
       controller.dispose();
     }
-    super.dispose();
-  }
-
-  @override
-  void dispose() {
-    _videoControllers.values.forEach((controller) => controller.dispose());
-    _audioWaveformControllers.values.forEach((controller) => controller.dispose());
+    for (var controller in _audioWaveformControllers.values) {
+      controller.dispose();
+    }
     super.dispose();
   }
 
@@ -139,7 +134,6 @@ class _ConversationScreenState extends State<ConversationScreen> {
   }
 
   Widget _buildVideoBubble(String videoURL, bool isUser) {
-    // Check if controller exists, if not create and initialize it
     if (!_videoControllers.containsKey(videoURL)) {
       _videoControllers[videoURL] = VideoPlayerController.networkUrl(Uri.parse(videoURL))
         ..initialize().then((_) {
@@ -197,140 +191,158 @@ class _ConversationScreenState extends State<ConversationScreen> {
     );
   }
 
-  Widget _buildVoiceBubble(String audioUrl, bool isUser) {
-    if (!_audioWaveformControllers.containsKey(audioUrl)) {
-      final controller = PlayerController();
-      _audioWaveformControllers[audioUrl] = controller;
+// --- ULTIMATE FIX FOR THE BUGGY audio_waveforms PACKAGE ---
+Widget _buildVoiceBubble(String audioUrl, bool isUser) {
+  // Track playback completion manually
+  final Map<String, bool> _playbackFinished = {};
+  
+  if (!_audioWaveformControllers.containsKey(audioUrl)) {
+    final controller = PlayerController();
+    _audioWaveformControllers[audioUrl] = controller;
 
-      Future.microtask(() async {
-        try {
-          final localPath = await downloadToLocalFile(audioUrl);
-
-          _audioLocalPaths[audioUrl] = localPath;
-          await controller.preparePlayer(
-            path: localPath,
-            shouldExtractWaveform: true,
-          );
-
-          if (mounted) setState(() {});
-        } catch (e) {
-          log("Audio prepare error: $e");
-        }
-      });
-
-      controller.onPlayerStateChanged.listen((state) async {
-        if (state == PlayerState.stopped && controller.maxDuration > 0) {
-          try {
-            await controller.stopPlayer();
+    Future.microtask(() async {
+      try {
+        final localPath = await downloadToLocalFile(audioUrl);
+        _audioLocalPaths[audioUrl] = localPath;
+        await controller.preparePlayer(
+          path: localPath,
+          shouldExtractWaveform: true,
+        );
+        
+        // Monitor playback to detect completion
+        controller.onCurrentDurationChanged.listen((position) async {
+          final maxDuration = controller.maxDuration;
+          if (maxDuration > 0 && position >= maxDuration - 100) {
+            // Audio finished
+            _playbackFinished[audioUrl] = true;
+            await controller.pausePlayer();
             await controller.seekTo(0);
-          } catch (e) {
-            log("Error resetting player: $e");
+            if (mounted) setState(() {});
+          } else {
+            _playbackFinished[audioUrl] = false;
           }
-          if (mounted) setState(() {});
-        }
-      });
-    }
-
-    final playerController = _audioWaveformControllers[audioUrl]!;
-    final isReady = playerController.maxDuration > 0;
-
-    return Align(
-      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-        margin: const EdgeInsets.symmetric(vertical: 6),
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.75,
-        ),
-        decoration: BoxDecoration(
-          color: isUser ? Colors.blue[50] : Colors.grey[200],
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                StreamBuilder<PlayerState>(
-                  stream: playerController.onPlayerStateChanged,
-                  builder: (context, snapshot) {
-                    final state = snapshot.data ?? PlayerState.stopped;
-                    final isPlaying = state == PlayerState.playing;
-
-                    return IconButton(
-                      iconSize: 36,
-                      icon: Icon(
-                        isPlaying
-                            ? Icons.pause_circle_filled
-                            : Icons.play_circle_fill,
-                        color: Colors.black87,
-                      ),
-                      onPressed: !isReady
-                          ? null
-                          : () async {
-                              final isPlaying = playerController.playerState == PlayerState.playing;
-                              if (isPlaying) {
-                                await playerController.pausePlayer();
-                              } else {
-                                await playerController.startPlayer();
-                              }
-                              if (mounted) setState(() {});
-                            },
-                    );
-                  },
-                ),
-
-                Expanded(
-                  child: isReady
-                      ? AudioFileWaveforms(
-                          size: const Size(double.infinity, 32),
-                          playerController: playerController,
-                          waveformType: WaveformType.long,
-                          enableSeekGesture: true,
-                          playerWaveStyle: const PlayerWaveStyle(
-                            fixedWaveColor: Colors.black26,
-                            liveWaveColor: Colors.purple,
-                            spacing: 4,
-                          ),
-                        )
-                      : const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 10),
-                          child: Text("Loading...", style: TextStyle(fontSize: 12)),
-                        ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 6),
-            StreamBuilder<int>(
-              stream: playerController.onCurrentDurationChanged,
-              builder: (context, snapshot) {
-                if (!isReady) return const Text("Loading audio...", style: TextStyle(fontSize: 12));
-
-                final position = Duration(milliseconds: snapshot.data ?? 0);
-                final duration = Duration(milliseconds: playerController.maxDuration);
-
-                String fmt(Duration d) =>
-                    "${d.inMinutes}:${(d.inSeconds % 60).toString().padLeft(2, '0')}";
-
-                return Text(
-                  "${fmt(position)} / ${fmt(duration)}",
-                  style: const TextStyle(fontSize: 12),
-                );
-              },
-            ),
-          ],
-        ),
-      ),
-    );
+        });
+        
+        if (mounted) setState(() {});
+      } catch (e) {
+        debugPrint("Audio prepare error: $e");
+      }
+    });
   }
+
+  final playerController = _audioWaveformControllers[audioUrl]!;
+  final isReady = playerController.maxDuration > 0;
+  final isFinished = _playbackFinished[audioUrl] ?? false;
+
+  return Align(
+    alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+    child: Container(
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+      margin: const EdgeInsets.symmetric(vertical: 6),
+      constraints: BoxConstraints(
+        maxWidth: MediaQuery.of(context).size.width * 0.75,
+      ),
+      decoration: BoxDecoration(
+        color: isUser ? Colors.blue[50] : Colors.grey[200],
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              StreamBuilder<PlayerState>(
+                stream: playerController.onPlayerStateChanged,
+                initialData: PlayerState.stopped,
+                builder: (context, snapshot) {
+                  final state = snapshot.data ?? PlayerState.stopped;
+                  final isPlaying = state == PlayerState.playing && !isFinished;
+                  
+                  return IconButton(
+                    iconSize: 36,
+                    icon: Icon(
+                      isFinished
+                          ? Icons.replay_circle_filled
+                          : (isPlaying
+                              ? Icons.pause_circle_filled
+                              : Icons.play_circle_fill),
+                      color: Colors.black87,
+                    ),
+                    onPressed: !isReady
+                        ? null
+                        : () async {
+                            if (isFinished) {
+                              // Reset finished flag and play
+                              _playbackFinished[audioUrl] = false;
+                              await playerController.seekTo(0);
+                              await playerController.startPlayer();
+                            } else if (isPlaying) {
+                              await playerController.pausePlayer();
+                            } else {
+                              await playerController.startPlayer();
+                            }
+                            if (mounted) setState(() {});
+                          },
+                  );
+                },
+              ),
+
+              Expanded(
+                child: isReady
+                    ? AudioFileWaveforms(
+                        size: const Size(double.infinity, 32),
+                        playerController: playerController,
+                        waveformType: WaveformType.long,
+                        enableSeekGesture: true,
+                        playerWaveStyle: const PlayerWaveStyle(
+                          fixedWaveColor: Colors.black26,
+                          liveWaveColor: Colors.purple,
+                          spacing: 4,
+                        ),
+                      )
+                    : const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 10),
+                        child: Text("Loading...", style: TextStyle(fontSize: 12)),
+                      ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 6),
+          StreamBuilder<int>(
+            stream: playerController.onCurrentDurationChanged,
+            initialData: 0,
+            builder: (context, snapshot) {
+              if (!isReady) {
+                return const Text("Loading audio...", style: TextStyle(fontSize: 12));
+              }
+
+              final position = Duration(milliseconds: snapshot.data ?? 0);
+              final duration = Duration(milliseconds: playerController.maxDuration);
+
+              String fmt(Duration d) =>
+                  "${d.inMinutes}:${(d.inSeconds % 60).toString().padLeft(2, '0')}";
+
+              return Text(
+                "${fmt(position)} / ${fmt(duration)}",
+                style: const TextStyle(fontSize: 12),
+              );
+            },
+          ),
+        ],
+      ),
+    ),
+  );
+}
           
   Widget _buildUserMessage(Map<String, dynamic> msg) {
     final bool isUser = msg['isUser'];
 
+    // Clean up controller if message is not voice but has one associated
     if (msg['type'] != 'voice' && _audioWaveformControllers.containsKey(msg['content'])) {
       _audioWaveformControllers.remove(msg['content'])?.dispose();
     }
+    
     switch (msg['type']) {
       case 'text':
         return _buildTextBubble(msg['content'] ?? '', isUser);
@@ -387,7 +399,6 @@ class _ConversationScreenState extends State<ConversationScreen> {
         return SignInputBar(
           onVideoRecorded: _sendVideoMessage,
           isParentRecording: false,
-          // Update the state when recording starts/stops
           onRecordingStateChanged: (isRecording) {
              setState(() {
                _isRecording = isRecording;
@@ -454,10 +465,8 @@ class _ConversationScreenState extends State<ConversationScreen> {
       ),
       backgroundColor: Colors.white,
       
-      // Use a Stack instead of a Column for the body
       body: Stack(
         children: [
-          // Layer 1: The Chat Content (Mode Selector + Messages)
           Column(
             children: [
               _buildModeSelector(),
@@ -471,7 +480,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
                     final messages = snapshot.data!;
                     return ListView.builder(
                       reverse: true,
-                      padding: const EdgeInsets.only(bottom: 100), // Padding to avoid overlap
+                      padding: const EdgeInsets.only(bottom: 100),
                       itemCount: messages.length,
                       itemBuilder: (context, index) =>
                           _buildUserMessage(messages[index]),
@@ -482,12 +491,11 @@ class _ConversationScreenState extends State<ConversationScreen> {
             ],
           ),
 
-          // Layer 2: The Input Bar (Positioned at the bottom)
           Positioned(
             left: 0,
             right: 0,
             bottom: 0,
-            top: _isRecording ? 0 : null, // Expands to full screen if recording
+            top: _isRecording ? 0 : null,
             child: _buildInputBar(),
           ),
         ],
