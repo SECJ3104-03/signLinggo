@@ -1,7 +1,10 @@
+import 'dart:developer';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:video_player/video_player.dart';
+import 'package:audio_waveforms/audio_waveforms.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -30,12 +33,21 @@ class ConversationScreen extends StatefulWidget {
 class _ConversationScreenState extends State<ConversationScreen> {
   String _mode = "Text";
   final Map<String, VideoPlayerController> _videoControllers = {};
+  final Map<String, PlayerController> _audioWaveformControllers = {};
+  final Map<String, String> _audioLocalPaths = {};
   late final String currentUserId;
 
   @override
   void initState() {
     super.initState();
     currentUserId = widget.currentUserID;
+  }
+
+  @override
+  void dispose() {
+    _videoControllers.values.forEach((controller) => controller.dispose());
+    _audioWaveformControllers.values.forEach((controller) => controller.dispose());
+    super.dispose();
   }
 
   Future<void> _sendMessage(
@@ -126,7 +138,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
         width: width,
-        padding: const EdgeInsets.all(6),
+        padding: const EdgeInsets.all(12),
         margin: const EdgeInsets.symmetric(vertical: 6),
         decoration: BoxDecoration(
           color: isUser ? Colors.blue[50] : Colors.grey[200],
@@ -166,23 +178,140 @@ class _ConversationScreenState extends State<ConversationScreen> {
     );
   }
 
-  Widget _buildVoiceBubble(String content, bool isUser) {
+  Widget _buildVoiceBubble(String audioUrl, bool isUser) {
+    if (!_audioWaveformControllers.containsKey(audioUrl)) {
+      final controller = PlayerController();
+      _audioWaveformControllers[audioUrl] = controller;
+
+      Future.microtask(() async {
+        try {
+          final localPath = await downloadToLocalFile(audioUrl);
+
+          _audioLocalPaths[audioUrl] = localPath;
+          await controller.preparePlayer(
+            path: localPath,
+            shouldExtractWaveform: true,
+          );
+
+          if (mounted) setState(() {});
+        } catch (e) {
+          log("Audio prepare error: $e");
+        }
+      });
+
+      controller.onPlayerStateChanged.listen((state) async {
+        if (state == PlayerState.stopped && controller.maxDuration > 0) {
+          try {
+            await controller.stopPlayer();
+            await controller.seekTo(0);
+          } catch (e) {
+            log("Error resetting player: $e");
+          }
+          if (mounted) setState(() {});
+        }
+      });
+    }
+
+    final playerController = _audioWaveformControllers[audioUrl]!;
+    final isReady = playerController.maxDuration > 0;
+
     return Align(
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
         margin: const EdgeInsets.symmetric(vertical: 6),
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.of(context).size.width * 0.75,
+        ),
         decoration: BoxDecoration(
           color: isUser ? Colors.blue[50] : Colors.grey[200],
           borderRadius: BorderRadius.circular(16),
         ),
-        child: Text(content),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                StreamBuilder<PlayerState>(
+                  stream: playerController.onPlayerStateChanged,
+                  builder: (context, snapshot) {
+                    final state = snapshot.data ?? PlayerState.stopped;
+                    final isPlaying = state == PlayerState.playing;
+
+                    return IconButton(
+                      iconSize: 36,
+                      icon: Icon(
+                        isPlaying
+                            ? Icons.pause_circle_filled
+                            : Icons.play_circle_fill,
+                        color: Colors.black87,
+                      ),
+                      onPressed: !isReady
+                          ? null
+                          : () async {
+                              final isPlaying = playerController.playerState == PlayerState.playing;
+                              if (isPlaying) {
+                                await playerController.pausePlayer();
+                              } else {
+                                await playerController.startPlayer();
+                              }
+                              if (mounted) setState(() {});
+                            },
+                    );
+                  },
+                ),
+
+                Expanded(
+                  child: isReady
+                      ? AudioFileWaveforms(
+                          size: const Size(double.infinity, 32),
+                          playerController: playerController,
+                          waveformType: WaveformType.long,
+                          enableSeekGesture: true,
+                          playerWaveStyle: const PlayerWaveStyle(
+                            fixedWaveColor: Colors.black26,
+                            liveWaveColor: Colors.purple,
+                            spacing: 4,
+                          ),
+                        )
+                      : const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 10),
+                          child: Text("Loading...", style: TextStyle(fontSize: 12)),
+                        ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 6),
+            StreamBuilder<int>(
+              stream: playerController.onCurrentDurationChanged,
+              builder: (context, snapshot) {
+                if (!isReady) return const Text("Loading audio...", style: TextStyle(fontSize: 12));
+
+                final position = Duration(milliseconds: snapshot.data ?? 0);
+                final duration = Duration(milliseconds: playerController.maxDuration);
+
+                String fmt(Duration d) =>
+                    "${d.inMinutes}:${(d.inSeconds % 60).toString().padLeft(2, '0')}";
+
+                return Text(
+                  "${fmt(position)} / ${fmt(duration)}",
+                  style: const TextStyle(fontSize: 12),
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
-
+          
   Widget _buildUserMessage(Map<String, dynamic> msg) {
     final bool isUser = msg['isUser'];
+
+    if (msg['type'] != 'voice' && _audioWaveformControllers.containsKey(msg['content'])) {
+      _audioWaveformControllers.remove(msg['content'])?.dispose();
+    }
     switch (msg['type']) {
       case 'text':
         return _buildTextBubble(msg['content'], isUser);
@@ -246,6 +375,23 @@ class _ConversationScreenState extends State<ConversationScreen> {
     }
   }
 
+  Future<String> downloadToLocalFile(String url) async {
+    final tempDir = await getTemporaryDirectory();
+    final filePath = "${tempDir.path}/${DateTime.now().millisecondsSinceEpoch}.m4a";
+
+    final response = await HttpClient().getUrl(Uri.parse(url));
+    final result = await response.close();
+
+    final file = File(filePath);
+    final sink = file.openWrite();
+
+    await result.forEach((chunk) => sink.add(chunk));
+    await sink.close();
+
+    return file.path;
+  }
+
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -264,12 +410,18 @@ class _ConversationScreenState extends State<ConversationScreen> {
                   style: const TextStyle(color: Colors.white)),
             ),
             const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(widget.chatName,
-                    style: const TextStyle(color: Colors.black, fontSize: 18)),
-              ],
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.chatName,
+                    style: const TextStyle(color: Colors.black, fontSize: 18),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -286,11 +438,14 @@ class _ConversationScreenState extends State<ConversationScreen> {
                   return const Center(child: CircularProgressIndicator());
                 }
                 final messages = snapshot.data!;
-                return ListView.builder(
-                  reverse: true,
-                  itemCount: messages.length,
-                  itemBuilder: (context, index) =>
-                      _buildUserMessage(messages[index]),
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  child: ListView.builder(
+                    reverse: true,
+                    itemCount: messages.length,
+                    itemBuilder: (context, index) =>
+                        _buildUserMessage(messages[index]),
+                  ),
                 );
               },
             ),
