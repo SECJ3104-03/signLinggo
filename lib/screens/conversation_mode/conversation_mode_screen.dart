@@ -72,29 +72,42 @@ class _ConversationScreenState extends State<ConversationScreen> {
       'type': type,
       'isRead': false,
       'createdAt': FieldValue.serverTimestamp(),
+      'deletedFor': [],
     });
 
-    await _updateConversationDocument(previewText);
+    await _updateConversationDocumentForAllUsers(previewText);
   }
 
-  Future<void> _updateConversationDocument(String lastMessage) async {
-    final conversationIds = widget.conversationId.split('_');
-    final otherUserID = conversationIds.firstWhere(
-        (id) => id != widget.currentUserID,
-        orElse: () => '');
-
-    final updateData = {
-      'lastMessage': lastMessage,
-      'lastMessageAt': FieldValue.serverTimestamp(),
-      'userIDs': conversationIds,
-      'otherUserID': otherUserID,
-    };
-
-    await FirebaseFirestore.instance
-        .collection('conversation')
-        .doc(widget.conversationId)
-        .set(updateData, SetOptions(merge: true));
+  Future<void> _updateConversationDocumentForAllUsers(String lastMessage) async {
+    final conversationDoc =
+        FirebaseFirestore.instance.collection('conversation').doc(widget.conversationId);
+    final snapshot = await conversationDoc.get();
+ 
+    List<String> userIDs;
+ 
+    if (snapshot.exists) {
+      final data = snapshot.data()!;
+      userIDs = List<String>.from(data['userIDs'] ?? []);
+    } else {
+      // If conversation doesn't exist, create it with participants from conversationId
+      userIDs = widget.conversationId.split('_');
+    }
+ 
+    Map<String, dynamic> lastMessageFor = {};
+    Map<String, dynamic> lastMessageAtFor = {};
+ 
+    for (var userId in userIDs) {
+      lastMessageFor[userId] = lastMessage;
+      lastMessageAtFor[userId] = FieldValue.serverTimestamp();
+    }
+ 
+    await conversationDoc.set({
+      'lastMessageFor': lastMessageFor,
+      'lastMessageAtFor': lastMessageAtFor,
+      'userIDs': userIDs,
+    }, SetOptions(merge: true));
   }
+
 
   Future<void> _sendVideoMessage(String videoUrl) async {
     await _sendMessage(videoUrl, 'video', 'Sent a video');
@@ -107,11 +120,144 @@ class _ConversationScreenState extends State<ConversationScreen> {
         .collection('messages')
         .orderBy('createdAt', descending: true)
         .snapshots()
-        .map((snapshot) => snapshot.docs.map((doc) {
-              final data = doc.data();
-              data['isUser'] = data['senderId'] == currentUserId;
-              return data;
-            }).toList());
+        .map((snapshot) {
+          return snapshot.docs.map((doc) {
+            final data = doc.data();
+
+            // Skip messages deleted FOR ME
+            final deletedFor = List<String>.from(data['deletedFor'] ?? []);
+            if (deletedFor.contains(currentUserId)) {
+              return {"hidden": true}; // Skip rendering
+            }
+
+            data['isUser'] = data['senderId'] == currentUserId;
+            data['messageId'] = doc.id;
+            return data;
+          }).where((msg) => msg["hidden"] != true).toList();
+        });
+  }
+
+  Future<void> _deleteForMe(String messageId) async {
+    final ref = FirebaseFirestore.instance
+        .collection('conversation')
+        .doc(widget.conversationId)
+        .collection('messages')
+        .doc(messageId);
+
+    await ref.update({
+      'deletedFor': FieldValue.arrayUnion([currentUserId]),
+    });
+
+    final snap = await ref.get();
+    final data = snap.data();
+    if (data == null) return;
+
+    final deletedFor = List<String>.from(data['deletedFor'] ?? []);
+    final participants = widget.conversationId.split('_');  
+
+    final bothDeleted =
+        deletedFor.contains(participants[0]) &&
+        deletedFor.contains(participants[1]);
+
+    if (bothDeleted) {
+      await ref.delete();
+    }
+    await _refreshConversationPreviewAfterDeletion(forEveryone: false);
+  }
+
+  Future<void> _deleteForEveryone(String messageId, String type, String content) async {
+    final messageRef = FirebaseFirestore.instance
+        .collection('conversation')
+        .doc(widget.conversationId)
+        .collection('messages')
+        .doc(messageId);
+
+    await messageRef.delete();
+
+    if (type == 'video' && _videoControllers.containsKey(content)) {
+      _videoControllers[content]!.dispose();
+      _videoControllers.remove(content);
+    }
+
+    if (type == 'voice' && _audioWaveformControllers.containsKey(content)) {
+      _audioWaveformControllers[content]!.dispose();
+      _audioWaveformControllers.remove(content);
+    }
+
+    await _refreshConversationPreviewAfterDeletion(forEveryone: true);
+  }
+
+  Future<void> _refreshConversationPreviewAfterDeletion({required bool forEveryone}) async {
+    final messagesSnapshot = await FirebaseFirestore.instance
+        .collection('conversation')
+        .doc(widget.conversationId)
+        .collection('messages')
+        .orderBy('createdAt', descending: true)
+        .get();
+
+    String newLastMessage = "";
+
+    // Find the latest relevant message
+    for (var doc in messagesSnapshot.docs) {
+      final data = doc.data();
+      final deletedFor = List<String>.from(data['deletedFor'] ?? []);
+
+      if (forEveryone) {
+        // Pick the first message not deleted for ANYONE
+        if (deletedFor.isEmpty) {
+          newLastMessage = _getPreviewText(data['type'], data['content']);
+          break;
+        }
+      } else {
+        // Pick the first message not deleted for CURRENT user
+        if (!deletedFor.contains(currentUserId)) {
+          newLastMessage = _getPreviewText(data['type'], data['content']);
+          break;
+        }
+      }
+    }
+
+    final conversationRef = FirebaseFirestore.instance
+        .collection('conversation')
+        .doc(widget.conversationId);
+
+    final snapshot = await conversationRef.get();
+    if (!snapshot.exists) return;
+
+    final data = snapshot.data()!;
+    final userIDs = List<String>.from(data['userIDs'] ?? []);
+    final lastMessageFor = Map<String, dynamic>.from(data['lastMessageFor'] ?? {});
+    final lastMessageAtFor = Map<String, dynamic>.from(data['lastMessageAtFor'] ?? {});
+
+    if (forEveryone) {
+      // Update lastMessage for all users
+      for (var userId in userIDs) {
+        lastMessageFor[userId] = newLastMessage;
+        lastMessageAtFor[userId] = FieldValue.serverTimestamp();
+      }
+    } else {
+      // Update lastMessage only for current user
+      lastMessageFor[currentUserId] = newLastMessage;
+      lastMessageAtFor[currentUserId] = FieldValue.serverTimestamp();
+    }
+
+    await conversationRef.set({
+      'lastMessageFor': lastMessageFor,
+      'lastMessageAtFor': lastMessageAtFor,
+    }, SetOptions(merge: true));
+  }
+
+  String _getPreviewText(String type, String content) {
+    switch (type) {
+      case 'text':
+        return content;
+      case 'voice':
+        return "Voice message";
+      case 'video':
+        return "Video";
+      default:
+        return "";
+    }
   }
 
   Widget _buildTextBubble(String text, bool isUser) {
@@ -119,7 +265,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
         padding: const EdgeInsets.all(12),
-        margin: const EdgeInsets.symmetric(vertical: 6),
+        margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
         decoration: BoxDecoration(
           color: isUser ? Colors.blue[50] : Colors.grey[200],
           borderRadius: BorderRadius.circular(16),
@@ -149,7 +295,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
       child: Container(
         width: width,
         padding: const EdgeInsets.all(12),
-        margin: const EdgeInsets.symmetric(vertical: 6),
+        margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
         decoration: BoxDecoration(
           color: isUser ? Colors.blue[50] : Colors.grey[200],
           borderRadius: BorderRadius.circular(16),
@@ -238,7 +384,7 @@ Widget _buildVoiceBubble(String audioUrl, bool isUser) {
     alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
     child: Container(
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-      margin: const EdgeInsets.symmetric(vertical: 6),
+      margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
       constraints: BoxConstraints(
         maxWidth: MediaQuery.of(context).size.width * 0.75,
       ),
@@ -337,22 +483,27 @@ Widget _buildVoiceBubble(String audioUrl, bool isUser) {
           
   Widget _buildUserMessage(Map<String, dynamic> msg) {
     final bool isUser = msg['isUser'];
+    final String id = msg['messageId'];
+    final String type = msg['type'];
+    final String content = msg['content'];
 
-    // Clean up controller if message is not voice but has one associated
-    if (msg['type'] != 'voice' && _audioWaveformControllers.containsKey(msg['content'])) {
-      _audioWaveformControllers.remove(msg['content'])?.dispose();
-    }
-    
-    switch (msg['type']) {
-      case 'text':
-        return _buildTextBubble(msg['content'] ?? '', isUser);
-      case 'video':
-        return _buildVideoBubble(msg['content'] as String, isUser);
-      case 'voice':
-        return _buildVoiceBubble(msg['content'] ?? '', isUser);
-      default:
-        return const SizedBox.shrink();
-    }
+    return GestureDetector(
+      onLongPress: () => _showDeleteDialog(id, msg['senderId'], type, content),
+      child: Builder(
+        builder: (_) {
+          switch (type) {
+            case 'text':
+              return _buildTextBubble(content, isUser);
+            case 'video':
+              return _buildVideoBubble(content, isUser);
+            case 'voice':
+              return _buildVoiceBubble(content, isUser);
+            default:
+              return const SizedBox.shrink();
+          }
+        },
+      ),
+    );
   }
 
   Widget _buildModeSelector() {
@@ -426,6 +577,43 @@ Widget _buildVoiceBubble(String audioUrl, bool isUser) {
     return file.path;
   }
 
+  void _showDeleteDialog(String messageId, String senderId, String type, String content) {
+    final bool isUserMessage = senderId == currentUserId;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text("Delete message"),
+          actions: [
+            // DELETE FOR ME
+            TextButton(
+              child: const Text("Delete for me"),
+              onPressed: () {
+                Navigator.pop(context);
+                _deleteForMe(messageId);
+              },
+            ),
+
+            // DELETE FOR EVERYONE (only sender can do this)
+            if (isUserMessage)
+              TextButton(
+                child: const Text("Delete for everyone", style: TextStyle(color: Colors.red)),
+                onPressed: () {
+                  Navigator.pop(context);
+                  _deleteForEveryone(messageId, type, content);
+                },
+              ),
+
+            TextButton(
+              child: const Text("Cancel"),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -440,11 +628,15 @@ Widget _buildVoiceBubble(String audioUrl, bool isUser) {
         title: Row(
           children: [
             CircleAvatar(
-              backgroundColor: Colors.grey,
-              child: Text(
-                widget.avatar.isNotEmpty ? widget.avatar[0].toUpperCase() : '?', 
-                style: const TextStyle(color: Colors.white)
-              ),
+              backgroundColor: Colors.grey.shade300,
+              backgroundImage: widget.avatar.startsWith('')
+                  ? NetworkImage(widget.avatar)
+                  : null,
+              child: !widget.avatar.startsWith('')
+                  ? Text(
+                      widget.avatar.isNotEmpty ? widget.avatar[0].toUpperCase() : '?',
+                      style: const TextStyle(color: Colors.white))
+                  : null,
             ),
             const SizedBox(width: 12),
             Expanded(
