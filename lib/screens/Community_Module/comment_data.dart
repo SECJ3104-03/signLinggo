@@ -4,7 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 class CommentData {
   final String? id; 
-  final String authorId; // --- NEW: ID of the person who commented ---
+  final String authorId; 
   final String author;
   final String initials;
   final String content;
@@ -12,10 +12,11 @@ class CommentData {
   final int likeCount;
   final bool isReply;
   final bool isLiked; 
+  final String? authorProfileImage; // --- NEW: Store profile picture ---
 
   CommentData({
     this.id,
-    required this.authorId, // Required
+    required this.authorId, 
     required this.author,
     required this.initials,
     required this.content,
@@ -23,17 +24,19 @@ class CommentData {
     this.likeCount = 0,
     this.isReply = false,
     this.isLiked = false,
+    this.authorProfileImage, // --- NEW ---
   });
 
   Map<String, dynamic> toMap() {
     return {
-      'authorId': authorId, // Save to DB
+      'authorId': authorId, 
       'author': author,
       'initials': initials,
       'content': content,
       'timestamp': Timestamp.fromDate(timestamp), 
       'likeCount': likeCount,
       'isReply': isReply,
+      'authorProfileImage': authorProfileImage, // --- NEW: Save to DB ---
     };
   }
 
@@ -42,7 +45,7 @@ class CommentData {
 
     return CommentData(
       id: docId,
-      authorId: map['authorId'] ?? '', // Load from DB
+      authorId: map['authorId'] ?? '', 
       author: map['author'] ?? 'Unknown',
       initials: map['initials'] ?? '?',
       content: map['content'] ?? '',
@@ -50,6 +53,7 @@ class CommentData {
       likeCount: map['likeCount'] ?? 0,
       isReply: map['isReply'] ?? false,
       isLiked: likedBy.contains(currentUserId), 
+      authorProfileImage: map['authorProfileImage'], // --- NEW: Load from DB ---
     );
   }
 
@@ -63,6 +67,7 @@ class CommentData {
     int? likeCount,
     bool? isReply,
     bool? isLiked,
+    String? authorProfileImage, // --- NEW ---
   }) {
     return CommentData(
       id: id ?? this.id,
@@ -74,6 +79,7 @@ class CommentData {
       likeCount: likeCount ?? this.likeCount,
       isReply: isReply ?? this.isReply,
       isLiked: isLiked ?? this.isLiked,
+      authorProfileImage: authorProfileImage ?? this.authorProfileImage, // --- NEW ---
     );
   }
 }

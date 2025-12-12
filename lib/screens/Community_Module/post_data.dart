@@ -9,19 +9,17 @@ class PostData {
   final String authorId;
   final String initials;
   final String author;
+  final String? authorProfileImage;
   final DateTime timestamp;
   final String tag;
   final String title;
   final String content;
   final int likes;
-  final int commentCount; 
-  final List<CommentData> commentList; 
-  
-  // --- THESE ARE NOW CALCULATED ---
+  final int commentCount;
+  final List<CommentData> commentList;
+
   final bool isLiked;
   final bool isFollowed;
-  // --------------------------------
-
   final bool showFollowButton;
   final Gradient profileGradient;
   final String? videoUrl;
@@ -33,12 +31,13 @@ class PostData {
     required this.authorId,
     required this.initials,
     required this.author,
+    this.authorProfileImage,
     required this.timestamp,
     required this.tag,
     required this.title,
     required this.content,
     required this.likes,
-    this.commentCount = 0, 
+    this.commentCount = 0,
     this.commentList = const [],
     this.isLiked = false,
     this.isFollowed = false,
@@ -53,18 +52,19 @@ class PostData {
     this.isEdited = false,
   });
 
+  // --- USED FOR FIRESTORE (Keeps Timestamp) ---
   Map<String, dynamic> toMap() {
     return {
       'authorId': authorId,
       'initials': initials,
       'author': author,
-      'timestamp': Timestamp.fromDate(timestamp),
+      'authorProfileImage': authorProfileImage,
+      'timestamp': Timestamp.fromDate(timestamp), // Firestore loves Timestamp
       'tag': tag,
       'title': title,
       'content': content,
       'likes': likes,
       'commentCount': commentCount,
-      // We don't save booleans. The DB uses arrays 'likedBy' and 'followers'.
       'showFollowButton': showFollowButton,
       'videoUrl': videoUrl,
       'imageUrl': imageUrl,
@@ -72,41 +72,76 @@ class PostData {
     };
   }
 
-  // --- UPDATED: Receive currentUserId to calculate state ---
+  // --- USED FOR LOCAL STORAGE / PRINTING (Converts Timestamp to String) ---
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'authorId': authorId,
+      'initials': initials,
+      'author': author,
+      'authorProfileImage': authorProfileImage,
+      'timestamp': timestamp.toIso8601String(), // Safe for JSON
+      'tag': tag,
+      'title': title,
+      'content': content,
+      'likes': likes,
+      'commentCount': commentCount,
+      'showFollowButton': showFollowButton,
+      'videoUrl': videoUrl,
+      'imageUrl': imageUrl,
+      'isEdited': isEdited,
+    };
+  }
+
   factory PostData.fromMap(Map<String, dynamic> map, String docId, String currentUserId) {
-    // 1. Get Lists
     List<String> likedBy = List<String>.from(map['likedBy'] ?? []);
     List<String> followers = List<String>.from(map['followers'] ?? []);
+
+    // Handle timestamp being either a Timestamp (from DB) or String (from JSON cache)
+    DateTime parsedDate;
+    if (map['timestamp'] is Timestamp) {
+      parsedDate = (map['timestamp'] as Timestamp).toDate();
+    } else if (map['timestamp'] is String) {
+      parsedDate = DateTime.parse(map['timestamp']);
+    } else {
+      parsedDate = DateTime.now();
+    }
 
     return PostData(
       id: docId,
       authorId: map['authorId'] ?? '',
       initials: map['initials'] ?? '',
       author: map['author'] ?? '',
-      timestamp: (map['timestamp'] as Timestamp).toDate(),
+      authorProfileImage: map['authorProfileImage'],
+      timestamp: parsedDate,
       tag: map['tag'] ?? '',
       title: map['title'] ?? '',
       content: map['content'] ?? '',
       likes: map['likes'] ?? 0,
       commentCount: map['commentCount'] ?? 0,
-      
-      // 2. Calculate State based on ID
       isLiked: likedBy.contains(currentUserId),
       isFollowed: followers.contains(currentUserId),
-      
       showFollowButton: map['showFollowButton'] ?? true,
       videoUrl: map['videoUrl'],
       imageUrl: map['imageUrl'],
       isEdited: map['isEdited'] ?? false,
-      commentList: [], 
+      commentList: [],
     );
   }
 
-  PostData copyWith({
+  // Override toString to prevent accidental crashes during debug prints
+  @override
+  String toString() {
+    return 'PostData(author: $author, title: $title)';
+  }
+  
+  // CopyWith ... (Keep your existing copyWith here)
+   PostData copyWith({
     String? id,
     String? authorId,
     String? initials,
     String? author,
+    String? authorProfileImage,
     DateTime? timestamp,
     String? tag,
     String? title,
@@ -127,6 +162,7 @@ class PostData {
       authorId: authorId ?? this.authorId,
       initials: initials ?? this.initials,
       author: author ?? this.author,
+      authorProfileImage: authorProfileImage ?? this.authorProfileImage,
       timestamp: timestamp ?? this.timestamp,
       tag: tag ?? this.tag,
       title: title ?? this.title,

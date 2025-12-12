@@ -1,18 +1,18 @@
 // lib/screens/Community_Module/post_card.dart
 
-import 'dart:io'; 
+import 'dart:io';
 import 'dart:core';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; 
+import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
-import 'package:share_plus/share_plus.dart'; 
-import 'package:path_provider/path_provider.dart'; 
+import 'package:share_plus/share_plus.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
-import 'package:firebase_auth/firebase_auth.dart'; 
-import 'post_data.dart'; 
-import 'video_player_widget.dart'; 
+import 'package:firebase_auth/firebase_auth.dart';
+import 'post_data.dart';
+import 'video_player_widget.dart';
 import 'package:signlinggo/screens/conversation_mode/conversation_mode_screen.dart';
-import 'real_time_widget.dart'; 
+import 'real_time_widget.dart';
 
 class PostCard extends StatefulWidget {
   final PostData post;
@@ -22,11 +22,11 @@ class PostCard extends StatefulWidget {
   final VoidCallback? onCommentTap;
 
   const PostCard({
-    super.key, 
+    super.key,
     required this.post,
     this.onFollowTap,
     this.onLikeTap,
-    this.onMoreOptionsTap, 
+    this.onMoreOptionsTap,
     this.onCommentTap,
   });
 
@@ -36,7 +36,7 @@ class PostCard extends StatefulWidget {
 
 class _PostCardState extends State<PostCard> {
   VideoPlayerController? _videoController;
-  bool _isSharing = false; 
+  bool _isSharing = false;
 
   bool get _isOwner {
     final currentUser = FirebaseAuth.instance.currentUser;
@@ -52,7 +52,6 @@ class _PostCardState extends State<PostCard> {
     }
   }
 
-  // --- UPDATED METHOD TO FIX THE ERROR ---
   void _navigateToDirectMessage() {
     if (_videoController != null && _videoController!.value.isPlaying) {
       _videoController!.pause();
@@ -64,10 +63,8 @@ class _PostCardState extends State<PostCard> {
     final String currentUserId = currentUser.uid;
     final String targetUserId = widget.post.authorId;
 
-    // Generate a consistent Conversation ID
-    // We sort the IDs so "A talking to B" is the same ID as "B talking to A"
     final List<String> ids = [currentUserId, targetUserId];
-    ids.sort(); 
+    ids.sort();
     final String conversationId = ids.join("_");
 
     Navigator.push(
@@ -76,7 +73,6 @@ class _PostCardState extends State<PostCard> {
         builder: (context) => ConversationScreen(
           chatName: widget.post.author,
           avatar: widget.post.initials,
-          // --- NEW PARAMETERS ADDED ---
           conversationId: conversationId,
           currentUserID: currentUserId,
         ),
@@ -85,6 +81,7 @@ class _PostCardState extends State<PostCard> {
   }
 
   Future<void> _sharePost() async {
+    // ... (Keep existing share logic)
     final String shareText = '${widget.post.title}\n\n${widget.post.content}\n\nSent via SignLinggo App';
     final String? mediaPath = widget.post.videoUrl ?? widget.post.imageUrl;
 
@@ -97,7 +94,7 @@ class _PostCardState extends State<PostCard> {
         if (mediaPath.startsWith('http') || mediaPath.startsWith('https')) {
           final response = await http.get(Uri.parse(mediaPath));
           final tempDir = await getTemporaryDirectory();
-          final String fileExtension = mediaPath.split('.').last.split('?').first; 
+          final String fileExtension = mediaPath.split('.').last.split('?').first;
           final File tempFile = File('${tempDir.path}/shared_file.$fileExtension');
           await tempFile.writeAsBytes(response.bodyBytes);
           fileToShare = XFile(tempFile.path);
@@ -107,7 +104,7 @@ class _PostCardState extends State<PostCard> {
           final String fileName = mediaPath.split('/').last;
           final File tempFile = File('${tempDir.path}/$fileName');
           await tempFile.writeAsBytes(byteData.buffer.asUint8List(
-            byteData.offsetInBytes, 
+            byteData.offsetInBytes,
             byteData.lengthInBytes
           ));
           fileToShare = XFile(tempFile.path);
@@ -153,7 +150,7 @@ class _PostCardState extends State<PostCard> {
                 indent: 21.22,
                 endIndent: 21.22,
               ),
-              _buildFooter(), 
+              _buildFooter(),
             ],
           ),
         ),
@@ -167,31 +164,64 @@ class _PostCardState extends State<PostCard> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 39.98,
-            height: 39.98,
-            clipBehavior: Clip.antiAlias,
-            decoration: ShapeDecoration(
-              gradient: widget.post.profileGradient,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(41659800),
+          // --- UPDATED PROFILE PICTURE LOGIC ---
+          if (widget.post.authorProfileImage != null && widget.post.authorProfileImage!.isNotEmpty)
+            Container(
+              width: 39.98,
+              height: 39.98,
+              clipBehavior: Clip.antiAlias,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
               ),
-            ),
-            child: Center(
-              child: Text(
-                widget.post.initials,
-                style: const TextStyle(
-                  color: Color(0xFF0A0A0A),
-                  fontSize: 16,
-                  fontFamily: 'Arimo',
-                  fontWeight: FontWeight.w400,
-                  height: 1.50,
+              child: Image.network(
+                widget.post.authorProfileImage!,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  // Fallback to gradient if image fails
+                  return Container(
+                    decoration: ShapeDecoration(
+                      gradient: widget.post.profileGradient,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(41659800)),
+                    ),
+                    child: Center(
+                      child: Text(
+                        widget.post.initials,
+                        style: const TextStyle(color: Color(0xFF0A0A0A), fontSize: 16),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            )
+          else
+            // Fallback to gradient if no image is set
+            Container(
+              width: 39.98,
+              height: 39.98,
+              clipBehavior: Clip.antiAlias,
+              decoration: ShapeDecoration(
+                gradient: widget.post.profileGradient,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(41659800),
+                ),
+              ),
+              child: Center(
+                child: Text(
+                  widget.post.initials,
+                  style: const TextStyle(
+                    color: Color(0xFF0A0A0A),
+                    fontSize: 16,
+                    fontFamily: 'Arimo',
+                    fontWeight: FontWeight.w400,
+                    height: 1.50,
+                  ),
                 ),
               ),
             ),
-          ),
+          // -------------------------------------
+
           const SizedBox(width: 12),
-          
+
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -262,7 +292,7 @@ class _PostCardState extends State<PostCard> {
               ],
             ),
           ),
-          
+
           if (_isOwner)
             InkWell(
               onTap: widget.onMoreOptionsTap,
@@ -319,7 +349,7 @@ class _PostCardState extends State<PostCard> {
               child: PostVideoPlayer(
                 key: ValueKey(widget.post.videoUrl!),
                 videoUrl: widget.post.videoUrl!,
-                isSquare: true, 
+                isSquare: true,
                 onControllerInitialized: (controller) {
                   _videoController = controller;
                 },
@@ -330,7 +360,7 @@ class _PostCardState extends State<PostCard> {
             Padding(
               padding: const EdgeInsets.only(bottom: 20.0),
               child: AspectRatio(
-                aspectRatio: 4 / 3, 
+                aspectRatio: 4 / 3,
                 child: _buildImageWidget(widget.post.imageUrl!),
               ),
             ),
@@ -348,13 +378,13 @@ class _PostCardState extends State<PostCard> {
               ),
             ),
           ),
-          
-          const SizedBox(height: 12), 
-          
+
+          const SizedBox(height: 12),
+
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 21.22),
             child: SizedBox(
-              width: double.infinity, 
+              width: double.infinity,
               child: Text(
                 widget.post.content,
                 style: const TextStyle(
@@ -367,7 +397,7 @@ class _PostCardState extends State<PostCard> {
               ),
             ),
           ),
-          
+
           const SizedBox(height: 40),
         ],
       ),
@@ -377,7 +407,7 @@ class _PostCardState extends State<PostCard> {
   Widget _buildImageWidget(String path) {
     if (path.startsWith('http') || path.startsWith('https')) {
       return Image.network(
-        path, 
+        path,
         fit: BoxFit.cover,
         loadingBuilder: (context, child, loadingProgress) {
           if (loadingProgress == null) return child;
@@ -400,7 +430,7 @@ class _PostCardState extends State<PostCard> {
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 12.0),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.start, 
+          mainAxisAlignment: MainAxisAlignment.start,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             _buildFooterIcon(
@@ -409,9 +439,9 @@ class _PostCardState extends State<PostCard> {
               color: widget.post.isLiked ? const Color(0xFFFA2B36) : const Color(0xFF495565),
               onTap: widget.onLikeTap,
             ),
-            
-            const SizedBox(width: 24), 
-            
+
+            const SizedBox(width: 24),
+
             _buildFooterIcon(
               icon: Icons.chat_bubble_outline,
               label: (widget.post.commentCount < 0 ? 0 : widget.post.commentCount).toString(),
@@ -419,8 +449,8 @@ class _PostCardState extends State<PostCard> {
               onTap: _navigateToCommentScreen,
             ),
 
-            if (!_isOwner) ...[ 
-              const SizedBox(width: 24), 
+            if (!_isOwner) ...[
+              const SizedBox(width: 24),
               InkWell(
                 onTap: _navigateToDirectMessage,
                 child: Row(
@@ -432,16 +462,16 @@ class _PostCardState extends State<PostCard> {
             ],
 
             const Spacer(),
-            
+
             InkWell(
-              onTap: _isSharing ? null : _sharePost, 
+              onTap: _isSharing ? null : _sharePost,
               child: SizedBox(
                 width: 19.98,
                 height: 19.98,
                 child: _isSharing
                     ? const SizedBox(
-                        width: 14, 
-                        height: 14, 
+                        width: 14,
+                        height: 14,
                         child: CircularProgressIndicator(strokeWidth: 2, color: Colors.grey)
                       )
                     : const Icon(Icons.share_outlined, color: Color(0xFF495565)),

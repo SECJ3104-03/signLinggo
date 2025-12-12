@@ -1,20 +1,21 @@
 // lib/screens/Community_Module/create_post_screen.dart
 
-import 'dart:io'; 
+import 'dart:io';
 import 'dart:core';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart'; 
+import 'package:image_picker/image_picker.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'post_data.dart';
 import 'video_player_widget.dart';
-import 'package:signlinggo/services/supabase_storage_service.dart'; 
-import 'package:firebase_auth/firebase_auth.dart'; 
+import 'package:signlinggo/services/supabase_storage_service.dart';
 
 class CreatePostScreen extends StatefulWidget {
   final PostData? existingPost;
-  
+
   const CreatePostScreen({
-    super.key, 
-    this.existingPost, 
+    super.key,
+    this.existingPost,
   });
 
   @override
@@ -29,40 +30,65 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
   final List<String> _postTags = ['Learning Tips', 'Ask for Help', 'Share Experiences'];
   String _selectedTag = 'Learning Tips';
-  
+
   File? _videoFile;
-  File? _imageFile; 
+  File? _imageFile;
   bool _isPosting = false;
   late bool _isEditMode;
 
-  // Helper to get Real User Name
-  String _getCurrentUserName() {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      if (user.displayName != null && user.displayName!.isNotEmpty) {
-        return user.displayName!;
-      }
-      if (user.email != null) {
-        return user.email!.split('@')[0];
-      }
-    }
-    return "Anonymous";
-  }
-
-  String _getInitials(String name) {
-    if (name.isEmpty) return "?";
-    return name[0].toUpperCase();
-  }
+  // --- NEW VARIABLES FOR PREVIEW ---
+  String _previewName = "Loading...";
+  String _previewInitials = "?";
+  String? _previewProfileImage;
 
   @override
   void initState() {
     super.initState();
     _isEditMode = widget.existingPost != null;
-    
+
     if (_isEditMode) {
       _titleController.text = widget.existingPost!.title;
       _contentController.text = widget.existingPost!.content;
-      _selectedTag = widget.existingPost!.tag; 
+      _selectedTag = widget.existingPost!.tag;
+    }
+    
+    // Load the correct profile data immediately
+    _loadCurrentUser();
+  }
+
+  // --- NEW: Load real profile data for the preview ---
+  Future<void> _loadCurrentUser() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    try {
+      final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      
+      if (doc.exists) {
+        final data = doc.data()!;
+        // Prioritize Full Name -> Username -> Display Name -> Email
+        final String name = data['fullName'] ?? data['username'] ?? user.displayName ?? user.email?.split('@')[0] ?? "User";
+        final String? image = data['profileUrl'] ?? user.photoURL;
+
+        if (mounted) {
+          setState(() {
+            _previewName = name;
+            _previewInitials = name.isNotEmpty ? name[0].toUpperCase() : "?";
+            _previewProfileImage = image;
+          });
+        }
+      } else {
+        // Fallback if no Firestore data found
+        if (mounted) {
+          setState(() {
+             _previewName = user.displayName ?? user.email?.split('@')[0] ?? "User";
+             _previewInitials = _previewName.isNotEmpty ? _previewName[0].toUpperCase() : "?";
+             _previewProfileImage = user.photoURL;
+          });
+        }
+      }
+    } catch (e) {
+      print("Error loading user preview: $e");
     }
   }
 
@@ -71,7 +97,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     if (pickedFile != null) {
       setState(() {
         _videoFile = File(pickedFile.path);
-        _imageFile = null; 
+        _imageFile = null;
       });
     }
   }
@@ -81,7 +107,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     if (pickedFile != null) {
       setState(() {
         _imageFile = File(pickedFile.path);
-        _videoFile = null; 
+        _videoFile = null;
       });
     }
   }
@@ -93,22 +119,40 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     });
   }
 
+  String _getInitials(String name) {
+    if (name.isEmpty) return "?";
+    return name[0].toUpperCase();
+  }
+
   void _submitPost() async {
     final String title = _titleController.text;
     final String content = _contentController.text;
 
     if (title.isEmpty || content.isEmpty) {
-       ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please add a title and content')),
       );
       return;
     }
 
     setState(() {
-      _isPosting = true; 
+      _isPosting = true;
     });
 
     try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      // Ensure we use the exact same data we loaded for the preview
+      // (Or fetch fresh again to be super safe, but using the preview vars is usually fine)
+      // To be safe against race conditions, we fetch fresh one last time or use the preview vars.
+      // Let's use the preview vars since we know they are loaded or loading.
+      
+      // If preview hasn't loaded yet (rare), fallback to basic
+      String finalAuthorName = _previewName == "Loading..." ? (user.displayName ?? "Anonymous") : _previewName;
+      String? finalProfilePic = _previewProfileImage;
+      String finalInitials = _previewInitials;
+
       String? finalVideoUrl;
       String? finalImageUrl;
 
@@ -116,17 +160,11 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         finalVideoUrl = await _storageService.uploadFile(_videoFile!, 'vid');
         if (finalVideoUrl == null) throw Exception("Video upload failed");
       }
-      
+
       if (_imageFile != null) {
         finalImageUrl = await _storageService.uploadFile(_imageFile!, 'img');
         if (finalImageUrl == null) throw Exception("Image upload failed");
       }
-
-      // --- GET REAL USER INFO ---
-      final String realAuthor = _getCurrentUserName();
-      final String realInitials = _getInitials(realAuthor);
-      // --- GET USER ID ---
-      final String currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
 
       if (_isEditMode) {
         PostData updatedPost;
@@ -134,9 +172,10 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         if (finalVideoUrl != null || finalImageUrl != null) {
           updatedPost = PostData(
             id: widget.existingPost!.id,
-            authorId: widget.existingPost!.authorId, // Keep original ID
-            initials: widget.existingPost!.initials,
-            author: widget.existingPost!.author,
+            authorId: widget.existingPost!.authorId,
+            initials: finalInitials,
+            author: finalAuthorName,
+            authorProfileImage: finalProfilePic,
             timestamp: widget.existingPost!.timestamp,
             likes: widget.existingPost!.likes,
             commentList: widget.existingPost!.commentList,
@@ -145,13 +184,12 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
             profileGradient: widget.existingPost!.profileGradient,
             isFollowed: widget.existingPost!.isFollowed,
             commentCount: widget.existingPost!.commentCount,
-            
             title: title,
             content: content,
             tag: _selectedTag,
             isEdited: true,
             videoUrl: finalVideoUrl,
-            imageUrl: finalImageUrl, 
+            imageUrl: finalImageUrl,
           );
         } else {
           updatedPost = widget.existingPost!.copyWith(
@@ -159,32 +197,33 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
             content: content,
             tag: _selectedTag,
             isEdited: true,
+            authorProfileImage: finalProfilePic,
+            author: finalAuthorName,
           );
         }
-
         if (mounted) Navigator.pop(context, updatedPost);
-        
+
       } else {
-        // --- NEW POST ---
         final newPost = PostData(
-          id: DateTime.now().millisecondsSinceEpoch.toString(), 
-          authorId: currentUserId, // <--- SAVE UID HERE
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          authorId: user.uid,
           title: title,
           content: content,
           tag: _selectedTag,
-          author: realAuthor,      
-          initials: realInitials, 
+          author: finalAuthorName,
+          initials: finalInitials,
+          authorProfileImage: finalProfilePic,
           timestamp: DateTime.now(),
           likes: 0,
           commentCount: 0,
           commentList: [],
           isLiked: false,
-          showFollowButton: true, // Everyone else can follow
+          showFollowButton: true,
           isFollowed: false,
-          videoUrl: finalVideoUrl, 
-          imageUrl: finalImageUrl, 
+          videoUrl: finalVideoUrl,
+          imageUrl: finalImageUrl,
         );
-        
+
         if (mounted) Navigator.pop(context, newPost);
       }
 
@@ -196,7 +235,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         );
         setState(() => _isPosting = false);
       }
-    } 
+    }
   }
 
   @override
@@ -209,7 +248,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   @override
   Widget build(BuildContext context) {
     Widget? mediaPreview;
-    
+
     if (_videoFile != null) {
       mediaPreview = _buildVideoPreview();
     } else if (_imageFile != null) {
@@ -235,7 +274,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                 children: [
                   _buildUserHeader(),
                   const SizedBox(height: 20),
-                  
                   TextField(
                     controller: _titleController,
                     style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black87),
@@ -247,9 +285,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                     ),
                     textCapitalization: TextCapitalization.sentences,
                   ),
-                  
                   const SizedBox(height: 12),
-                  
                   TextField(
                     controller: _contentController,
                     style: const TextStyle(fontSize: 16, height: 1.5, color: Colors.black87),
@@ -263,15 +299,12 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                     keyboardType: TextInputType.multiline,
                     textCapitalization: TextCapitalization.sentences,
                   ),
-                  
                   const SizedBox(height: 20),
-
                   if (mediaPreview != null) mediaPreview,
                 ],
               ),
             ),
           ),
-          
           _buildBottomToolbar(),
         ],
       ),
@@ -297,7 +330,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           child: ElevatedButton(
             onPressed: _isPosting ? null : _submitPost,
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF155DFC), 
+              backgroundColor: const Color(0xFF155DFC),
               foregroundColor: Colors.white,
               elevation: 0,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -312,25 +345,48 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     );
   }
 
+  // --- UPDATED USER HEADER TO USE LOADED DATA ---
   Widget _buildUserHeader() {
-    final String currentName = _getCurrentUserName();
-    final String currentInitials = _getInitials(currentName);
-
     return Row(
       children: [
-        Container(
-          width: 44, height: 44,
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(colors: [Color(0xFF155CFB), Color(0xFF980FFA)]),
-            shape: BoxShape.circle,
+        // Show Profile Image if available
+        if (_previewProfileImage != null && _previewProfileImage!.isNotEmpty)
+          Container(
+            width: 44, height: 44,
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Image.network(
+              _previewProfileImage!,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                 return Container(
+                  color: Colors.blue,
+                  child: Center(child: Text(_previewInitials, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
+                );
+              },
+            ),
+          )
+        else
+          // Fallback to gradient initials
+          Container(
+            width: 44, height: 44,
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(colors: [Color(0xFF155CFB), Color(0xFF980FFA)]),
+              shape: BoxShape.circle,
+            ),
+            child: Center(child: Text(_previewInitials, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
           ),
-          child: Center(child: Text(currentInitials, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
-        ),
+          
         const SizedBox(width: 12),
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(currentName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black)),
+            Text(
+              _previewName, // Displays "Fluffy" now
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black)
+            ),
             const SizedBox(height: 2),
             Container(
               height: 26,
@@ -368,7 +424,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         ClipRRect(
           borderRadius: BorderRadius.circular(16),
           child: SizedBox(
-            height: 300, 
+            height: 300,
             width: double.infinity,
             child: PostVideoPlayer(
               videoUrl: _videoFile!.path,
@@ -408,10 +464,10 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         ClipRRect(
           borderRadius: BorderRadius.circular(16),
           child: SizedBox(
-            height: 300, 
+            height: 300,
             width: double.infinity,
             child: PostVideoPlayer(
-              videoUrl: url, 
+              videoUrl: url,
               isSquare: false,
               onControllerInitialized: (_) {},
             ),
@@ -429,8 +485,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           borderRadius: BorderRadius.circular(16),
           child: AspectRatio(
             aspectRatio: 4/3,
-            child: url.startsWith('assets/') 
-              ? Image.asset(url, fit: BoxFit.cover) 
+            child: url.startsWith('assets/')
+              ? Image.asset(url, fit: BoxFit.cover)
               : (url.startsWith('http') ? Image.network(url, fit: BoxFit.cover) : Image.file(File(url), fit: BoxFit.cover)),
           ),
         ),
@@ -459,7 +515,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         border: Border(top: BorderSide(color: Colors.grey[200]!, width: 1)),
       ),
       padding: EdgeInsets.only(
-        left: 16, right: 16, top: 12, 
+        left: 16, right: 16, top: 12,
         bottom: MediaQuery.of(context).viewPadding.bottom + 12
       ),
       child: Row(
