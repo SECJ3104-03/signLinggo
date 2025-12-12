@@ -4,9 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:video_player/video_player.dart';
-import 'package:audio_waveforms/audio_waveforms.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:just_audio/just_audio.dart';
+import 'package:audio_session/audio_session.dart';
 
 import 'text_input_bar.dart';
 import 'sign_input_bar.dart';
@@ -33,7 +34,7 @@ class ConversationScreen extends StatefulWidget {
 class _ConversationScreenState extends State<ConversationScreen> {
   String _mode = "Text";
   final Map<String, VideoPlayerController> _videoControllers = {};
-  final Map<String, PlayerController> _audioWaveformControllers = {};
+  final Map<String, AudioPlayer> _audioPlayers = {}; // Using just_audio AudioPlayer
   final Map<String, String> _audioLocalPaths = {};
   late final String currentUserId;
   
@@ -51,9 +52,10 @@ class _ConversationScreenState extends State<ConversationScreen> {
     for (var controller in _videoControllers.values) {
       controller.dispose();
     }
-    for (var controller in _audioWaveformControllers.values) {
-      controller.dispose();
+    for (var player in _audioPlayers.values) {
+      player.dispose();
     }
+    _audioPlayers.clear();
     super.dispose();
   }
 
@@ -179,9 +181,9 @@ class _ConversationScreenState extends State<ConversationScreen> {
       _videoControllers.remove(content);
     }
 
-    if (type == 'voice' && _audioWaveformControllers.containsKey(content)) {
-      _audioWaveformControllers[content]!.dispose();
-      _audioWaveformControllers.remove(content);
+    if (type == 'voice' && _audioPlayers.containsKey(content)) {
+      _audioPlayers[content]!.dispose();
+      _audioPlayers.remove(content);
     }
 
     await _refreshConversationPreviewAfterDeletion(forEveryone: true);
@@ -337,173 +339,160 @@ class _ConversationScreenState extends State<ConversationScreen> {
     );
   }
 
-// --- ULTIMATE FIX FOR THE BUGGY audio_waveforms PACKAGE ---
-Widget _buildVoiceBubble(String audioUrl, bool isUser) {
-  // Track playback completion manually
-  final Map<String, bool> _playbackFinished = {};
-  
-  if (!_audioWaveformControllers.containsKey(audioUrl)) {
-    final controller = PlayerController();
-    _audioWaveformControllers[audioUrl] = controller;
+  Widget _buildVoiceBubble(String audioUrl, bool isUser) {
+    if (!_audioPlayers.containsKey(audioUrl)) {
+      final player = AudioPlayer();
+      _audioPlayers[audioUrl] = player;
+      
+      // Initialize the player
+      Future.microtask(() async {
+        try {
+          await player.setUrl(audioUrl);
+          
+          // Handle playback completion
+          player.playerStateStream.listen((state) {
+            if (state.processingState == ProcessingState.completed) {
+              // Reset to start when completed
+              player.seek(Duration.zero);
+              if (mounted) setState(() {});
+            }
+          });
+          
+          if (mounted) setState(() {});
+        } catch (e) {
+          debugPrint("Error setting audio URL: $e");
+        }
+      });
+    }
 
-    Future.microtask(() async {
-      try {
-        final localPath = await downloadToLocalFile(audioUrl);
-        _audioLocalPaths[audioUrl] = localPath;
-        await controller.preparePlayer(
-          path: localPath,
-          shouldExtractWaveform: true,
-        );
-        
-        // Monitor playback to detect completion
-        controller.onCurrentDurationChanged.listen((position) async {
-          final maxDuration = controller.maxDuration;
-          if (maxDuration > 0 && position >= maxDuration - 100) {
-            // Audio finished
-            _playbackFinished[audioUrl] = true;
-            await controller.pausePlayer();
-            await controller.seekTo(0);
-            if (mounted) setState(() {});
-          } else {
-            _playbackFinished[audioUrl] = false;
-          }
-        });
-        
-        if (mounted) setState(() {});
-      } catch (e) {
-        debugPrint("Audio prepare error: $e");
-      }
-    });
-  }
+    final audioPlayer = _audioPlayers[audioUrl]!;
 
-  final playerController = _audioWaveformControllers[audioUrl]!;
-  final isReady = playerController.maxDuration > 0;
-  final isFinished = _playbackFinished[audioUrl] ?? false;
-
-  return Align(
-    alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-    child: Container(
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-      margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
-      constraints: BoxConstraints(
-        maxWidth: MediaQuery.of(context).size.width * 0.75,
-      ),
-      decoration: BoxDecoration(
-        color: isUser ? Colors.blue[50] : Colors.grey[200],
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              StreamBuilder<PlayerState>(
-                stream: playerController.onPlayerStateChanged,
-                initialData: PlayerState.stopped,
-                builder: (context, snapshot) {
-                  final state = snapshot.data ?? PlayerState.stopped;
-                  final isPlaying = state == PlayerState.playing && !isFinished;
-                  
-                  return IconButton(
-                    iconSize: 36,
-                    icon: Icon(
-                      isFinished
-                          ? Icons.replay_circle_filled
-                          : (isPlaying
-                              ? Icons.pause_circle_filled
-                              : Icons.play_circle_fill),
-                      color: Colors.black87,
-                    ),
-                    onPressed: !isReady
-                        ? null
-                        : () async {
-                            if (isFinished) {
-                              // Reset finished flag and play
-                              _playbackFinished[audioUrl] = false;
-                              await playerController.seekTo(0);
-                              await playerController.startPlayer();
-                            } else if (isPlaying) {
-                              await playerController.pausePlayer();
-                            } else {
-                              await playerController.startPlayer();
-                            }
-                            if (mounted) setState(() {});
-                          },
-                  );
-                },
-              ),
-
-              Expanded(
-                child: isReady
-                    ? AudioFileWaveforms(
-                        size: const Size(double.infinity, 32),
-                        playerController: playerController,
-                        waveformType: WaveformType.long,
-                        enableSeekGesture: true,
-                        playerWaveStyle: const PlayerWaveStyle(
-                          fixedWaveColor: Colors.black26,
-                          liveWaveColor: Colors.purple,
-                          spacing: 4,
-                        ),
-                      )
-                    : const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 10),
-                        child: Text("Loading...", style: TextStyle(fontSize: 12)),
+    return Align(
+      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+        margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.of(context).size.width * 0.75,
+        ),
+        decoration: BoxDecoration(
+          color: isUser ? Colors.blue[50] : Colors.grey[200],
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                StreamBuilder<PlayerState>(
+                  stream: audioPlayer.playerStateStream,
+                  builder: (context, snapshot) {
+                    final state = snapshot.data;
+                    final isPlaying = state?.playing ?? false;
+                    
+                    return IconButton(
+                      iconSize: 36,
+                      icon: Icon(
+                        isPlaying
+                            ? Icons.pause_circle_filled
+                            : Icons.play_circle_fill,
+                        color: Colors.black87,
                       ),
-              ),
-            ],
-          ),
+                      onPressed: () async {
+                        if (isPlaying) {
+                          await audioPlayer.pause();
+                        } else {
+                          // Check if we're at the end
+                          final position = audioPlayer.position;
+                          final duration = audioPlayer.duration ?? Duration.zero;
+                          
+                          if (position >= duration - const Duration(milliseconds: 100)) {
+                            await audioPlayer.seek(Duration.zero);
+                          }
+                          await audioPlayer.play();
+                        }
+                      },
+                    );
+                  },
+                ),
 
-          const SizedBox(height: 6),
-          StreamBuilder<int>(
-            stream: playerController.onCurrentDurationChanged,
-            initialData: 0,
-            builder: (context, snapshot) {
-              if (!isReady) {
-                return const Text("Loading audio...", style: TextStyle(fontSize: 12));
-              }
+                Expanded(
+                  child: StreamBuilder<Duration>(
+                    stream: audioPlayer.positionStream,
+                    initialData: Duration.zero,
+                    builder: (context, positionSnapshot) {
+                      return StreamBuilder<Duration?>(
+                        stream: audioPlayer.durationStream,
+                        initialData: Duration.zero,
+                        builder: (context, durationSnapshot) {
+                          final position = positionSnapshot.data ?? Duration.zero;
+                          final duration = durationSnapshot.data ?? Duration.zero;
+                          
+                          double progress = 0;
+                          if (duration.inMilliseconds > 0) {
+                            progress = position.inMilliseconds / duration.inMilliseconds;
+                          }
+                          
+                          return LinearProgressIndicator(
+                            value: progress,
+                            backgroundColor: Colors.black26,
+                            valueColor: const AlwaysStoppedAnimation<Color>(Colors.purple),
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
 
-              final position = Duration(milliseconds: snapshot.data ?? 0);
-              final duration = Duration(milliseconds: playerController.maxDuration);
+            const SizedBox(height: 6),
+            StreamBuilder<Duration>(
+              stream: audioPlayer.positionStream,
+              initialData: Duration.zero,
+              builder: (context, positionSnapshot) {
+                return StreamBuilder<Duration?>(
+                  stream: audioPlayer.durationStream,
+                  initialData: Duration.zero,
+                  builder: (context, durationSnapshot) {
+                    final position = positionSnapshot.data ?? Duration.zero;
+                    final duration = durationSnapshot.data ?? Duration.zero;
+                    
+                    String fmt(Duration d) =>
+                        "${d.inMinutes}:${(d.inSeconds % 60).toString().padLeft(2, '0')}";
 
-              String fmt(Duration d) =>
-                  "${d.inMinutes}:${(d.inSeconds % 60).toString().padLeft(2, '0')}";
-
-              return Text(
-                "${fmt(position)} / ${fmt(duration)}",
-                style: const TextStyle(fontSize: 12),
-              );
-            },
-          ),
-        ],
+                    return Text(
+                      "${fmt(position)} / ${fmt(duration)}",
+                      style: const TextStyle(fontSize: 12),
+                    );
+                  },
+                );
+              },
+            ),
+          ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
           
   Widget _buildUserMessage(Map<String, dynamic> msg) {
     final bool isUser = msg['isUser'];
-    final String id = msg['messageId'];
-    final String type = msg['type'];
-    final String content = msg['content'];
 
-    return GestureDetector(
-      onLongPress: () => _showDeleteDialog(id, msg['senderId'], type, content),
-      child: Builder(
-        builder: (_) {
-          switch (type) {
-            case 'text':
-              return _buildTextBubble(content, isUser);
-            case 'video':
-              return _buildVideoBubble(content, isUser);
-            case 'voice':
-              return _buildVoiceBubble(content, isUser);
-            default:
-              return const SizedBox.shrink();
-          }
-        },
-      ),
-    );
+    // Clean up player if message is not voice but has one associated
+    if (msg['type'] != 'voice' && _audioPlayers.containsKey(msg['content'])) {
+      _audioPlayers.remove(msg['content'])?.dispose();
+    }
+    
+    switch (msg['type']) {
+      case 'text':
+        return _buildTextBubble(msg['content'] ?? '', isUser);
+      case 'video':
+        return _buildVideoBubble(msg['content'] as String, isUser);
+      case 'voice':
+        return _buildVoiceBubble(msg['content'] ?? '', isUser);
+      default:
+        return const SizedBox.shrink();
+    }
   }
 
   Widget _buildModeSelector() {
