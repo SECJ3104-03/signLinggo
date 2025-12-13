@@ -55,12 +55,12 @@ class _ConversationScreenState extends State<ConversationScreen> {
     super.dispose();
   }
 
-  @override
+  /* @override
   void dispose() {
     _videoControllers.values.forEach((controller) => controller.dispose());
     _audioWaveformControllers.values.forEach((controller) => controller.dispose());
     super.dispose();
-  }
+  } */
 
   Future<void> _sendMessage(
       String content, String type, String previewText) async {

@@ -6,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:pull_to_refresh/pull_to_refresh.dart';
 
 import '../../auth/auth_service.dart';
 import '../../providers/app_provider.dart';
@@ -21,6 +22,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   User? user;
   Map<String, dynamic>? userData;
   bool isLoading = false;
+  final RefreshController _refreshController = RefreshController(initialRefresh: false);
 
   @override
   void initState() {
@@ -28,6 +30,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
     user = FirebaseAuth.instance.currentUser;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadUserData();
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Listen for edit profile updates
+    _listenForProfileUpdates();
+  }
+
+  void _listenForProfileUpdates() {
+    // This will trigger when coming back from edit profile
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final result = ModalRoute.of(context)?.settings.arguments;
+      if (result == true) {
+        // Refresh data if edit profile was successful
+        _loadUserData();
+      }
     });
   }
 
@@ -52,9 +72,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  void _onRefresh() async {
+    await _loadUserData();
+    _refreshController.refreshCompleted();
+  }
+
   void _openEditProfile() {
     // Use GoRouter to navigate to edit-profile route
-    GoRouter.of(context).push('/edit-profile');
+    GoRouter.of(context).push('/edit-profile').then((_) {
+      // Auto-refresh after returning from edit profile
+      _loadUserData();
+    });
   }
 
   void _goBack() {
@@ -97,6 +125,120 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  void _showGuestAuthOptions() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                "Continue as",
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 20),
+              
+              // Login Button
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    GoRouter.of(context).go('/signin');
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blueGrey.shade800,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size(double.infinity, 56),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.login, size: 20),
+                      SizedBox(width: 10),
+                      Text(
+                        "Login",
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              
+              const SizedBox(height: 12),
+              
+              // Sign Up Button
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    GoRouter.of(context).go('/register');
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.teal.shade600,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size(double.infinity, 56),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.person_add, size: 20),
+                      SizedBox(width: 10),
+                      Text(
+                        "Sign Up",
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              
+              const SizedBox(height: 12),
+              
+              // Cancel Button
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.grey,
+                    minimumSize: const Size(double.infinity, 56),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    side: BorderSide(color: Colors.grey.shade300),
+                  ),
+                  child: const Text(
+                    "Cancel",
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final bool isGuest = user == null;
@@ -119,7 +261,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ),
       ),
-      body: _buildBody(isGuest),
+      body: SmartRefresher(
+        controller: _refreshController,
+        onRefresh: _onRefresh,
+        enablePullDown: true,
+        enablePullUp: false,
+        header: ClassicHeader(
+          idleText: "Pull down to refresh",
+          releaseText: "Release to refresh",
+          refreshingText: "Refreshing...",
+          completeText: "Refresh complete",
+          failedText: "Refresh failed",
+          textStyle: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+          refreshingIcon: const CircularProgressIndicator(strokeWidth: 2),
+        ),
+        child: _buildBody(isGuest),
+      ),
     );
   }
 
@@ -210,16 +367,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Column(
       children: [
         // Edit Profile Button
-        _buildActionButton(
-          icon: Icons.edit,
-          label: "Edit Profile",
-          color: Colors.blueGrey.shade800,
-          onPressed: !isGuest ? _openEditProfile : null,
-        ),
+        if (!isGuest)
+          Column(
+            children: [
+              _buildActionButton(
+                icon: Icons.edit,
+                label: "Edit Profile",
+                color: Colors.blueGrey.shade800,
+                onPressed: !isGuest ? _openEditProfile : null,
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
         
-        const SizedBox(height: 16),
+        // Login/Signup Button (only for guests)
+        if (isGuest)
+          Column(
+            children: [
+              _buildActionButton(
+                icon: Icons.login,
+                label: "Login / Sign Up",
+                color: Colors.teal.shade600,
+                onPressed: _showGuestAuthOptions,
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
         
-        // Offline Mode Button
+        // Offline Mode Button (always shown)
         _buildActionButton(
           icon: Icons.wifi_off,
           label: "Offline Mode",
@@ -229,7 +404,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         
         const SizedBox(height: 40),
         
-        // Log Out Button
+        // Log Out Button (only for logged in users)
         if (!isGuest)
           _buildActionButton(
             icon: Icons.logout,

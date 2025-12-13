@@ -19,6 +19,7 @@ dependencies:
 
   # State Management
   provider: ^6.1.2
+  pull_to_refresh: ^2.0.0
 
   # Navigation
   go_router: ^14.2.7
@@ -60,6 +61,7 @@ dependencies:
   open_file: ^3.0.0
   archive: ^4.0.7
   cached_network_image: ^3.4.1
+  intl: ^0.20.2
 
 dev_dependencies:
   flutter_test:

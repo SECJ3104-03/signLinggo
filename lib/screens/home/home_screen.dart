@@ -13,6 +13,9 @@ class HomePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Get the safe area padding for notch/punch hole cameras
+    final topPadding = MediaQuery.of(context).padding.top;
+    
     return Scaffold(
       body: SingleChildScrollView(
         child: Container(
@@ -30,11 +33,16 @@ class HomePage extends StatelessWidget {
           ),
           child: Column(
             children: [
-              // === TOP BAR ===
+              // === TOP BAR (Increased height for punch hole camera) ===
               Container(
                 width: double.infinity,
-                height: 70,
-                padding: const EdgeInsets.symmetric(horizontal: 24),
+                height: 70 + topPadding, // Add safe area padding
+                padding: EdgeInsets.only(
+                  top: topPadding, // Account for status bar/notch
+                  left: 24,
+                  right: 24,
+                  bottom: 12,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.80),
                   boxShadow: const [
@@ -52,16 +60,54 @@ class HomePage extends StatelessWidget {
                     ),
                   ],
                 ),
-                child: const Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    'Signlingo Home',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF101727),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    const Text(
+                      'Signlingo Home',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF101727),
+                      ),
                     ),
-                  ),
+                    // === PROFILE BUTTON ===
+                    GestureDetector(
+                      onTap: () => context.push('/profile'),
+                      child: Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: const LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              Color(0xFF615EFF),
+                              Color(0xFFAC46FF),
+                              Color(0xFFF6329A),
+                            ],
+                          ),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Color(0x19000000),
+                              blurRadius: 6,
+                              offset: Offset(0, 4),
+                              spreadRadius: -4,
+                            ),
+                          ],
+                        ),
+                        child: const Center(
+                          child: Icon(
+                            Icons.person,
+                            color: Colors.white,
+                            size: 24,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
 
@@ -147,7 +193,7 @@ class HomePage extends StatelessWidget {
               const SizedBox(height: 20),
 
               // === FOOTER ===
-              // wrapped Cointainer with GestureDetector for offline mode
+              // wrapped Container with GestureDetector for offline mode
               GestureDetector(
                 onTap: () => context.push('/offline'),
                 child: Container(
