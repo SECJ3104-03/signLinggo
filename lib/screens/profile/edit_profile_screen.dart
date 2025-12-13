@@ -2,6 +2,7 @@
 
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -159,7 +160,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
       print("✅ Profile saved successfully!");
 
       if (mounted) {
-        Navigator.of(context).pop(true);
+        // Use GoRouter to pop with true value
+        GoRouter.of(context).pop(true);
       }
     } catch (e) {
       print("❌ Error saving profile: $e");
@@ -334,7 +336,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
                 radius: 20,
                 child: IconButton(
                   icon: const Icon(Icons.arrow_back, size: 20, color: Colors.black),
-                  onPressed: () => Navigator.of(context).pop(false),
+                  // onPressed: () => Navigator.of(context).pop(false),
+                  onPressed: () => GoRouter.of(context).pop(false),
                 ),
               ),
             ),

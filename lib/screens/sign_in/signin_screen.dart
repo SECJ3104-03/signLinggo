@@ -216,7 +216,7 @@ class _SignInScreenState extends State<SignInScreen> {
                         Provider.of<AppProvider>(context, listen: false);
                     appProvider.setGuestMode(true);
                     appProvider.setLoggedIn(false);
-                    context.go('/profile');
+                    context.go('/home');
                   },
                   child: const Text(
                     "Continue as Guest",
@@ -277,7 +277,7 @@ class _SignInScreenState extends State<SignInScreen> {
         final appProvider = Provider.of<AppProvider>(context, listen: false);
         appProvider.setLoggedIn(true);
         appProvider.setGuestMode(false);
-        context.go('/profile');
+        context.go('/home');
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Login failed: Invalid email or password")),
@@ -325,8 +325,8 @@ class _SignInScreenState extends State<SignInScreen> {
         appProvider.setLoggedIn(true);
         appProvider.setGuestMode(false);
 
-        // Navigate to profile
-        context.go('/profile');
+        // Navigate to home
+        context.go('/home');
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Google Sign-In cancelled")),
