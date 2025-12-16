@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
-import 'package:provider/provider.dart'; // Add this
+import 'package:provider/provider.dart';
 import 'package:signlinggo/data/progress_manager.dart';
+import 'package:signlinggo/services/sign_service.dart';
+import 'package:signlinggo/data/models/sign_model.dart';
+import 'package:signlinggo/data/models/category_model.dart';
 
 class LearnModePage extends StatefulWidget {
   const LearnModePage({super.key});
@@ -11,107 +14,14 @@ class LearnModePage extends StatefulWidget {
 }
 
 class _LearnModePageState extends State<LearnModePage> {
-  final List<String> categories = [
-    'All', 'Alphabets', 'Numbers', 'Greetings', 'Family',
-    'Food & Drinks', 'Emotions', 'Travel', 'Medical', 'Others',
-  ];
-
-  String selectedCategory = 'All';
+  String? selectedCategoryId; // null means "All"
+  String selectedCategoryName = 'All';
   final TextEditingController _searchController = TextEditingController();
-
-  // ✅ Example: Add video file names matching sign titles
-    final List<Map<String, String>> signs = [
-    //food and drinks
-    {'title': 'Bread', 'category': 'Food & Drinks', 'difficulty': 'Easy', 'video': 'assets/assets/videos/Bread.mp4'},
-    {'title': 'Juice', 'category': 'Food & Drinks', 'difficulty': 'Easy', 'video': 'assets/assets/videos/Juice.mp4'},
-    {'title': 'Drink', 'category': 'Food & Drinks', 'difficulty': 'Easy', 'video': 'assets/assets/videos/Drink.mp4'},
-    {'title': 'Eat', 'category': 'Food & Drinks', 'difficulty': 'Easy', 'video': 'assets/assets/videos/Eat.mp4'},
-    {'title': 'Water', 'category': 'Food & Drinks', 'difficulty': 'Easy', 'video': 'assets/assets/videos/Water.mp4'},
-    //family
-    {'title': 'Brother', 'category': 'Family', 'difficulty': 'Easy', 'video': 'assets/assets/videos/Brother.mp4'},
-    {'title': 'Elder Sister', 'category': 'Family', 'difficulty': 'Medium', 'video': 'assets/assets/videos/ElderSister.mp4'},
-    {'title': 'Father', 'category': 'Family', 'difficulty': 'Easy', 'video': 'assets/assets/videos/Father.mp4'},
-    {'title': 'Mother', 'category': 'Family', 'difficulty': 'Easy', 'video': 'assets/assets/videos/Mother.mp4'},
-    //travel
-    {'title': 'Bus', 'category': 'Travel', 'difficulty': 'Medium', 'video': 'assets/assets/videos/Bus.mp4'},
-    {'title': 'Hotel', 'category': 'Travel', 'difficulty': 'Medium', 'video': 'assets/assets/videos/Hotel.mp4'},
-    {'title': 'Toilet', 'category': 'Travel', 'difficulty': 'Medium', 'video': 'assets/assets/videos/Toilet.mp4'},
-    //emotions
-    {'title': 'Help', 'category': 'Emotions', 'difficulty': 'Medium', 'video': 'assets/assets/videos/Help.mp4'},
-    {'title': 'Hungry', 'category': 'Emotions', 'difficulty': 'Medium', 'video': 'assets/assets/videos/Hungry.mp4'},
-    {'title': 'Thirsty', 'category': 'Emotions', 'difficulty': 'Medium', 'video': 'assets/assets/videos/Thirsty.mp4'},
-    //others
-    {'title': 'Objects', 'category': 'Others', 'difficulty': 'Medium', 'video': 'assets/assets/videos/Objects.mp4'},
-    //numbers
-    {'title': '0', 'category': 'Numbers', 'difficulty': 'Easy', 'video': 'assets/assets/videos/0.mp4'},
-    {'title': '1', 'category': 'Numbers', 'difficulty': 'Easy', 'video': 'assets/assets/videos/1.mp4'},
-    {'title': '2', 'category': 'Numbers', 'difficulty': 'Easy', 'video': 'assets/assets/videos/2.mp4'},
-    {'title': '3', 'category': 'Numbers', 'difficulty': 'Easy', 'video': 'assets/assets/videos/3.mp4'},
-    {'title': '4', 'category': 'Numbers', 'difficulty': 'Easy', 'video': 'assets/assets/videos/4.mp4'},
-    {'title': '5', 'category': 'Numbers', 'difficulty': 'Easy', 'video': 'assets/assets/videos/5.mp4'},
-    {'title': '6', 'category': 'Numbers', 'difficulty': 'Easy', 'video': 'assets/assets/videos/6.mp4'},
-    {'title': '7', 'category': 'Numbers', 'difficulty': 'Easy', 'video': 'assets/assets/videos/7.mp4'},
-    {'title': '8', 'category': 'Numbers', 'difficulty': 'Easy', 'video': 'assets/assets/videos/8.mp4'},
-    {'title': '9', 'category': 'Numbers', 'difficulty': 'Easy', 'video': 'assets/assets/videos/9.mp4'},
-    {'title': '10', 'category': 'Numbers', 'difficulty': 'Easy', 'video': 'assets/assets/videos/10.mp4'},
-    //alphabets
-    {'title': 'A', 'category': 'Alphabets', 'difficulty': 'Easy', 'video': 'assets/assets/videos/A.mp4'},
-    {'title': 'B', 'category': 'Alphabets', 'difficulty': 'Easy', 'video': 'assets/assets/videos/B.mp4'},
-    {'title': 'C', 'category': 'Alphabets', 'difficulty': 'Easy', 'video': 'assets/assets/videos/C.mp4'},
-    {'title': 'D', 'category': 'Alphabets', 'difficulty': 'Easy', 'video': 'assets/assets/videos/D.mp4'},
-    {'title': 'E', 'category': 'Alphabets', 'difficulty': 'Easy', 'video': 'assets/assets/videos/E.mp4'},
-    {'title': 'F', 'category': 'Alphabets', 'difficulty': 'Easy', 'video': 'assets/assets/videos/F.mp4'},
-    {'title': 'G', 'category': 'Alphabets', 'difficulty': 'Easy', 'video': 'assets/assets/videos/G.mp4'},
-    {'title': 'H', 'category': 'Alphabets', 'difficulty': 'Easy', 'video': 'assets/assets/videos/H.mp4'},
-    {'title': 'I', 'category': 'Alphabets', 'difficulty': 'Easy', 'video': 'assets/assets/videos/I.mp4'},
-    {'title': 'J', 'category': 'Alphabets', 'difficulty': 'Easy', 'video': 'assets/assets/videos/J.mp4'},
-    {'title': 'K', 'category': 'Alphabets', 'difficulty': 'Easy', 'video': 'assets/assets/videos/K.mp4'},
-    {'title': 'L', 'category': 'Alphabets', 'difficulty': 'Easy', 'video': 'assets/assets/videos/L.mp4'},
-    {'title': 'M', 'category': 'Alphabets', 'difficulty': 'Easy', 'video': 'assets/assets/videos/M.mp4'},
-    {'title': 'N', 'category': 'Alphabets', 'difficulty': 'Easy', 'video': 'assets/assets/videos/N.mp4'},
-    {'title': 'O', 'category': 'Alphabets', 'difficulty': 'Easy', 'video': 'assets/assets/videos/O.mp4'},
-    {'title': 'P', 'category': 'Alphabets', 'difficulty': 'Easy', 'video': 'assets/assets/videos/P.mp4'},
-    {'title': 'Q', 'category': 'Alphabets', 'difficulty': 'Easy', 'video': 'assets/assets/videos/Q.mp4'},
-    {'title': 'R', 'category': 'Alphabets', 'difficulty': 'Easy', 'video': 'assets/assets/videos/R.mp4'},
-    {'title': 'S', 'category': 'Alphabets', 'difficulty': 'Easy', 'video': 'assets/assets/videos/S.mp4'},
-    {'title': 'T', 'category': 'Alphabets', 'difficulty': 'Easy', 'video': 'assets/assets/videos/T.mp4'},
-    {'title': 'U', 'category': 'Alphabets', 'difficulty': 'Easy', 'video': 'assets/assets/videos/U.mp4'},
-    {'title': 'V', 'category': 'Alphabets', 'difficulty': 'Easy', 'video': 'assets/assets/videos/V.mp4'},
-    {'title': 'W', 'category': 'Alphabets', 'difficulty': 'Easy', 'video': 'assets/videos/W.mp4'},
-    {'title': 'S', 'category': 'Alphabets', 'difficulty': 'Easy', 'video': 'assets/assets/videos/X.mp4'},
-    {'title': 'Y', 'category': 'Alphabets', 'difficulty': 'Easy', 'video': 'assets/assets/videos/Y.mp4'},
-    {'title': 'Z', 'category': 'Alphabets', 'difficulty': 'Easy', 'video': 'assets/assets/videos/Z.mp4'},
-    {'title': 'Backspace', 'category': 'Alphabets', 'difficulty': 'Medium', 'video': 'assets/assets/videos/Backspace.mp4'},
-    {'title': 'Space', 'category': 'Alphabets', 'difficulty': 'Easy', 'video': 'assets/assets/videos/Space.mp4'},
-    // greetings and others
-    {'title': 'Today', 'category': 'Greetings', 'difficulty': 'Medium', 'video': 'assets/assets/videos/Today.mp4'},
-    {'title': 'Hello', 'category': 'Greetings', 'difficulty': 'Easy', 'video': 'assets/assets/videos/Hello.mp4'},
-    {'title': 'I', 'category': 'Greetings', 'difficulty': 'Easy', 'video': 'assets/assets/videos/I(Saya).mp4'},
-    {'title': 'I love you', 'category': 'Greetings', 'difficulty': 'Easy', 'video': 'assets/assets/videos/ILoveYou.mp4'},
-    {'title': 'Friends', 'category': 'Family', 'difficulty': 'Medium', 'video': 'assets/assets/videos/Friend.mp4'},
-    {'title': 'Night', 'category': 'Greetings', 'difficulty': 'Medium', 'video': 'assets/assets/videos/Night.mp4'},
-    {'title': 'Morning', 'category': 'Greetings', 'difficulty': 'Easy', 'video': 'assets/assets/videos/Morning.mp4'},
-    {'title': 'Selamat', 'category': 'Greetings', 'difficulty': 'Easy', 'video': 'assets/assets/videos/Selamat.mp4'},
-    {'title': 'Noon', 'category': 'Greetings', 'difficulty': 'Medium', 'video': 'assets/assets/videos/Noon.mp4'},
-    {'title': 'Thank you', 'category': 'Greetings', 'difficulty': 'Easy', 'video': 'assets/assets/videos/ThankYou.mp4'},
-    {'title': 'Ucapan', 'category': 'Greetings', 'difficulty': 'Medium', 'video': 'assets/assets/videos/Ucapan.mp4'},
-    {'title': 'How much', 'category': 'Greetings', 'difficulty': 'Hard', 'video': 'assets/assets/videos/HowMuch.mp4'},
-    {'title': 'No', 'category': 'Greetings', 'difficulty': 'Easy', 'video': 'assets/assets/videos/No.mp4'},
-    {'title': 'Yes', 'category': 'Greetings', 'difficulty': 'Easy', 'video': 'assets/assets/videos/Yes.mp4'},
-    {'title': 'Sorry', 'category': 'Greetings', 'difficulty': 'Easy', 'video': 'assets/assets/videos/Sorry.mp4'},
-  ];
-
+  final SignService _signService = SignService();
 
   @override
   Widget build(BuildContext context) {
-    final filteredSigns = signs.where((sign) {
-      final matchesSearch = sign['title']!
-          .toLowerCase()
-          .contains(_searchController.text.toLowerCase());
-      final matchesCategory = selectedCategory == 'All' ||
-          sign['category'] == selectedCategory;
-      return matchesSearch && matchesCategory;
-    }).toList();
+    final searchQuery = _searchController.text;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -151,167 +61,286 @@ class _LearnModePageState extends State<LearnModePage> {
               ),
               const SizedBox(height: 16),
 
-              // Categories
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: categories.map((category) {
-                    final bool isSelected = category == selectedCategory;
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 8.0),
-                      child: GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            selectedCategory = category;
-                          });
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: isSelected ? Colors.blue.shade600 : Colors.grey.shade200,
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            category,
-                            style: TextStyle(
-                              color: isSelected ? Colors.white : Colors.grey[800],
-                              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+              // Categories - Dynamically loaded from Firestore
+              StreamBuilder<List<Category>>(
+                stream: _signService.getCategories(),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData) {
+                    return const SizedBox(
+                      height: 50,
+                      child: Center(child: CircularProgressIndicator()),
+                    );
+                  }
+
+                  final categories = snapshot.data!;
+
+                  return SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        // "All" category button
+                        Padding(
+                          padding: const EdgeInsets.only(right: 8.0),
+                          child: GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                selectedCategoryId = null;
+                                selectedCategoryName = 'All';
+                              });
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: selectedCategoryName == 'All'
+                                    ? Colors.blue.shade600
+                                    : Colors.grey.shade200,
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                'All',
+                                style: TextStyle(
+                                  color: selectedCategoryName == 'All'
+                                      ? Colors.white
+                                      : Colors.grey[800],
+                                  fontWeight: selectedCategoryName == 'All'
+                                      ? FontWeight.w600
+                                      : FontWeight.w400,
+                                ),
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    );
-                  }).toList(),
-                ),
+                        // Dynamic categories from Firestore
+                        ...categories.map((category) {
+                          final bool isSelected = selectedCategoryId == category.id;
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 8.0),
+                            child: GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  selectedCategoryId = category.id;
+                                  selectedCategoryName = category.name;
+                                });
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: isSelected ? Colors.blue.shade600 : Colors.grey.shade200,
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Text(
+                                  category.name,
+                                  style: TextStyle(
+                                    color: isSelected ? Colors.white : Colors.grey[800],
+                                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ],
+                    ),
+                  );
+                },
               ),
               const SizedBox(height: 24),
 
-              // Grid of cards
-              GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  childAspectRatio: 0.85,
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
-                ),
-                itemCount: filteredSigns.length,
-                itemBuilder: (context, index) {
-                  final sign = filteredSigns[index];
-                  final progressManager = Provider.of<ProgressManager>(context);
-                  final isWatched = progressManager.isWatched(sign['title']!);
-                  
-                  return GestureDetector(
-                    onTap: () {
-                      _showVideoPopup(context, sign);
-                    },
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.grey.withOpacity(0.15),
-                            spreadRadius: 2,
-                            blurRadius: 8,
-                          ),
-                        ],
-                        border: isWatched 
-                          ? Border.all(color: Colors.green, width: 2)
-                          : null,
+              // StreamBuilder for Firebase data
+              StreamBuilder<List<Sign>>(
+                stream: _signService.getFilteredSigns(selectedCategoryId, searchQuery),
+                builder: (context, snapshot) {
+                  // Loading state
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(32.0),
+                        child: CircularProgressIndicator(),
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Stack(
-                              children: [
-                                Container(
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey[200],
-                                    borderRadius: const BorderRadius.only(
-                                      topLeft: Radius.circular(16),
-                                      topRight: Radius.circular(16),
-                                    ),
-                                    image: const DecorationImage(
-                                      image: AssetImage('assets/placeholder.png'),
-                                      fit: BoxFit.cover,
-                                    ),
-                                  ),
-                                ),
-                                
-                                // Already watched indicator
-                                if (isWatched)
-                                  Positioned(
-                                    top: 8,
-                                    right: 8,
-                                    child: Container(
-                                      padding: const EdgeInsets.all(4),
-                                      decoration: const BoxDecoration(
-                                        color: Colors.green,
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: const Icon(
-                                        Icons.check,
-                                        size: 16,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                  ),
-                                
-                                const Positioned(
-                                  right: 8,
-                                  bottom: 8,
-                                  child: CircleAvatar(
-                                    backgroundColor: Colors.blue,
-                                    radius: 16,
-                                    child: Icon(Icons.play_arrow,
-                                        color: Colors.white, size: 18),
-                                  ),
-                                ),
-                              ],
+                    );
+                  }
+
+                  // Error state
+                  if (snapshot.hasError) {
+                    return Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(32.0),
+                        child: Column(
+                          children: [
+                            const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Error loading signs',
+                              style: TextStyle(fontSize: 18, color: Colors.grey[800]),
                             ),
+                            const SizedBox(height: 8),
+                            Text(
+                              snapshot.error.toString(),
+                              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }
+
+                  // Empty state
+                  if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                    return Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(32.0),
+                        child: Column(
+                          children: [
+                            Icon(Icons.search_off, size: 64, color: Colors.grey[400]),
+                            const SizedBox(height: 16),
+                            Text(
+                              'No signs found',
+                              style: TextStyle(fontSize: 18, color: Colors.grey[800]),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              searchQuery.isNotEmpty
+                                  ? 'Try a different search term'
+                                  : 'No signs available in this category',
+                              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }
+
+                  // Data loaded successfully
+                  final signs = snapshot.data!;
+
+                  return GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      childAspectRatio: 0.85,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                    ),
+                    itemCount: signs.length,
+                    itemBuilder: (context, index) {
+                      final sign = signs[index];
+                      final progressManager = Provider.of<ProgressManager>(context);
+                      final isWatched = progressManager.isWatched(sign.title);
+                      
+                      return GestureDetector(
+                        onTap: () {
+                          _showVideoPopup(context, sign);
+                        },
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.grey.withOpacity(0.15),
+                                spreadRadius: 2,
+                                blurRadius: 8,
+                              ),
+                            ],
+                            border: isWatched 
+                              ? Border.all(color: Colors.green, width: 2)
+                              : null,
                           ),
-                          Padding(
-                            padding: const EdgeInsets.all(8.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(sign['title']!,
-                                    style: const TextStyle(
-                                        fontWeight: FontWeight.w600, fontSize: 16)),
-                                const SizedBox(height: 4),
-                                Text(sign['category']!,
-                                    style: TextStyle(fontSize: 13, color: Colors.grey[600])),
-                                const SizedBox(height: 4),
-                                Row(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: Stack(
                                   children: [
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                       decoration: BoxDecoration(
-                                        color: Colors.blue.shade50,
-                                        borderRadius: BorderRadius.circular(8),
+                                        color: Colors.grey[200],
+                                        borderRadius: const BorderRadius.only(
+                                          topLeft: Radius.circular(16),
+                                          topRight: Radius.circular(16),
+                                        ),
+                                        image: const DecorationImage(
+                                          image: AssetImage('assets/placeholder.png'),
+                                          fit: BoxFit.cover,
+                                        ),
                                       ),
-                                      child: Text(sign['difficulty']!,
-                                          style: TextStyle(
-                                              fontSize: 12, color: Colors.blue.shade700)),
                                     ),
-                                    const Spacer(),
+                                    
+                                    // Already watched indicator
                                     if (isWatched)
-                                      const Icon(
-                                        Icons.check_circle,
-                                        color: Colors.green,
-                                        size: 16,
+                                      Positioned(
+                                        top: 8,
+                                        right: 8,
+                                        child: Container(
+                                          padding: const EdgeInsets.all(4),
+                                          decoration: const BoxDecoration(
+                                            color: Colors.green,
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: const Icon(
+                                            Icons.check,
+                                            size: 16,
+                                            color: Colors.white,
+                                          ),
+                                        ),
                                       ),
+                                    
+                                    const Positioned(
+                                      right: 8,
+                                      bottom: 8,
+                                      child: CircleAvatar(
+                                        backgroundColor: Colors.blue,
+                                        radius: 16,
+                                        child: Icon(Icons.play_arrow,
+                                            color: Colors.white, size: 18),
+                                      ),
+                                    ),
                                   ],
                                 ),
-                              ],
-                            ),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.all(8.0),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(sign.title,
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.w600, fontSize: 16)),
+                                    const SizedBox(height: 4),
+                                    Text(selectedCategoryName,
+                                        style: TextStyle(fontSize: 13, color: Colors.grey[600])),
+                                    const SizedBox(height: 4),
+                                    Row(
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: Colors.blue.shade50,
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: Text(sign.difficultyLevel,
+                                              style: TextStyle(
+                                                  fontSize: 12, color: Colors.blue.shade700)),
+                                        ),
+                                        const Spacer(),
+                                        if (isWatched)
+                                          const Icon(
+                                            Icons.check_circle,
+                                            color: Colors.green,
+                                            size: 16,
+                                          ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                    ),
+                        ),
+                      );
+                    },
                   );
                 },
               ),
@@ -322,13 +351,13 @@ class _LearnModePageState extends State<LearnModePage> {
     );
   }
 
-  // ✅ Function to show popup dialog with video
-  void _showVideoPopup(BuildContext context, Map<String, String> sign) {
-    // 🟢 Mark this sign as watched
+  // Function to show popup dialog with video
+  void _showVideoPopup(BuildContext context, Sign sign) {
+    // Mark this sign as watched
     final progressManager = Provider.of<ProgressManager>(context, listen: false);
-    progressManager.markAsWatched(sign['title']!);
+    progressManager.markAsWatched(sign.title);
 
-    // 🟦 Show video dialog
+    // Show video dialog
     showDialog(
       context: context,
       builder: (context) {
@@ -336,8 +365,8 @@ class _LearnModePageState extends State<LearnModePage> {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           insetPadding: const EdgeInsets.all(20),
           child: _VideoPlayerDialog(
-            videoPath: sign['video']!,
-            title: sign['title']!,
+            videoPath: sign.videoUrl,
+            title: sign.title,
           ),
         );
       },
@@ -345,7 +374,7 @@ class _LearnModePageState extends State<LearnModePage> {
   }
 }
 
-// ✅ Separate stateful widget for the video player inside popup
+// Separate stateful widget for the video player inside popup
 class _VideoPlayerDialog extends StatefulWidget {
   final String videoPath;
   final String title;
@@ -358,15 +387,27 @@ class _VideoPlayerDialog extends StatefulWidget {
 
 class _VideoPlayerDialogState extends State<_VideoPlayerDialog> {
   late VideoPlayerController _controller;
+  bool _isNetworkVideo = false;
 
   @override
   void initState() {
     super.initState();
-    _controller = VideoPlayerController.asset(widget.videoPath)
-      ..initialize().then((_) {
-        setState(() {});
-        _controller.play();
-      });
+    
+    // Check if video is from network or asset
+    _isNetworkVideo = widget.videoPath.startsWith('http://') || 
+                      widget.videoPath.startsWith('https://');
+    
+    // Initialize appropriate controller
+    _controller = _isNetworkVideo
+        ? VideoPlayerController.networkUrl(Uri.parse(widget.videoPath))
+        : VideoPlayerController.asset(widget.videoPath);
+    
+    _controller.initialize().then((_) {
+      setState(() {});
+      _controller.play();
+    }).catchError((error) {
+      print('❌ Error loading video: $error');
+    });
   }
 
   @override
