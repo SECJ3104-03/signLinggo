@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart'; 
 import 'package:scroll_to_index/scroll_to_index.dart';
 import 'dart:io';
-import 'dart:async'; // Needed for the Timer/Delay
+import 'dart:async'; 
 import 'dart:typed_data'; 
 import 'package:dio/dio.dart'; 
 import 'package:path_provider/path_provider.dart';
@@ -131,9 +131,8 @@ class _OfflineModeState extends State<OfflineMode> with SingleTickerProviderStat
       icon: Icons.waving_hand_outlined,
       iconColor: Color(0xFFE5890A),
       backgroundColor: Color(0xFFFFF2DE),
-      //downloadUrl: 'https://drive.google.com/uc?export=download&id=1IVY1gC2ebZkIhNT0CYqkbiynAZSulVKQ', 
       downloadUrl: 'assets/assets/offline_materials/basic_greetings.zip', 
-      includedVideos: ['Minum', 'Roti', 'Hello', 'Goodbye', 'Thank You'],
+      includedVideos: ['Hello', 'I Love You', 'Morning', 'Night', 'No', 'Noon', 'Greet', 'Sorry',  'Thank You', 'Today', 'Yes' ],
     ),
 
     // 3. Food & Drink (OFFLINE ASSET MODE)
@@ -143,9 +142,8 @@ class _OfflineModeState extends State<OfflineMode> with SingleTickerProviderStat
       icon: Icons.coffee_outlined,
       iconColor: Color(0xFFD62F0B),
       backgroundColor: Color(0xFFFFD6D1),
-      // Points to local asset
       downloadUrl: 'assets/assets/offline_materials/Foof_Drink_Signs.zip',
-      includedVideos: ['Chicken', 'Rice', 'Water', 'Coffee'],
+      includedVideos: ['Bread', 'Drink', 'Eat', 'Hungry', 'Juice', 'Thirsty', 'Water'],
     ),
 
     // 4. Medical
@@ -167,7 +165,7 @@ class _OfflineModeState extends State<OfflineMode> with SingleTickerProviderStat
       iconColor: Color(0xFFD60B95),
       backgroundColor: Color(0xFFFFDFF2),
       downloadUrl: 'assets/assets/offline_materials/Family_People.zip', 
-      includedVideos: ['Father', 'Mother', 'Friend'],
+      includedVideos: ['Father', 'Mother', 'Friend', 'Brother', 'Sister', 'I/Me'],
     ),
 
     // 6. Travel
@@ -178,7 +176,7 @@ class _OfflineModeState extends State<OfflineMode> with SingleTickerProviderStat
       iconColor: Color(0xFF5E0BD6),
       backgroundColor: Color(0xFFF5F1FF),
       downloadUrl: 'assets/assets/offline_materials/Travel_Transport.zip', 
-      includedVideos: ['Car', 'Train', 'Go'],
+      includedVideos: ['Bus', 'Help', 'Hotel', 'How much?', 'Toilet'],
     ),
   ];
 
@@ -234,6 +232,57 @@ class _OfflineModeState extends State<OfflineMode> with SingleTickerProviderStat
     }
   }
 
+  // --- NEW: Function to handle Deletion ---
+  Future<void> _confirmAndDelete(_DownloadableItemData item) async {
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text("Delete Download"),
+          content: Text("Are you sure you want to delete '${item.title}' from your offline library?"),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text("Cancel", style: TextStyle(color: Colors.grey)),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text("Delete", style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirm == true) {
+      try {
+        final Directory appDir = await getApplicationDocumentsDirectory();
+        final String folderPath = '${appDir.path}/${item.folderName}';
+        final directory = Directory(folderPath);
+
+        if (await directory.exists()) {
+          await directory.delete(recursive: true);
+          
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text("${item.title} deleted"), duration: const Duration(seconds: 2)),
+            );
+          }
+          // Refresh list to remove the item from screen
+          await _refreshDownloadedList();
+        }
+      } catch (e) {
+        print("Error deleting: $e");
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("Error deleting file: $e"), backgroundColor: Colors.red),
+          );
+        }
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -251,7 +300,8 @@ class _OfflineModeState extends State<OfflineMode> with SingleTickerProviderStat
           elevation: 0,
           leading: IconButton(
             icon: const Icon(Icons.arrow_back, color: Color(0xFF101727)),
-            onPressed: () => Navigator.of(context).pop(),
+            // onPressed: () => Navigator.of(context).pop(),
+            onPressed: () => context.go('/home'),
           ),
           title: const Text(
             'Offline Downloads',
@@ -348,6 +398,9 @@ class _OfflineModeState extends State<OfflineMode> with SingleTickerProviderStat
         return Padding(
           padding: const EdgeInsets.only(bottom: 20.0),
           child: InkWell(
+            borderRadius: BorderRadius.circular(30.18),
+            // --- MODIFIED: Added Long Press Logic ---
+            onLongPress: () => _confirmAndDelete(item),
             onTap: () async {
               try {
                 final Directory appDir = await getApplicationDocumentsDirectory();
@@ -414,7 +467,7 @@ class _OfflineModeState extends State<OfflineMode> with SingleTickerProviderStat
   }
 }
 
-// --- STEP 4: DOWNLOAD ITEM LOGIC (HYBRID WITH FAKE DELAY) ---
+// --- STEP 4: DOWNLOAD ITEM LOGIC ---
 enum DownloadState { idle, downloading, downloaded }
 
 class _DownloadableFileItem extends StatefulWidget {
@@ -447,6 +500,13 @@ class _DownloadableFileItemState extends State<_DownloadableFileItem> with Autom
     _checkIfFolderExists();
   }
 
+  // --- NEW: Re-check status if the list updates (e.g. after a delete) ---
+  @override
+  void didUpdateWidget(_DownloadableFileItem oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _checkIfFolderExists();
+  }
+
   String _getTargetFolderName() {
     return widget.data.folderName;
   }
@@ -458,19 +518,18 @@ class _DownloadableFileItemState extends State<_DownloadableFileItem> with Autom
       final String folderPath = '${appDir.path}/$folderName';
 
       final directory = Directory(folderPath);
-      if (await directory.exists() && directory.listSync().isNotEmpty) {
-        if (mounted) {
-          setState(() {
-            _downloadState = DownloadState.downloaded;
-          });
-        }
+      bool exists = await directory.exists() && directory.listSync().isNotEmpty;
+      
+      if (mounted) {
+        setState(() {
+          _downloadState = exists ? DownloadState.downloaded : DownloadState.idle;
+        });
       }
     } catch (e) {
       print("Error checking folder: $e");
     }
   }
 
-  // --- UPDATED DOWNLOAD LOGIC ---
   Future<void> _startDownload() async {
     setState(() {
       _downloadState = DownloadState.downloading;
@@ -499,24 +558,18 @@ class _DownloadableFileItemState extends State<_DownloadableFileItem> with Autom
         );
       } else {
         // --- SCENARIO B: LOCAL ASSET COPY (Simulated Delay) ---
-        // We use a loop to "fake" the download time to make it feel satisfying
-        
         for (int i = 0; i <= 100; i+=2) {
-          if (!mounted) return; // Stop if user leaves screen
+          if (!mounted) return; 
           
           setState(() {
             _downloadProgress = i / 100;
           });
           
-          // Wait 20ms for each step. Total time approx 1-2 seconds.
           await Future.delayed(const Duration(milliseconds: 20));
         }
 
-        // Now actually load the file
         final ByteData data = await DefaultAssetBundle.of(context).load(pathOrUrl);
         final List<int> bytes = data.buffer.asUint8List();
-        
-        // Write it to the app's document storage
         await File(zipSavePath).writeAsBytes(bytes);
       }
 
@@ -539,7 +592,6 @@ class _DownloadableFileItemState extends State<_DownloadableFileItem> with Autom
         }
       }
 
-      // Cleanup
       await File(zipSavePath).delete();
 
       if (mounted) {

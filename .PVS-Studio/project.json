@@ -1,0 +1,580 @@
+{
+  "modules": [
+    {
+      "name": "app",
+      "path": "c:\\Users\\User\\Documents\\APPLICATION DEVELOPMENT\\signLinggo\\android\\app\\",
+      "sources": [
+        "c:\\Users\\User\\Documents\\APPLICATION DEVELOPMENT\\signLinggo\\android\\app\\src\\main\\java\\io\\flutter\\plugins\\GeneratedPluginRegistrant.java"
+      ],
+      "testSources": [],
+      "generatedSources": [],
+      "classpath": []
+    },
+    {
+      "name": "android",
+      "path": "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\app_links-6.4.1\\android\\",
+      "sources": [
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\app_links-6.4.1\\android\\build\\",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\app_links-6.4.1\\android\\src\\main\\java\\com\\llfbandit\\app_links\\AppLinksHelper.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\app_links-6.4.1\\android\\src\\main\\java\\com\\llfbandit\\app_links\\AppLinksPlugin.java"
+      ],
+      "testSources": [],
+      "generatedSources": [
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\app_links-6.4.1\\android\\build\\"
+      ],
+      "classpath": []
+    },
+    {
+      "name": "android",
+      "path": "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\audio_session-0.1.25\\android\\",
+      "sources": [
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\audio_session-0.1.25\\android\\build\\",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\audio_session-0.1.25\\android\\src\\main\\java\\com\\ryanheise\\audio_session\\AndroidAudioManager.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\audio_session-0.1.25\\android\\src\\main\\java\\com\\ryanheise\\audio_session\\AudioSessionPlugin.java"
+      ],
+      "testSources": [],
+      "generatedSources": [
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\audio_session-0.1.25\\android\\build\\"
+      ],
+      "classpath": []
+    },
+    {
+      "name": "android",
+      "path": "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\audio_waveforms-1.3.0\\android\\",
+      "sources": [
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\audio_waveforms-1.3.0\\android\\build\\"
+      ],
+      "testSources": [],
+      "generatedSources": [
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\audio_waveforms-1.3.0\\android\\build\\"
+      ],
+      "classpath": []
+    },
+    {
+      "name": "android",
+      "path": "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\",
+      "sources": [
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\main\\java\\io\\flutter\\plugins\\camerax\\AnalyzerProxyApi.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\main\\java\\io\\flutter\\plugins\\camerax\\AspectRatioStrategyProxyApi.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\main\\java\\io\\flutter\\plugins\\camerax\\Camera2CameraControlProxyApi.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\main\\java\\io\\flutter\\plugins\\camerax\\Camera2CameraInfoProxyApi.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\main\\java\\io\\flutter\\plugins\\camerax\\CameraAndroidCameraxPlugin.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\main\\java\\io\\flutter\\plugins\\camerax\\CameraCharacteristicsProxyApi.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\main\\java\\io\\flutter\\plugins\\camerax\\CameraControlProxyApi.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\main\\java\\io\\flutter\\plugins\\camerax\\CameraInfoProxyApi.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\main\\java\\io\\flutter\\plugins\\camerax\\CameraIntegerRangeProxyApi.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\main\\java\\io\\flutter\\plugins\\camerax\\CameraPermissionsError.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\main\\java\\io\\flutter\\plugins\\camerax\\CameraPermissionsErrorProxyApi.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\main\\java\\io\\flutter\\plugins\\camerax\\CameraPermissionsManager.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\main\\java\\io\\flutter\\plugins\\camerax\\CameraProxyApi.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\main\\java\\io\\flutter\\plugins\\camerax\\CameraSelectorProxyApi.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\main\\java\\io\\flutter\\plugins\\camerax\\CameraSizeProxyApi.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\main\\java\\io\\flutter\\plugins\\camerax\\CameraStateProxyApi.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\main\\java\\io\\flutter\\plugins\\camerax\\CameraStateStateErrorProxyApi.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\main\\java\\io\\flutter\\plugins\\camerax\\CaptureRequestOptionsProxyApi.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\main\\java\\io\\flutter\\plugins\\camerax\\CaptureRequestProxyApi.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\main\\java\\io\\flutter\\plugins\\camerax\\DeviceOrientationManager.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\main\\java\\io\\flutter\\plugins\\camerax\\DeviceOrientationManagerProxyApi.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\main\\java\\io\\flutter\\plugins\\camerax\\DisplayOrientedMeteringPointFactoryProxyApi.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\main\\java\\io\\flutter\\plugins\\camerax\\ExposureStateProxyApi.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\main\\java\\io\\flutter\\plugins\\camerax\\FallbackStrategyProxyApi.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\main\\java\\io\\flutter\\plugins\\camerax\\FocusMeteringActionBuilderProxyApi.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\main\\java\\io\\flutter\\plugins\\camerax\\FocusMeteringActionProxyApi.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\main\\java\\io\\flutter\\plugins\\camerax\\FocusMeteringResultProxyApi.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\main\\java\\io\\flutter\\plugins\\camerax\\GeneratedCameraXLibrary.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\main\\java\\io\\flutter\\plugins\\camerax\\ImageAnalysisProxyApi.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\main\\java\\io\\flutter\\plugins\\camerax\\ImageCaptureProxyApi.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\main\\java\\io\\flutter\\plugins\\camerax\\ImageProxyProxyApi.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\main\\java\\io\\flutter\\plugins\\camerax\\ImageProxyUtils.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\main\\java\\io\\flutter\\plugins\\camerax\\ImageProxyUtilsProxyApi.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\main\\java\\io\\flutter\\plugins\\camerax\\LiveDataProxyApi.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\main\\java\\io\\flutter\\plugins\\camerax\\MeteringPointFactoryProxyApi.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\main\\java\\io\\flutter\\plugins\\camerax\\MeteringPointProxyApi.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\main\\java\\io\\flutter\\plugins\\camerax\\ObserverProxyApi.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\main\\java\\io\\flutter\\plugins\\camerax\\PendingRecordingProxyApi.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\main\\java\\io\\flutter\\plugins\\camerax\\PlaneProxyProxyApi.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\main\\java\\io\\flutter\\plugins\\camerax\\PreviewProxyApi.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\main\\java\\io\\flutter\\plugins\\camerax\\ProcessCameraProviderProxyApi.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\main\\java\\io\\flutter\\plugins\\camerax\\ProxyApiRegistrar.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\main\\java\\io\\flutter\\plugins\\camerax\\ProxyLifecycleProvider.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\main\\java\\io\\flutter\\plugins\\camerax\\QualitySelectorProxyApi.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\main\\java\\io\\flutter\\plugins\\camerax\\RecorderProxyApi.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\main\\java\\io\\flutter\\plugins\\camerax\\RecordingProxyApi.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\main\\java\\io\\flutter\\plugins\\camerax\\ResolutionFilterProxyApi.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\main\\java\\io\\flutter\\plugins\\camerax\\ResolutionInfoProxyApi.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\main\\java\\io\\flutter\\plugins\\camerax\\ResolutionSelectorProxyApi.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\main\\java\\io\\flutter\\plugins\\camerax\\ResolutionStrategyProxyApi.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\main\\java\\io\\flutter\\plugins\\camerax\\SystemServicesManager.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\main\\java\\io\\flutter\\plugins\\camerax\\SystemServicesManagerProxyApi.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\main\\java\\io\\flutter\\plugins\\camerax\\VideoCaptureProxyApi.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\main\\java\\io\\flutter\\plugins\\camerax\\VideoRecordEventListener.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\main\\java\\io\\flutter\\plugins\\camerax\\VideoRecordEventListenerProxyApi.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\main\\java\\io\\flutter\\plugins\\camerax\\ZoomStateProxyApi.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\test\\java\\android\\util\\Range.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\test\\java\\android\\util\\Rational.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\test\\java\\android\\util\\Size.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\test\\java\\io\\flutter\\plugins\\camerax\\AnalyzerTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\test\\java\\io\\flutter\\plugins\\camerax\\AspectRatioStrategyTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\test\\java\\io\\flutter\\plugins\\camerax\\Camera2CameraControlTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\test\\java\\io\\flutter\\plugins\\camerax\\Camera2CameraInfoTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\test\\java\\io\\flutter\\plugins\\camerax\\CameraAndroidCameraxPluginTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\test\\java\\io\\flutter\\plugins\\camerax\\CameraControlTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\test\\java\\io\\flutter\\plugins\\camerax\\CameraInfoTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\test\\java\\io\\flutter\\plugins\\camerax\\CameraIntegerRangeTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\test\\java\\io\\flutter\\plugins\\camerax\\CameraPermissionsErrorTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\test\\java\\io\\flutter\\plugins\\camerax\\CameraPermissionsManagerTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\test\\java\\io\\flutter\\plugins\\camerax\\CameraSelectorTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\test\\java\\io\\flutter\\plugins\\camerax\\CameraSizeTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\test\\java\\io\\flutter\\plugins\\camerax\\CameraStateStateErrorTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\test\\java\\io\\flutter\\plugins\\camerax\\CameraStateTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\test\\java\\io\\flutter\\plugins\\camerax\\CameraTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\test\\java\\io\\flutter\\plugins\\camerax\\CaptureRequestOptionsTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\test\\java\\io\\flutter\\plugins\\camerax\\DeviceOrientationManagerApiTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\test\\java\\io\\flutter\\plugins\\camerax\\DeviceOrientationManagerTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\test\\java\\io\\flutter\\plugins\\camerax\\ExposureStateTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\test\\java\\io\\flutter\\plugins\\camerax\\FallbackStrategyTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\test\\java\\io\\flutter\\plugins\\camerax\\FocusMeteringActionBuilderTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\test\\java\\io\\flutter\\plugins\\camerax\\FocusMeteringActionTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\test\\java\\io\\flutter\\plugins\\camerax\\FocusMeteringResultTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\test\\java\\io\\flutter\\plugins\\camerax\\ImageAnalysisTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\test\\java\\io\\flutter\\plugins\\camerax\\ImageCaptureTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\test\\java\\io\\flutter\\plugins\\camerax\\ImageProxyTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\test\\java\\io\\flutter\\plugins\\camerax\\ImageProxyUtilsApiTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\test\\java\\io\\flutter\\plugins\\camerax\\ImageProxyUtilsTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\test\\java\\io\\flutter\\plugins\\camerax\\LiveDataTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\test\\java\\io\\flutter\\plugins\\camerax\\MeteringPointFactoryTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\test\\java\\io\\flutter\\plugins\\camerax\\MeteringPointTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\test\\java\\io\\flutter\\plugins\\camerax\\ObserverTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\test\\java\\io\\flutter\\plugins\\camerax\\PendingRecordingTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\test\\java\\io\\flutter\\plugins\\camerax\\PlaneProxyTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\test\\java\\io\\flutter\\plugins\\camerax\\PreviewTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\test\\java\\io\\flutter\\plugins\\camerax\\ProcessCameraProviderTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\test\\java\\io\\flutter\\plugins\\camerax\\ProxyLifecycleProviderTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\test\\java\\io\\flutter\\plugins\\camerax\\QualitySelectorTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\test\\java\\io\\flutter\\plugins\\camerax\\RecorderTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\test\\java\\io\\flutter\\plugins\\camerax\\RecordingTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\test\\java\\io\\flutter\\plugins\\camerax\\ResolutionFilterTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\test\\java\\io\\flutter\\plugins\\camerax\\ResolutionInfoTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\test\\java\\io\\flutter\\plugins\\camerax\\ResolutionSelectorTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\test\\java\\io\\flutter\\plugins\\camerax\\ResolutionStrategyTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\test\\java\\io\\flutter\\plugins\\camerax\\SystemServicesTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\test\\java\\io\\flutter\\plugins\\camerax\\TestProxyApiRegistrar.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\test\\java\\io\\flutter\\plugins\\camerax\\VideoCaptureTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\test\\java\\io\\flutter\\plugins\\camerax\\VideoRecordEventListenerTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\camera_android_camerax-0.6.24\\android\\src\\test\\java\\io\\flutter\\plugins\\camerax\\ZoomStateTest.java"
+      ],
+      "testSources": [],
+      "generatedSources": [],
+      "classpath": []
+    },
+    {
+      "name": "android",
+      "path": "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\cloud_firestore-6.1.0\\android\\",
+      "sources": [
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\cloud_firestore-6.1.0\\android\\build\\",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\cloud_firestore-6.1.0\\android\\src\\main\\java\\io\\flutter\\plugins\\firebase\\firestore\\FlutterFirebaseFirestoreException.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\cloud_firestore-6.1.0\\android\\src\\main\\java\\io\\flutter\\plugins\\firebase\\firestore\\FlutterFirebaseFirestoreExtension.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\cloud_firestore-6.1.0\\android\\src\\main\\java\\io\\flutter\\plugins\\firebase\\firestore\\FlutterFirebaseFirestoreMessageCodec.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\cloud_firestore-6.1.0\\android\\src\\main\\java\\io\\flutter\\plugins\\firebase\\firestore\\FlutterFirebaseFirestorePlugin.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\cloud_firestore-6.1.0\\android\\src\\main\\java\\io\\flutter\\plugins\\firebase\\firestore\\FlutterFirebaseFirestoreRegistrar.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\cloud_firestore-6.1.0\\android\\src\\main\\java\\io\\flutter\\plugins\\firebase\\firestore\\FlutterFirebaseFirestoreTransactionResult.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\cloud_firestore-6.1.0\\android\\src\\main\\java\\io\\flutter\\plugins\\firebase\\firestore\\GeneratedAndroidFirebaseFirestore.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\cloud_firestore-6.1.0\\android\\src\\main\\java\\io\\flutter\\plugins\\firebase\\firestore\\streamhandler\\DocumentSnapshotsStreamHandler.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\cloud_firestore-6.1.0\\android\\src\\main\\java\\io\\flutter\\plugins\\firebase\\firestore\\streamhandler\\LoadBundleStreamHandler.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\cloud_firestore-6.1.0\\android\\src\\main\\java\\io\\flutter\\plugins\\firebase\\firestore\\streamhandler\\OnTransactionResultListener.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\cloud_firestore-6.1.0\\android\\src\\main\\java\\io\\flutter\\plugins\\firebase\\firestore\\streamhandler\\QuerySnapshotsStreamHandler.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\cloud_firestore-6.1.0\\android\\src\\main\\java\\io\\flutter\\plugins\\firebase\\firestore\\streamhandler\\SnapshotsInSyncStreamHandler.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\cloud_firestore-6.1.0\\android\\src\\main\\java\\io\\flutter\\plugins\\firebase\\firestore\\streamhandler\\TransactionStreamHandler.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\cloud_firestore-6.1.0\\android\\src\\main\\java\\io\\flutter\\plugins\\firebase\\firestore\\utils\\ExceptionConverter.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\cloud_firestore-6.1.0\\android\\src\\main\\java\\io\\flutter\\plugins\\firebase\\firestore\\utils\\PigeonParser.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\cloud_firestore-6.1.0\\android\\src\\main\\java\\io\\flutter\\plugins\\firebase\\firestore\\utils\\ServerTimestampBehaviorConverter.java"
+      ],
+      "testSources": [],
+      "generatedSources": [
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\cloud_firestore-6.1.0\\android\\build\\"
+      ],
+      "classpath": []
+    },
+    {
+      "name": "android",
+      "path": "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\firebase_auth-6.1.2\\android\\",
+      "sources": [
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\firebase_auth-6.1.2\\android\\src\\main\\java\\io\\flutter\\plugins\\firebase\\auth\\AuthStateChannelStreamHandler.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\firebase_auth-6.1.2\\android\\src\\main\\java\\io\\flutter\\plugins\\firebase\\auth\\Constants.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\firebase_auth-6.1.2\\android\\src\\main\\java\\io\\flutter\\plugins\\firebase\\auth\\FlutterFirebaseAuthPlugin.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\firebase_auth-6.1.2\\android\\src\\main\\java\\io\\flutter\\plugins\\firebase\\auth\\FlutterFirebaseAuthPluginException.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\firebase_auth-6.1.2\\android\\src\\main\\java\\io\\flutter\\plugins\\firebase\\auth\\FlutterFirebaseAuthRegistrar.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\firebase_auth-6.1.2\\android\\src\\main\\java\\io\\flutter\\plugins\\firebase\\auth\\FlutterFirebaseAuthUser.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\firebase_auth-6.1.2\\android\\src\\main\\java\\io\\flutter\\plugins\\firebase\\auth\\FlutterFirebaseMultiFactor.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\firebase_auth-6.1.2\\android\\src\\main\\java\\io\\flutter\\plugins\\firebase\\auth\\FlutterFirebaseTotpMultiFactor.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\firebase_auth-6.1.2\\android\\src\\main\\java\\io\\flutter\\plugins\\firebase\\auth\\FlutterFirebaseTotpSecret.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\firebase_auth-6.1.2\\android\\src\\main\\java\\io\\flutter\\plugins\\firebase\\auth\\GeneratedAndroidFirebaseAuth.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\firebase_auth-6.1.2\\android\\src\\main\\java\\io\\flutter\\plugins\\firebase\\auth\\IdTokenChannelStreamHandler.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\firebase_auth-6.1.2\\android\\src\\main\\java\\io\\flutter\\plugins\\firebase\\auth\\PhoneNumberVerificationStreamHandler.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\firebase_auth-6.1.2\\android\\src\\main\\java\\io\\flutter\\plugins\\firebase\\auth\\PigeonParser.java"
+      ],
+      "testSources": [],
+      "generatedSources": [],
+      "classpath": []
+    },
+    {
+      "name": "android",
+      "path": "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\firebase_core-4.2.1\\android\\",
+      "sources": [
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\firebase_core-4.2.1\\android\\src\\main\\java\\io\\flutter\\plugins\\firebase\\core\\FlutterFirebaseCorePlugin.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\firebase_core-4.2.1\\android\\src\\main\\java\\io\\flutter\\plugins\\firebase\\core\\FlutterFirebaseCoreRegistrar.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\firebase_core-4.2.1\\android\\src\\main\\java\\io\\flutter\\plugins\\firebase\\core\\FlutterFirebasePlugin.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\firebase_core-4.2.1\\android\\src\\main\\java\\io\\flutter\\plugins\\firebase\\core\\FlutterFirebasePluginRegistry.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\firebase_core-4.2.1\\android\\src\\main\\java\\io\\flutter\\plugins\\firebase\\core\\GeneratedAndroidFirebaseCore.java"
+      ],
+      "testSources": [],
+      "generatedSources": [],
+      "classpath": []
+    },
+    {
+      "name": "android",
+      "path": "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\flutter_plugin_android_lifecycle-2.0.32\\android\\",
+      "sources": [
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\flutter_plugin_android_lifecycle-2.0.32\\android\\src\\main\\java\\io\\flutter\\embedding\\engine\\plugins\\lifecycle\\FlutterLifecycleAdapter.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\flutter_plugin_android_lifecycle-2.0.32\\android\\src\\main\\java\\io\\flutter\\plugins\\flutter_plugin_android_lifecycle\\FlutterAndroidLifecyclePlugin.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\flutter_plugin_android_lifecycle-2.0.32\\android\\src\\test\\java\\io\\flutter\\embedding\\engine\\plugins\\lifecycle\\FlutterLifecycleAdapterTest.java"
+      ],
+      "testSources": [],
+      "generatedSources": [],
+      "classpath": []
+    },
+    {
+      "name": "android",
+      "path": "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\flutter_sound-9.30.0\\android\\",
+      "sources": [
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\flutter_sound-9.30.0\\android\\build\\",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\flutter_sound-9.30.0\\android\\src\\main\\java\\xyz\\canardoux\\fluttersound\\FlutterSound.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\flutter_sound-9.30.0\\android\\src\\main\\java\\xyz\\canardoux\\fluttersound\\FlutterSoundManager.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\flutter_sound-9.30.0\\android\\src\\main\\java\\xyz\\canardoux\\fluttersound\\FlutterSoundPlayer.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\flutter_sound-9.30.0\\android\\src\\main\\java\\xyz\\canardoux\\fluttersound\\FlutterSoundPlayerManager.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\flutter_sound-9.30.0\\android\\src\\main\\java\\xyz\\canardoux\\fluttersound\\FlutterSoundRecorder.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\flutter_sound-9.30.0\\android\\src\\main\\java\\xyz\\canardoux\\fluttersound\\FlutterSoundRecorderManager.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\flutter_sound-9.30.0\\android\\src\\main\\java\\xyz\\canardoux\\fluttersound\\FlutterSoundSession.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\flutter_sound-9.30.0\\android\\src\\test\\java\\canardoux\\xyz\\taudio\\TaudioPluginTest.java"
+      ],
+      "testSources": [],
+      "generatedSources": [
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\flutter_sound-9.30.0\\android\\build\\"
+      ],
+      "classpath": []
+    },
+    {
+      "name": "android",
+      "path": "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\google_sign_in_android-6.2.1\\android\\",
+      "sources": [
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\google_sign_in_android-6.2.1\\android\\build\\",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\google_sign_in_android-6.2.1\\android\\src\\main\\java\\io\\flutter\\plugins\\googlesignin\\GoogleSignInPlugin.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\google_sign_in_android-6.2.1\\android\\src\\main\\java\\io\\flutter\\plugins\\googlesignin\\GoogleSignInWrapper.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\google_sign_in_android-6.2.1\\android\\src\\main\\java\\io\\flutter\\plugins\\googlesignin\\Messages.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\google_sign_in_android-6.2.1\\android\\src\\test\\java\\io\\flutter\\plugins\\googlesignin\\GoogleSignInTest.java"
+      ],
+      "testSources": [],
+      "generatedSources": [
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\google_sign_in_android-6.2.1\\android\\build\\"
+      ],
+      "classpath": []
+    },
+    {
+      "name": "gradle",
+      "path": "c:\\MinGW\\DSA\\mini Project\\.vscode\\flutter\\packages\\flutter_tools\\gradle\\",
+      "sources": [
+        "c:\\MinGW\\DSA\\mini Project\\.vscode\\flutter\\packages\\flutter_tools\\gradle\\bin\\",
+        "c:\\MinGW\\DSA\\mini Project\\.vscode\\flutter\\packages\\flutter_tools\\gradle\\build\\"
+      ],
+      "testSources": [],
+      "generatedSources": [
+        "c:\\MinGW\\DSA\\mini Project\\.vscode\\flutter\\packages\\flutter_tools\\gradle\\bin\\",
+        "c:\\MinGW\\DSA\\mini Project\\.vscode\\flutter\\packages\\flutter_tools\\gradle\\build\\"
+      ],
+      "classpath": [
+        "C:\\MinGW\\DSA\\mini Project\\.vscode\\flutter\\packages\\flutter_tools\\gradle\\bin\\main",
+        "C:\\MinGW\\DSA\\mini Project\\.vscode\\flutter\\packages\\flutter_tools\\gradle\\bin\\test",
+        "C:\\Users\\User\\.gradle\\caches\\modules-2\\files-2.1\\androidx.annotation\\annotation-jvm\\1.9.1\\b17951747e38bf3986a24431b9ba0d039958aa5f\\annotation-jvm-1.9.1.jar",
+        "C:\\Users\\User\\.gradle\\caches\\modules-2\\files-2.1\\com.android.tools.build\\gradle\\8.9.1\\4e50fe7802406421df7b7165d5a8bcbb2762ff0f\\gradle-8.9.1.jar",
+        "C:\\Users\\User\\.gradle\\caches\\modules-2\\files-2.1\\org.jetbrains.kotlin\\kotlin-reflect\\2.0.21\\669e1d35e4ca1797f9ddb2830dd6c36c0ca531e4\\kotlin-reflect-2.0.21.jar",
+        "C:\\Users\\User\\.gradle\\caches\\modules-2\\files-2.1\\org.jetbrains.kotlinx\\kotlinx-serialization-json-jvm\\1.4.0\\cfa3e57d044a20e5c9e4561a997df823e2f1c81a\\kotlinx-serialization-json-jvm-1.4.0.jar",
+        "C:\\Users\\User\\.gradle\\caches\\modules-2\\files-2.1\\org.jetbrains.kotlinx\\kotlinx-serialization-core-jvm\\1.4.0\\9b00d574374ae0201a505ab54c7744586866dc27\\kotlinx-serialization-core-jvm-1.4.0.jar",
+        "C:\\Users\\User\\.gradle\\caches\\modules-2\\files-2.1\\org.jetbrains.kotlin\\kotlin-stdlib-jdk8\\1.8.0\\ed04f49e186a116753ad70d34f0ac2925d1d8020\\kotlin-stdlib-jdk8-1.8.0.jar",
+        "C:\\Users\\User\\.gradle\\caches\\modules-2\\files-2.1\\org.jetbrains.kotlin\\kotlin-stdlib-jdk7\\1.8.0\\3c91271347f678c239607abb676d4032a7898427\\kotlin-stdlib-jdk7-1.8.0.jar",
+        "C:\\Users\\User\\.gradle\\caches\\modules-2\\files-2.1\\org.jetbrains.kotlin\\kotlin-stdlib\\2.0.21\\618b539767b4899b4660a83006e052b63f1db551\\kotlin-stdlib-2.0.21.jar",
+        "C:\\Users\\User\\.gradle\\caches\\modules-2\\files-2.1\\org.jetbrains.kotlin\\kotlin-gradle-plugin\\1.8.0\\d79a079634e8d3bd92c594b224f4de2086bb4a10\\kotlin-gradle-plugin-1.8.0-gradle76.jar",
+        "C:\\Users\\User\\.gradle\\caches\\modules-2\\files-2.1\\com.android.tools.build\\builder\\8.9.1\\5dfef4d0bb66f0f2df305d0dbfe1dc014c2ceca4\\builder-8.9.1.jar",
+        "C:\\Users\\User\\.gradle\\caches\\modules-2\\files-2.1\\com.android.tools.build\\builder-model\\8.9.1\\a749b3ff28c2bf555e7168f0f2ded564ac07dd4\\builder-model-8.9.1.jar",
+        "C:\\Users\\User\\.gradle\\caches\\modules-2\\files-2.1\\com.android.tools.build\\gradle-api\\8.9.1\\cb1f5854bebf3b56c02cd747c7530d73c098ff99\\gradle-api-8.9.1.jar",
+        "C:\\Users\\User\\.gradle\\caches\\modules-2\\files-2.1\\org.jetbrains\\annotations\\13.0\\919f0dfe192fb4e063e7dacadee7f8bb9a2672a9\\annotations-13.0.jar",
+        "C:\\Users\\User\\.gradle\\caches\\modules-2\\files-2.1\\org.jetbrains.kotlin\\kotlin-gradle-plugin-model\\1.8.0\\9da2fce7af0a94348001ee8dd20a82167f5de284\\kotlin-gradle-plugin-model-1.8.0.jar",
+        "C:\\Users\\User\\.gradle\\caches\\modules-2\\files-2.1\\org.jetbrains.kotlin\\kotlin-gradle-plugin-api\\1.8.0\\29f79a3bb109e05b07f1d2893074ab176a4276e0\\kotlin-gradle-plugin-api-1.8.0-gradle76.jar",
+        "C:\\Users\\User\\.gradle\\caches\\modules-2\\files-2.1\\org.jetbrains.kotlin\\kotlin-gradle-plugin-api\\1.8.0\\29f79a3bb109e05b07f1d2893074ab176a4276e0\\kotlin-gradle-plugin-api-1.8.0.jar",
+        "C:\\Users\\User\\.gradle\\caches\\modules-2\\files-2.1\\org.jetbrains.kotlin\\kotlin-tooling-core\\1.8.0\\da3a4252e4b48833eb566227b2baecbaede8993\\kotlin-tooling-core-1.8.0.jar",
+        "C:\\Users\\User\\.gradle\\caches\\modules-2\\files-2.1\\com.android.tools.build\\manifest-merger\\31.9.1\\2bdbfcb2117fe7e47dc8eb01eb1911618c2d2e91\\manifest-merger-31.9.1.jar",
+        "C:\\Users\\User\\.gradle\\caches\\modules-2\\files-2.1\\com.android\\zipflinger\\8.9.1\\de8e3267995699af356740cf562cbedb485f5763\\zipflinger-8.9.1.jar",
+        "C:\\Users\\User\\.gradle\\caches\\modules-2\\files-2.1\\com.android.tools.build\\apksig\\8.9.1\\f005788487574c7d6ba23dea63bf8cb3a4f164a6\\apksig-8.9.1.jar",
+        "C:\\Users\\User\\.gradle\\caches\\modules-2\\files-2.1\\com.android.tools.build\\apkzlib\\8.9.1\\d656b52facbb301b8bdc1e40a5ae008bcf335fe9\\apkzlib-8.9.1.jar",
+        "C:\\Users\\User\\.gradle\\caches\\modules-2\\files-2.1\\com.squareup\\javawriter\\2.5.0\\81241ff7078ef14f42ea2a8995fa09c096256e6b\\javawriter-2.5.0.jar",
+        "C:\\Users\\User\\.gradle\\caches\\modules-2\\files-2.1\\org.ow2.asm\\asm\\9.7\\73d7b3086e14beb604ced229c302feff6449723\\asm-9.7.jar",
+        "C:\\Users\\User\\.gradle\\caches\\modules-2\\files-2.1\\org.jetbrains.kotlin\\kotlin-native-utils\\1.8.0\\73361435f42e1fecbd81f686ccaa8aa1c498b941\\kotlin-native-utils-1.8.0.jar",
+        "C:\\Users\\User\\.gradle\\caches\\modules-2\\files-2.1\\org.jetbrains.kotlin\\kotlin-project-model\\1.8.0\\2b8d20018168339835a79512f46f3251ff09caf5\\kotlin-project-model-1.8.0.jar",
+        "C:\\Users\\User\\.gradle\\caches\\modules-2\\files-2.1\\org.jetbrains.kotlin\\kotlin-util-io\\1.8.0\\1d7ca3cc3c24111ca8a12e29b10d6df0f778afd8\\kotlin-util-io-1.8.0.jar",
+        "C:\\Users\\User\\.gradle\\caches\\modules-2\\files-2.1\\org.jetbrains.kotlin\\kotlin-gradle-plugin-idea-proto\\1.8.0\\2f0dadae067048a92f7153db7af6613c3a3fb052\\kotlin-gradle-plugin-idea-proto-1.8.0.jar",
+        "C:\\Users\\User\\.gradle\\caches\\modules-2\\files-2.1\\org.jetbrains.kotlin\\kotlin-gradle-plugin-idea\\1.8.0\\6998138dffe44597dc30d038d26dbb1fabde2dd2\\kotlin-gradle-plugin-idea-1.8.0.jar",
+        "C:\\Users\\User\\.gradle\\caches\\modules-2\\files-2.1\\org.jetbrains.kotlin\\kotlin-util-klib\\1.8.0\\256da9f306860ba60f5d74576a36e962a1697a61\\kotlin-util-klib-1.8.0.jar",
+        "C:\\Users\\User\\.gradle\\caches\\modules-2\\files-2.1\\org.jetbrains.kotlin\\kotlin-klib-commonizer-api\\1.8.0\\e5974a8e0109dd31d7c16c8901608281a52b6216\\kotlin-klib-commonizer-api-1.8.0.jar",
+        "C:\\Users\\User\\.gradle\\caches\\modules-2\\files-2.1\\org.jetbrains.kotlin\\kotlin-annotation-processing-gradle\\1.8.0\\fa6b4c851584366968803fe879d995bcfe7aa8aa\\kotlin-annotation-processing-gradle-1.8.0.jar",
+        "C:\\Users\\User\\.gradle\\caches\\modules-2\\files-2.1\\org.jetbrains.kotlin\\kotlin-android-extensions\\1.8.0\\c53f898318b2228e3bb1e6d3af53fc8e0c22e318\\kotlin-android-extensions-1.8.0.jar",
+        "C:\\Users\\User\\.gradle\\caches\\modules-2\\files-2.1\\org.jetbrains.kotlin\\kotlin-compiler-runner\\1.8.0\\8b3e2ba6225ff140efc1f9fa60b2c5ef095f37b0\\kotlin-compiler-runner-1.8.0.jar",
+        "C:\\Users\\User\\.gradle\\caches\\modules-2\\files-2.1\\org.jetbrains.kotlin\\kotlin-compiler-embeddable\\1.8.0\\eb9118d4bcceaa2a94b2ae2a33a4ddba7c9a947f\\kotlin-compiler-embeddable-1.8.0.jar",
+        "C:\\Users\\User\\.gradle\\caches\\modules-2\\files-2.1\\org.jetbrains.kotlin\\kotlin-scripting-compiler-embeddable\\1.8.0\\e6b1ab0def6f13dc49d53594f31ed6452b653282\\kotlin-scripting-compiler-embeddable-1.8.0.jar",
+        "C:\\Users\\User\\.gradle\\caches\\modules-2\\files-2.1\\org.jetbrains.kotlin\\kotlin-scripting-compiler-impl-embeddable\\1.8.0\\3f07d79727996675a2243a4c11045a6615ec228c\\kotlin-scripting-compiler-impl-embeddable-1.8.0.jar",
+        "C:\\Users\\User\\.gradle\\caches\\modules-2\\files-2.1\\org.jetbrains.kotlin\\kotlin-daemon-embeddable\\1.8.0\\d255216c551685dc3a7e852b53617f5f01aaaa5c\\kotlin-daemon-embeddable-1.8.0.jar",
+        "C:\\Users\\User\\.gradle\\caches\\modules-2\\files-2.1\\org.jetbrains.intellij.deps\\trove4j\\1.0.20200330\\3afb14d5f9ceb459d724e907a21145e8ff394f02\\trove4j-1.0.20200330.jar",
+        "C:\\Users\\User\\.gradle\\caches\\modules-2\\files-2.1\\net.java.dev.jna\\jna\\5.6.0\\330f2244e9030119ab3030fc3fededc86713d9cc\\jna-5.6.0.jar",
+        "C:\\Users\\User\\.gradle\\caches\\modules-2\\files-2.1\\org.jetbrains.kotlin\\kotlin-build-common\\1.8.0\\90035b6ebbdbbd3c09300d9ba084ce8f5f03b81a\\kotlin-build-common-1.8.0.jar",
+        "C:\\Users\\User\\.gradle\\caches\\modules-2\\files-2.1\\org.jetbrains.kotlin\\kotlin-daemon-client\\1.8.0\\67f8cfc94b53e11080d36e44805348ae19d33cd3\\kotlin-daemon-client-1.8.0.jar",
+        "C:\\Users\\User\\.gradle\\caches\\modules-2\\files-2.1\\org.jetbrains.kotlinx\\kotlinx-coroutines-core-jvm\\1.5.0\\d8cebccdcddd029022aa8646a5a953ff88b13ac8\\kotlinx-coroutines-core-jvm-1.5.0.jar",
+        "C:\\Users\\User\\.gradle\\caches\\modules-2\\files-2.1\\org.jetbrains.kotlin\\kotlin-scripting-jvm\\1.8.0\\1f7345b3fc46786c1f36a4ba0728a95990d05929\\kotlin-scripting-jvm-1.8.0.jar",
+        "C:\\Users\\User\\.gradle\\caches\\modules-2\\files-2.1\\org.jetbrains.kotlin\\kotlin-scripting-common\\1.8.0\\ffeb4c0c2b3978876b993d6b55646e6b567077a8\\kotlin-scripting-common-1.8.0.jar",
+        "C:\\Users\\User\\.gradle\\caches\\modules-2\\files-2.1\\org.jetbrains.kotlin\\kotlin-stdlib-jdk8\\1.7.10\\d70d7d2c56371f7aa18f32e984e3e2e998fe9081\\kotlin-stdlib-jdk8-1.7.10.jar",
+        "C:\\Users\\User\\.gradle\\caches\\modules-2\\files-2.1\\org.jetbrains.kotlin\\kotlin-stdlib-jdk7\\1.7.10\\1ef73fee66f45d52c67e2aca12fd945dbe0659bf\\kotlin-stdlib-jdk7-1.7.10.jar",
+        "C:\\Users\\User\\.gradle\\caches\\modules-2\\files-2.1\\org.jetbrains.kotlin\\kotlin-stdlib\\1.7.10\\d2abf9e77736acc4450dc4a3f707fa2c10f5099d\\kotlin-stdlib-1.7.10.jar",
+        "C:\\Users\\User\\.gradle\\caches\\modules-2\\files-2.1\\org.jetbrains.kotlin\\kotlin-stdlib-common\\1.7.10\\bac80c520d0a9e3f3673bc2658c6ed02ef45a76a\\kotlin-stdlib-common-1.7.10.jar",
+        "C:\\Users\\User\\.gradle\\caches\\8.12\\generated-gradle-jars\\gradle-api-8.12.jar",
+        "C:\\Users\\User\\.gradle\\wrapper\\dists\\gradle-8.12-all\\ejduaidbjup3bmmkhw3rie4zb\\gradle-8.12\\lib\\groovy-3.0.22.jar",
+        "C:\\Users\\User\\.gradle\\wrapper\\dists\\gradle-8.12-all\\ejduaidbjup3bmmkhw3rie4zb\\gradle-8.12\\lib\\groovy-ant-3.0.22.jar",
+        "C:\\Users\\User\\.gradle\\wrapper\\dists\\gradle-8.12-all\\ejduaidbjup3bmmkhw3rie4zb\\gradle-8.12\\lib\\groovy-astbuilder-3.0.22.jar",
+        "C:\\Users\\User\\.gradle\\wrapper\\dists\\gradle-8.12-all\\ejduaidbjup3bmmkhw3rie4zb\\gradle-8.12\\lib\\groovy-console-3.0.22.jar",
+        "C:\\Users\\User\\.gradle\\wrapper\\dists\\gradle-8.12-all\\ejduaidbjup3bmmkhw3rie4zb\\gradle-8.12\\lib\\groovy-datetime-3.0.22.jar",
+        "C:\\Users\\User\\.gradle\\wrapper\\dists\\gradle-8.12-all\\ejduaidbjup3bmmkhw3rie4zb\\gradle-8.12\\lib\\groovy-dateutil-3.0.22.jar",
+        "C:\\Users\\User\\.gradle\\wrapper\\dists\\gradle-8.12-all\\ejduaidbjup3bmmkhw3rie4zb\\gradle-8.12\\lib\\groovy-groovydoc-3.0.22.jar",
+        "C:\\Users\\User\\.gradle\\wrapper\\dists\\gradle-8.12-all\\ejduaidbjup3bmmkhw3rie4zb\\gradle-8.12\\lib\\groovy-json-3.0.22.jar",
+        "C:\\Users\\User\\.gradle\\wrapper\\dists\\gradle-8.12-all\\ejduaidbjup3bmmkhw3rie4zb\\gradle-8.12\\lib\\groovy-nio-3.0.22.jar",
+        "C:\\Users\\User\\.gradle\\wrapper\\dists\\gradle-8.12-all\\ejduaidbjup3bmmkhw3rie4zb\\gradle-8.12\\lib\\groovy-sql-3.0.22.jar",
+        "C:\\Users\\User\\.gradle\\wrapper\\dists\\gradle-8.12-all\\ejduaidbjup3bmmkhw3rie4zb\\gradle-8.12\\lib\\groovy-templates-3.0.22.jar",
+        "C:\\Users\\User\\.gradle\\wrapper\\dists\\gradle-8.12-all\\ejduaidbjup3bmmkhw3rie4zb\\gradle-8.12\\lib\\groovy-test-3.0.22.jar",
+        "C:\\Users\\User\\.gradle\\wrapper\\dists\\gradle-8.12-all\\ejduaidbjup3bmmkhw3rie4zb\\gradle-8.12\\lib\\groovy-xml-3.0.22.jar",
+        "C:\\Users\\User\\.gradle\\wrapper\\dists\\gradle-8.12-all\\ejduaidbjup3bmmkhw3rie4zb\\gradle-8.12\\lib\\javaparser-core-3.17.0.jar",
+        "C:\\Users\\User\\.gradle\\wrapper\\dists\\gradle-8.12-all\\ejduaidbjup3bmmkhw3rie4zb\\gradle-8.12\\lib\\kotlin-stdlib-2.0.21.jar",
+        "C:\\Users\\User\\.gradle\\wrapper\\dists\\gradle-8.12-all\\ejduaidbjup3bmmkhw3rie4zb\\gradle-8.12\\lib\\kotlin-reflect-2.0.21.jar",
+        "C:\\Users\\User\\.gradle\\wrapper\\dists\\gradle-8.12-all\\ejduaidbjup3bmmkhw3rie4zb\\gradle-8.12\\lib\\gradle-installation-beacon-8.12.jar",
+        "C:\\Users\\User\\.gradle\\wrapper\\dists\\gradle-8.12-all\\ejduaidbjup3bmmkhw3rie4zb\\gradle-8.12\\lib\\gradle-kotlin-dsl-extensions-8.12.jar",
+        "C:\\Users\\User\\.gradle\\wrapper\\dists\\gradle-8.12-all\\ejduaidbjup3bmmkhw3rie4zb\\gradle-8.12\\lib\\gradle-kotlin-dsl-8.12.jar",
+        "C:\\Users\\User\\.gradle\\wrapper\\dists\\gradle-8.12-all\\ejduaidbjup3bmmkhw3rie4zb\\gradle-8.12\\lib\\gradle-kotlin-dsl-shared-runtime-8.12.jar",
+        "C:\\Users\\User\\.gradle\\wrapper\\dists\\gradle-8.12-all\\ejduaidbjup3bmmkhw3rie4zb\\gradle-8.12\\lib\\gradle-kotlin-dsl-tooling-models-8.12.jar"
+      ]
+    },
+    {
+      "name": "android",
+      "path": "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\image_picker_android-0.8.13+7\\android\\",
+      "sources": [
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\image_picker_android-0.8.13+7\\android\\src\\main\\java\\io\\flutter\\plugins\\imagepicker\\ExifDataCopier.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\image_picker_android-0.8.13+7\\android\\src\\main\\java\\io\\flutter\\plugins\\imagepicker\\FileUtils.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\image_picker_android-0.8.13+7\\android\\src\\main\\java\\io\\flutter\\plugins\\imagepicker\\ImagePickerCache.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\image_picker_android-0.8.13+7\\android\\src\\main\\java\\io\\flutter\\plugins\\imagepicker\\ImagePickerDelegate.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\image_picker_android-0.8.13+7\\android\\src\\main\\java\\io\\flutter\\plugins\\imagepicker\\ImagePickerFileProvider.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\image_picker_android-0.8.13+7\\android\\src\\main\\java\\io\\flutter\\plugins\\imagepicker\\ImagePickerPlugin.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\image_picker_android-0.8.13+7\\android\\src\\main\\java\\io\\flutter\\plugins\\imagepicker\\ImagePickerUtils.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\image_picker_android-0.8.13+7\\android\\src\\main\\java\\io\\flutter\\plugins\\imagepicker\\ImageResizer.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\image_picker_android-0.8.13+7\\android\\src\\main\\java\\io\\flutter\\plugins\\imagepicker\\Messages.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\image_picker_android-0.8.13+7\\android\\src\\test\\java\\io\\flutter\\plugins\\imagepicker\\ExifDataCopierTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\image_picker_android-0.8.13+7\\android\\src\\test\\java\\io\\flutter\\plugins\\imagepicker\\FileUtilTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\image_picker_android-0.8.13+7\\android\\src\\test\\java\\io\\flutter\\plugins\\imagepicker\\ImagePickerCacheTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\image_picker_android-0.8.13+7\\android\\src\\test\\java\\io\\flutter\\plugins\\imagepicker\\ImagePickerDelegateTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\image_picker_android-0.8.13+7\\android\\src\\test\\java\\io\\flutter\\plugins\\imagepicker\\ImagePickerPluginTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\image_picker_android-0.8.13+7\\android\\src\\test\\java\\io\\flutter\\plugins\\imagepicker\\ImageResizerTest.java"
+      ],
+      "testSources": [],
+      "generatedSources": [],
+      "classpath": []
+    },
+    {
+      "name": "android",
+      "path": "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\just_audio-0.9.46\\android\\",
+      "sources": [
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\just_audio-0.9.46\\android\\build\\",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\just_audio-0.9.46\\android\\src\\main\\java\\com\\ryanheise\\just_audio\\AudioPlayer.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\just_audio-0.9.46\\android\\src\\main\\java\\com\\ryanheise\\just_audio\\BetterEventChannel.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\just_audio-0.9.46\\android\\src\\main\\java\\com\\ryanheise\\just_audio\\JustAudioPlugin.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\just_audio-0.9.46\\android\\src\\main\\java\\com\\ryanheise\\just_audio\\MainMethodCallHandler.java"
+      ],
+      "testSources": [],
+      "generatedSources": [
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\just_audio-0.9.46\\android\\build\\"
+      ],
+      "classpath": []
+    },
+    {
+      "name": "android",
+      "path": "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\open_file_android-1.0.6\\android\\",
+      "sources": [
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\open_file_android-1.0.6\\android\\build\\",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\open_file_android-1.0.6\\android\\src\\main\\java\\com\\crazecoder\\openfile\\FileProvider.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\open_file_android-1.0.6\\android\\src\\main\\java\\com\\crazecoder\\openfile\\OpenFilePlugin.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\open_file_android-1.0.6\\android\\src\\main\\java\\com\\crazecoder\\openfile\\utils\\FileUtil.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\open_file_android-1.0.6\\android\\src\\main\\java\\com\\crazecoder\\openfile\\utils\\JsonUtil.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\open_file_android-1.0.6\\android\\src\\main\\java\\com\\crazecoder\\openfile\\utils\\MapUtil.java"
+      ],
+      "testSources": [],
+      "generatedSources": [
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\open_file_android-1.0.6\\android\\build\\"
+      ],
+      "classpath": []
+    },
+    {
+      "name": "android",
+      "path": "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\path_provider_android-2.2.20\\android\\",
+      "sources": [
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\path_provider_android-2.2.20\\android\\src\\main\\java\\io\\flutter\\plugins\\pathprovider\\Messages.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\path_provider_android-2.2.20\\android\\src\\main\\java\\io\\flutter\\plugins\\pathprovider\\PathProviderPlugin.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\path_provider_android-2.2.20\\android\\src\\test\\java\\io\\flutter\\plugins\\pathprovider\\PathProviderPluginTest.java"
+      ],
+      "testSources": [],
+      "generatedSources": [],
+      "classpath": []
+    },
+    {
+      "name": "android",
+      "path": "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\permission_handler_android-12.1.0\\android\\",
+      "sources": [
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\permission_handler_android-12.1.0\\android\\src\\main\\java\\com\\baseflow\\permissionhandler\\AppSettingsManager.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\permission_handler_android-12.1.0\\android\\src\\main\\java\\com\\baseflow\\permissionhandler\\ErrorCallback.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\permission_handler_android-12.1.0\\android\\src\\main\\java\\com\\baseflow\\permissionhandler\\MethodCallHandlerImpl.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\permission_handler_android-12.1.0\\android\\src\\main\\java\\com\\baseflow\\permissionhandler\\PermissionConstants.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\permission_handler_android-12.1.0\\android\\src\\main\\java\\com\\baseflow\\permissionhandler\\PermissionHandlerPlugin.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\permission_handler_android-12.1.0\\android\\src\\main\\java\\com\\baseflow\\permissionhandler\\PermissionManager.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\permission_handler_android-12.1.0\\android\\src\\main\\java\\com\\baseflow\\permissionhandler\\PermissionUtils.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\permission_handler_android-12.1.0\\android\\src\\main\\java\\com\\baseflow\\permissionhandler\\ServiceManager.java"
+      ],
+      "testSources": [],
+      "generatedSources": [],
+      "classpath": []
+    },
+    {
+      "name": "android",
+      "path": "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\record_android-1.4.4\\android\\",
+      "sources": [
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\record_android-1.4.4\\android\\build\\",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\record_android-1.4.4\\android\\src\\main\\kotlin\\com\\llfbandit\\record\\Utils.java"
+      ],
+      "testSources": [],
+      "generatedSources": [
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\record_android-1.4.4\\android\\build\\"
+      ],
+      "classpath": []
+    },
+    {
+      "name": "android",
+      "path": "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\share_plus-10.1.4\\android\\",
+      "sources": [
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\share_plus-10.1.4\\android\\build\\"
+      ],
+      "testSources": [],
+      "generatedSources": [
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\share_plus-10.1.4\\android\\build\\"
+      ],
+      "classpath": []
+    },
+    {
+      "name": "android",
+      "path": "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\shared_preferences_android-2.4.15\\android\\",
+      "sources": [
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\shared_preferences_android-2.4.15\\android\\src\\main\\java\\io\\flutter\\plugins\\sharedpreferences\\LegacySharedPreferencesPlugin.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\shared_preferences_android-2.4.15\\android\\src\\main\\java\\io\\flutter\\plugins\\sharedpreferences\\Messages.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\shared_preferences_android-2.4.15\\android\\src\\main\\java\\io\\flutter\\plugins\\sharedpreferences\\SharedPreferencesListEncoder.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\shared_preferences_android-2.4.15\\android\\src\\test\\java\\io\\flutter\\plugins\\sharedpreferences\\LegacySharedPreferencesTest.java"
+      ],
+      "testSources": [],
+      "generatedSources": [],
+      "classpath": []
+    },
+    {
+      "name": "android",
+      "path": "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\sqflite_android-2.4.2+2\\android\\",
+      "sources": [
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\sqflite_android-2.4.2+2\\android\\src\\main\\java\\com\\tekartik\\sqflite\\Constant.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\sqflite_android-2.4.2+2\\android\\src\\main\\java\\com\\tekartik\\sqflite\\Database.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\sqflite_android-2.4.2+2\\android\\src\\main\\java\\com\\tekartik\\sqflite\\DatabaseTask.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\sqflite_android-2.4.2+2\\android\\src\\main\\java\\com\\tekartik\\sqflite\\DatabaseWorker.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\sqflite_android-2.4.2+2\\android\\src\\main\\java\\com\\tekartik\\sqflite\\DatabaseWorkerPool.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\sqflite_android-2.4.2+2\\android\\src\\main\\java\\com\\tekartik\\sqflite\\LogLevel.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\sqflite_android-2.4.2+2\\android\\src\\main\\java\\com\\tekartik\\sqflite\\SqfliteCursor.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\sqflite_android-2.4.2+2\\android\\src\\main\\java\\com\\tekartik\\sqflite\\SqflitePlugin.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\sqflite_android-2.4.2+2\\android\\src\\main\\java\\com\\tekartik\\sqflite\\SqlCommand.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\sqflite_android-2.4.2+2\\android\\src\\main\\java\\com\\tekartik\\sqflite\\Utils.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\sqflite_android-2.4.2+2\\android\\src\\main\\java\\com\\tekartik\\sqflite\\dev\\Debug.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\sqflite_android-2.4.2+2\\android\\src\\main\\java\\com\\tekartik\\sqflite\\operation\\BaseOperation.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\sqflite_android-2.4.2+2\\android\\src\\main\\java\\com\\tekartik\\sqflite\\operation\\BaseReadOperation.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\sqflite_android-2.4.2+2\\android\\src\\main\\java\\com\\tekartik\\sqflite\\operation\\BatchOperation.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\sqflite_android-2.4.2+2\\android\\src\\main\\java\\com\\tekartik\\sqflite\\operation\\MethodCallOperation.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\sqflite_android-2.4.2+2\\android\\src\\main\\java\\com\\tekartik\\sqflite\\operation\\Operation.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\sqflite_android-2.4.2+2\\android\\src\\main\\java\\com\\tekartik\\sqflite\\operation\\OperationResult.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\sqflite_android-2.4.2+2\\android\\src\\main\\java\\com\\tekartik\\sqflite\\operation\\OperationRunnable.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\sqflite_android-2.4.2+2\\android\\src\\main\\java\\com\\tekartik\\sqflite\\operation\\QueuedOperation.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\sqflite_android-2.4.2+2\\android\\src\\main\\java\\com\\tekartik\\sqflite\\operation\\SqlErrorInfo.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\sqflite_android-2.4.2+2\\android\\src\\test\\java\\com\\tekartik\\sqflite\\ConstantTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\sqflite_android-2.4.2+2\\android\\src\\test\\java\\com\\tekartik\\sqflite\\DatabaseWorkerPoolTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\sqflite_android-2.4.2+2\\android\\src\\test\\java\\com\\tekartik\\sqflite\\LogLevelTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\sqflite_android-2.4.2+2\\android\\src\\test\\java\\com\\tekartik\\sqflite\\SqlCommandTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\sqflite_android-2.4.2+2\\android\\src\\test\\java\\com\\tekartik\\sqflite\\UtilsTest.java"
+      ],
+      "testSources": [],
+      "generatedSources": [],
+      "classpath": []
+    },
+    {
+      "name": "android",
+      "path": "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\url_launcher_android-6.3.28\\android\\",
+      "sources": [
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\url_launcher_android-6.3.28\\android\\src\\main\\java\\io\\flutter\\plugins\\urllauncher\\Messages.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\url_launcher_android-6.3.28\\android\\src\\main\\java\\io\\flutter\\plugins\\urllauncher\\UrlLauncher.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\url_launcher_android-6.3.28\\android\\src\\main\\java\\io\\flutter\\plugins\\urllauncher\\UrlLauncherPlugin.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\url_launcher_android-6.3.28\\android\\src\\main\\java\\io\\flutter\\plugins\\urllauncher\\WebViewActivity.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\url_launcher_android-6.3.28\\android\\src\\test\\java\\io\\flutter\\plugins\\urllauncher\\UrlLauncherTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\url_launcher_android-6.3.28\\android\\src\\test\\java\\io\\flutter\\plugins\\urllauncher\\WebViewActivityTest.java"
+      ],
+      "testSources": [],
+      "generatedSources": [],
+      "classpath": []
+    },
+    {
+      "name": "android",
+      "path": "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\video_player_android-2.8.17\\android\\",
+      "sources": [
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\video_player_android-2.8.17\\android\\src\\main\\java\\io\\flutter\\plugins\\videoplayer\\ExoPlayerEventListener.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\video_player_android-2.8.17\\android\\src\\main\\java\\io\\flutter\\plugins\\videoplayer\\HttpVideoAsset.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\video_player_android-2.8.17\\android\\src\\main\\java\\io\\flutter\\plugins\\videoplayer\\LocalVideoAsset.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\video_player_android-2.8.17\\android\\src\\main\\java\\io\\flutter\\plugins\\videoplayer\\QueuingEventSink.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\video_player_android-2.8.17\\android\\src\\main\\java\\io\\flutter\\plugins\\videoplayer\\RtspVideoAsset.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\video_player_android-2.8.17\\android\\src\\main\\java\\io\\flutter\\plugins\\videoplayer\\VideoAsset.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\video_player_android-2.8.17\\android\\src\\main\\java\\io\\flutter\\plugins\\videoplayer\\VideoPlayer.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\video_player_android-2.8.17\\android\\src\\main\\java\\io\\flutter\\plugins\\videoplayer\\VideoPlayerCallbacks.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\video_player_android-2.8.17\\android\\src\\main\\java\\io\\flutter\\plugins\\videoplayer\\VideoPlayerEventCallbacks.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\video_player_android-2.8.17\\android\\src\\main\\java\\io\\flutter\\plugins\\videoplayer\\VideoPlayerOptions.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\video_player_android-2.8.17\\android\\src\\main\\java\\io\\flutter\\plugins\\videoplayer\\VideoPlayerPlugin.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\video_player_android-2.8.17\\android\\src\\main\\java\\io\\flutter\\plugins\\videoplayer\\platformview\\PlatformVideoView.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\video_player_android-2.8.17\\android\\src\\main\\java\\io\\flutter\\plugins\\videoplayer\\platformview\\PlatformVideoViewFactory.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\video_player_android-2.8.17\\android\\src\\main\\java\\io\\flutter\\plugins\\videoplayer\\platformview\\PlatformViewExoPlayerEventListener.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\video_player_android-2.8.17\\android\\src\\main\\java\\io\\flutter\\plugins\\videoplayer\\platformview\\PlatformViewVideoPlayer.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\video_player_android-2.8.17\\android\\src\\main\\java\\io\\flutter\\plugins\\videoplayer\\texture\\TextureExoPlayerEventListener.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\video_player_android-2.8.17\\android\\src\\main\\java\\io\\flutter\\plugins\\videoplayer\\texture\\TextureVideoPlayer.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\video_player_android-2.8.17\\android\\src\\test\\java\\io\\flutter\\plugins\\videoplayer\\ExoPlayerEventListenerTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\video_player_android-2.8.17\\android\\src\\test\\java\\io\\flutter\\plugins\\videoplayer\\FakeVideoAsset.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\video_player_android-2.8.17\\android\\src\\test\\java\\io\\flutter\\plugins\\videoplayer\\PlatformVideoViewFactoryTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\video_player_android-2.8.17\\android\\src\\test\\java\\io\\flutter\\plugins\\videoplayer\\PlatformVideoViewTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\video_player_android-2.8.17\\android\\src\\test\\java\\io\\flutter\\plugins\\videoplayer\\PlatformViewExoPlayerEventListenerTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\video_player_android-2.8.17\\android\\src\\test\\java\\io\\flutter\\plugins\\videoplayer\\TextureExoPlayerEventListenerTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\video_player_android-2.8.17\\android\\src\\test\\java\\io\\flutter\\plugins\\videoplayer\\TextureVideoPlayerTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\video_player_android-2.8.17\\android\\src\\test\\java\\io\\flutter\\plugins\\videoplayer\\VideoAssetTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\video_player_android-2.8.17\\android\\src\\test\\java\\io\\flutter\\plugins\\videoplayer\\VideoPlayerEventCallbacksTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\video_player_android-2.8.17\\android\\src\\test\\java\\io\\flutter\\plugins\\videoplayer\\VideoPlayerPluginTest.java",
+        "c:\\Users\\User\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\video_player_android-2.8.17\\android\\src\\test\\java\\io\\flutter\\plugins\\videoplayer\\VideoPlayerTest.java"
+      ],
+      "testSources": [],
+      "generatedSources": [],
+      "classpath": []
+    }
+  ]
+}
