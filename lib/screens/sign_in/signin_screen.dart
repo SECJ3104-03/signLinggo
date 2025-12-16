@@ -25,12 +25,110 @@ class _SignInScreenState extends State<SignInScreen> {
 
   bool _loading = false;
   bool _obscurePassword = true; // Track password visibility
+  bool _isSendingResetEmail = false; // Track password reset state
 
   @override
   void dispose() {
     emailController.dispose();
     passwordController.dispose();
     super.dispose();
+  }
+
+  // --- HELPER: Password Validation Logic ---
+  String? _validatePassword(String password) {
+    if (password.length < 8) {
+      return 'Password must be at least 8 characters long';
+    }
+    if (!password.contains(RegExp(r'[A-Z]'))) {
+      return 'Password must contain at least one uppercase letter';
+    }
+    // Checks for special characters like ! @ # $ % ^ & * ( ) , . ? " : { } | < >
+    if (!password.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>]'))) {
+      return 'Password must contain at least one special character';
+    }
+    return null; // Return null if valid
+  }
+
+  // --- FORGOT PASSWORD FUNCTION ---
+  Future<void> _resetPassword() async {
+    final email = emailController.text.trim();
+
+    // Validate email
+    if (email.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please enter your email address")),
+      );
+      return;
+    }
+
+    // Email format validation
+    if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(email)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please enter a valid email address")),
+      );
+      return;
+    }
+
+    setState(() => _isSendingResetEmail = true);
+
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+      
+      // Show success dialog
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text("Password Reset Email Sent"),
+          content: Text(
+            "We've sent a password reset link to:\n\n$email\n\n"
+            "Please check your inbox (and spam folder) and follow the instructions to reset your password.",
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("OK"),
+            ),
+          ],
+        ),
+      );
+    } on FirebaseAuthException catch (e) {
+      String errorMessage = "Failed to send reset email";
+      
+      switch (e.code) {
+        case 'user-not-found':
+          errorMessage = "No account found with this email address";
+          break;
+        case 'invalid-email':
+          errorMessage = "Invalid email address format";
+          break;
+        case 'user-disabled':
+          errorMessage = "This account has been disabled";
+          break;
+        case 'too-many-requests':
+          errorMessage = "Too many requests. Please try again later";
+          break;
+        default:
+          errorMessage = "Error: ${e.message}";
+      }
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(errorMessage),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("An error occurred: ${e.toString()}"),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSendingResetEmail = false);
+      }
+    }
   }
 
   @override
@@ -139,7 +237,32 @@ class _SignInScreenState extends State<SignInScreen> {
                   icon: Icons.lock,
                 ),
 
-                const SizedBox(height: 40),
+                // Forgot Password Button
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: _isSendingResetEmail ? null : _resetPassword,
+                    child: _isSendingResetEmail
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          )
+                        : const Text(
+                            "Forgot Password?",
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              decoration: TextDecoration.underline,
+                            ),
+                          ),
+                  ),
+                ),
+
+                const SizedBox(height: 30),
 
                 // Email/Password Login Button
                 GestureDetector(
@@ -231,40 +354,64 @@ class _SignInScreenState extends State<SignInScreen> {
     );
   }
 
-  // EMAIL/PASSWORD LOGIN (UPDATED with Self-Healing Logic)
+  // EMAIL/PASSWORD LOGIN (UPDATED with Validation & Verification)
   Future<void> _emailPasswordLogin() async {
-    if (emailController.text.isEmpty || passwordController.text.isEmpty) {
+    final email = emailController.text.trim();
+    final password = passwordController.text.trim();
+
+    // 1. Basic Empty Check
+    if (email.isEmpty || password.isEmpty) {
       ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text("Fill all fields")));
+          .showSnackBar(const SnackBar(content: Text("Please fill all fields")));
       return;
+    }
+
+    // 2. Validate Password Strength
+    String? passwordError = _validatePassword(password);
+    if (passwordError != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Weak Password: $passwordError"),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+      return; // Stop here if password is weak
     }
 
     setState(() => _loading = true);
 
     try {
-      // Sign out any previous session
+      // Sign out any previous session to ensure clean login
       await _authService.signOut();
 
       // Attempt login
       final user = await _authService.login(
-        email: emailController.text.trim(),
-        password: passwordController.text.trim(),
+        email: email,
+        password: password,
       );
 
       if (user != null) {
         
-        // --- FAIL-SAFE FIX FOR CURRENT USERS ---
-        // We check if this user has a profile in the database.
-        // If they are an "Old User" and don't have one, we create it now.
+        // 3. CHECK EMAIL VERIFICATION
+        if (!user.emailVerified) {
+          // If not verified, sign them out immediately to prevent access
+          await _authService.signOut();
+          
+          setState(() => _loading = false);
+          _showVerificationDialog(user);
+          return; // Stop login process
+        }
+
+        // --- FAIL-SAFE FIX FOR DATABASE PROFILE ---
         try {
           final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
           if (!userDoc.exists) {
             // Auto-create the missing profile
             await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
               'uid': user.uid,
-              // We use the email prefix as a temporary name if they don't have one
-              'name': user.displayName ?? emailController.text.split('@')[0], 
-              'email': user.email ?? emailController.text,
+              'name': user.displayName ?? email.split('@')[0], 
+              'email': user.email ?? email,
               'createdAt': FieldValue.serverTimestamp(),
             });
             print("Auto-fixed missing profile for user: ${user.uid}");
@@ -285,14 +432,47 @@ class _SignInScreenState extends State<SignInScreen> {
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Login error: $e")),
+        SnackBar(content: Text("Login error: ${e.toString()}")),
       );
     } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
 
-  // GOOGLE LOGIN (UPDATED with Self-Healing Logic)
+  // --- Verification Dialog ---
+  void _showVerificationDialog(User user) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Email Not Verified"),
+        content: const Text(
+          "You must verify your email address before logging in.\n\nCheck your inbox (and spam folder) for the verification link.",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              try {
+                // Note: user object might be detached after signOut, so we might need to rely on 
+                // the auth service sending it, or re-signin briefly. 
+                // Ideally, verify logic happens before signOut, but for security we signed out.
+                // Re-sending usually requires an active user instance.
+                // Simple fix: Show a message telling them to use the previous email.
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                   const SnackBar(content: Text("Please check your email for the verification link sent previously.")),
+                );
+              } catch (e) {
+                 Navigator.pop(context);
+              }
+            },
+            child: const Text("OK"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // GOOGLE LOGIN
   Future<void> _googleLogin() async {
     setState(() => _loading = true);
 
@@ -317,7 +497,7 @@ class _SignInScreenState extends State<SignInScreen> {
             }
           }
         } catch (dbError) {
-           print("Safe-fail: Could not check/fix Google user profile: $dbError");
+            print("Safe-fail: Could not check/fix Google user profile: $dbError");
         }
         // --------------------------------------
 
