@@ -477,22 +477,42 @@ class _ConversationScreenState extends State<ConversationScreen> {
           
   Widget _buildUserMessage(Map<String, dynamic> msg) {
     final bool isUser = msg['isUser'];
+    final String messageId = msg['messageId'];
+    final String senderId = msg['senderId'];
+    final String type = msg['type'];
+    final String content = msg['content'];
 
-    // Clean up player if message is not voice but has one associated
+    Widget messageBubble;
+
     if (msg['type'] != 'voice' && _audioPlayers.containsKey(msg['content'])) {
       _audioPlayers.remove(msg['content'])?.dispose();
     }
     
-    switch (msg['type']) {
+    switch (type) {
       case 'text':
-        return _buildTextBubble(msg['content'] ?? '', isUser);
+        messageBubble = _buildTextBubble(content, isUser);
+        break;
       case 'video':
-        return _buildVideoBubble(msg['content'] as String, isUser);
+        messageBubble = _buildVideoBubble(content, isUser);
+        break;
       case 'voice':
-        return _buildVoiceBubble(msg['content'] ?? '', isUser);
+        messageBubble = _buildVoiceBubble(content, isUser);
+        break;
       default:
-        return const SizedBox.shrink();
+        messageBubble = const SizedBox.shrink();
     }
+
+    return GestureDetector(
+      onLongPress: () {
+        _showDeleteDialog(
+          messageId,
+          senderId,
+          type,
+          content,
+        );
+      },
+      child: messageBubble,
+    );
   }
 
   Widget _buildModeSelector() {
