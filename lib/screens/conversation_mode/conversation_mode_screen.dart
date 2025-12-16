@@ -57,7 +57,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
     }
     _audioPlayers.clear();
     super.dispose();
-  } */
+  }
 
   Future<void> _sendMessage(
       String content, String type, String previewText) async {
