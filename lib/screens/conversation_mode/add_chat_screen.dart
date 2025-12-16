@@ -44,7 +44,7 @@ class _AddChatScreenState extends State<AddChatScreen> {
     BuildContext context,
     String otherUserID,
     String chatName,
-    String avatar,
+    String? avatar,
   ) async {
     final conversationId = getConversationId(widget.currentUserID, otherUserID);
 
@@ -53,8 +53,8 @@ class _AddChatScreenState extends State<AddChatScreen> {
         context,
         MaterialPageRoute(
           builder: (context) => ConversationScreen(
-            chatName: chatName,
-            avatar: avatar,
+            chatName: chatName, 
+            avatar: avatar ?? (chatName.isNotEmpty ? chatName[0].toUpperCase() : '?'),
             conversationId: conversationId,
             currentUserID: widget.currentUserID,
           ),
@@ -105,7 +105,7 @@ class _AddChatScreenState extends State<AddChatScreen> {
             child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
-                hintText: 'Search by name or id',
+                hintText: 'Search',
                 hintStyle: TextStyle(color: Colors.grey[600]),
                 prefixIcon: Icon(Icons.search, color: Colors.grey[600]),
                 suffixIcon: _searchQuery.isNotEmpty
@@ -169,22 +169,25 @@ class _AddChatScreenState extends State<AddChatScreen> {
                     final otherUserID = userDoc.id;
 
                     final chatName =
-                        userData['name'] ?? userData['email'] ?? "Unknown User";
-                    final avatar =
+                        userData['username'] ?? userData['fullName'] ?? "Unknown User";
+                    final String? profileUrl = userData['profileUrl'];
+                    final String avatarInitial =
                         chatName.isNotEmpty ? chatName[0].toUpperCase() : '?';
 
                     return ListTile(
                       leading: CircleAvatar(
-                        backgroundColor: Colors.grey.shade200,
-                        child: Text(
-                          avatar,
-                          style: const TextStyle(color: Colors.black87),
-                        ),
+                        backgroundColor: Colors.grey.shade300,
+                        backgroundImage: profileUrl != null
+                            ? NetworkImage(profileUrl)
+                            : null,
+                        child: (profileUrl == null)
+                            ? Text(avatarInitial, style: const TextStyle(color: Colors.white))
+                            : null,
                       ),
                       title: Text(chatName),
-                      subtitle: Text(userData['email'] ?? ''),
-                      onTap: () =>
-                          _startChat(context, otherUserID, chatName, avatar),
+                      subtitle: Text(userData['fullName'] ?? ''),
+                      onTap: () => _startChat(
+                          context, otherUserID, chatName, profileUrl ?? avatarInitial),
                     );
                   },
                 );

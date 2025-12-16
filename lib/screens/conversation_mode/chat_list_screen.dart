@@ -27,59 +27,37 @@ class _ChatListScreenState extends State<ChatListScreen> {
     }
   }
 
-  Future<void> _deleteConversation(String conversationId) async {
-    final bool confirm = await showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Delete Chat'),
-            content: const Text(
-              'Are you sure you want to permanently delete this conversation? This cannot be undone.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Cancel'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                child: const Text('Delete', style: TextStyle(color: Colors.red)),
-              ),
-            ],
-          ),
-        ) ??
-        false;
+  Future<void> _deleteConversationForMe(String conversationId, String currentUserID) async {
+    final docRef = FirebaseFirestore.instance.collection('conversation').doc(conversationId);
 
-    if (!confirm) return;
+    await docRef.update({
+      'userIDs': FieldValue.arrayRemove([currentUserID]),
+      'lastMessageFor.$currentUserID': FieldValue.delete(),
+      'lastMessageAtFor.$currentUserID': FieldValue.delete(),
+    });
 
-    try {
-      final messagesSnapshot = await _firestore
-          .collection('conversation')
-          .doc(conversationId)
-          .collection('messages')
-          .get();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Conversation deleted for you.')),
+    );
+  }
 
-      final batch = _firestore.batch();
+  Future<void> _deleteConversationForEveryone(String conversationId) async {
+    final docRef = FirebaseFirestore.instance.collection('conversation').doc(conversationId);
 
-      for (final doc in messagesSnapshot.docs) {
-        batch.delete(doc.reference);
-      }
-
-      batch.delete(_firestore.collection('conversation').doc(conversationId));
-      await batch.commit();
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Conversation deleted successfully.')),
-        );
-      }
-    } catch (e) {
-      debugPrint('Error deleting conversation: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to delete conversation.')),
-        );
-      }
+    // Delete all messages subcollection
+    final messagesSnapshot = await docRef.collection('messages').get();
+    final batch = FirebaseFirestore.instance.batch();
+    for (var doc in messagesSnapshot.docs) {
+      batch.delete(doc.reference);
     }
+
+    // Delete the conversation document
+    batch.delete(docRef);
+    await batch.commit();
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Conversation deleted for everyone.')),
+    );
   }
 
   @override
@@ -153,12 +131,18 @@ class _ChatListScreenState extends State<ChatListScreen> {
               }
 
               conversations.sort((a, b) {
-                final aTime = (a['lastMessageAt'] as Timestamp?)?.toDate() ??
-                    DateTime.fromMicrosecondsSinceEpoch(0);
-                final bTime = (b['lastMessageAt'] as Timestamp?)?.toDate() ??
-                    DateTime.fromMicrosecondsSinceEpoch(0);
-                return bTime.compareTo(aTime);
-              });
+              final aData = a.data() as Map<String, dynamic>? ?? {};
+              final bData = b.data() as Map<String, dynamic>? ?? {};
+
+              final aLastAt = Map<String, dynamic>.from(aData['lastMessageAtFor'] ?? {})[currentUserID];
+              final bLastAt = Map<String, dynamic>.from(bData['lastMessageAtFor'] ?? {})[currentUserID];
+
+              final aTime = aLastAt != null ? (aLastAt as Timestamp).toDate() : DateTime.fromMicrosecondsSinceEpoch(0);
+              final bTime = bLastAt != null ? (bLastAt as Timestamp).toDate() : DateTime.fromMicrosecondsSinceEpoch(0);
+
+              return bTime.compareTo(aTime);
+            });
+
 
               return ListView.builder(
                 itemCount: conversations.length,
@@ -198,6 +182,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
 
                       String chatName = "Unknown User";
                       String avatar = '?';
+                      String? profileUrl;
 
                       if (userSnapshot.hasData &&
                           userSnapshot.data!.exists) {
@@ -205,25 +190,30 @@ class _ChatListScreenState extends State<ChatListScreen> {
                             userSnapshot.data!.data() as Map<String, dynamic>? ??
                                 {};
                         chatName =
-                            userData['name'] ?? userData['email'] ?? "Unknown";
+                            userData['username'] ?? userData['fullName'] ?? "Unknown";
                         avatar = chatName.isNotEmpty
                             ? chatName[0].toUpperCase()
                             : '?';
+                        profileUrl = userData['profileUrl'];
                       }
 
-                      final lastMessage = data['lastMessage'] ?? '';
-                      final lastMessageAt = data['lastMessageAt'] != null
-                          ? (data['lastMessageAt'] as Timestamp).toDate()
-                          : DateTime.fromMicrosecondsSinceEpoch(0);
+                      final lastMessageFor = Map<String, dynamic>.from(data['lastMessageFor'] ?? {});
+                      final lastMessageAtFor = Map<String, dynamic>.from(data['lastMessageAtFor'] ?? {});
+
+                      final lastMessage = (data['lastMessageFor'] as Map?)?[currentUserID] ?? '';
+                      final lastMessageAt = (data['lastMessageAtFor'] as Map?)?[currentUserID] != null
+                          ? (data['lastMessageAtFor'][currentUserID] as Timestamp).toDate()
+                          : DateTime.fromMillisecondsSinceEpoch(0);
+
                       final timeString = _formatLastMessageTime(lastMessageAt);
 
                       return ListTile(
                         leading: CircleAvatar(
-                          backgroundColor: Colors.grey,
-                          child: Text(
-                            avatar,
-                            style: const TextStyle(color: Colors.white),
-                          ),
+                          backgroundColor: Colors.grey.shade300,
+                          backgroundImage: profileUrl != null
+                              ? NetworkImage(profileUrl)
+                              : null,
+                          child: (profileUrl == null) ? Text(avatar, style: const TextStyle(color: Colors.white)) : null,
                         ),
                         title: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -253,17 +243,20 @@ class _ChatListScreenState extends State<ChatListScreen> {
                         trailing: PopupMenuButton<String>(
                           icon: const Icon(Icons.more_vert, color: Colors.grey),
                           onSelected: (String result) {
-                            if (result == 'delete') {
-                              _deleteConversation(conversationId);
+                            if (result == 'delete_for_me') {
+                              _deleteConversationForMe(conversationId, currentUserID);
+                            } else if (result == 'delete_for_everyone') {
+                              _deleteConversationForEveryone(conversationId);
                             }
                           },
-                          itemBuilder: (context) => const [
-                            PopupMenuItem<String>(
-                              value: 'delete',
-                              child: Text(
-                                'Delete chat for everyone',
-                                style: TextStyle(color: Colors.red),
-                              ),
+                          itemBuilder: (context) => [
+                            const PopupMenuItem<String>(
+                              value: 'delete_for_me',
+                              child: Text('Delete for me'),
+                            ),
+                            const PopupMenuItem<String>(
+                              value: 'delete_for_everyone',
+                              child: Text('Delete for everyone', style: TextStyle(color: Colors.red)),
                             ),
                           ],
                         ),
@@ -273,7 +266,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                             MaterialPageRoute(
                               builder: (context) => ConversationScreen(
                                 chatName: chatName,
-                                avatar: avatar,
+                                avatar: profileUrl ?? avatar,
                                 conversationId: conversationId,
                                 currentUserID: currentUserID,
                               ),
