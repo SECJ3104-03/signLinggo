@@ -22,11 +22,35 @@
           }
         },
         {
+          "client_id": "724828186533-6cri5334gq59h6gruq6kv32od1vv895q.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.signlinggo",
+            "certificate_hash": "f18d19c7f3e98415eee624656f78580132ce6686"
+          }
+        },
+        {
+          "client_id": "724828186533-cluql5mfacm4ppla86kouoj023bqu8hc.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.signlinggo",
+            "certificate_hash": "52504df5d3cadcf9ab05590d3cc2bcf5e65f0a85"
+          }
+        },
+        {
           "client_id": "724828186533-jmt6iucm4np1qt8hi27s6ttajbf8o1ti.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.example.signlinggo",
             "certificate_hash": "e44d87381ad35c84ace6bbbcb2154782fce953a3"
+          }
+        },
+        {
+          "client_id": "724828186533-vv3lvhchf7ji3jklu0budt4fr0cm653g.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.signlinggo",
+            "certificate_hash": "9d938e50d8ec21575a8805391fb50d7b12bbb377"
           }
         },
         {
@@ -45,6 +69,13 @@
             {
               "client_id": "724828186533-pd8s3b8kf9o3msjcova7n45eep61hha5.apps.googleusercontent.com",
               "client_type": 3
+            },
+            {
+              "client_id": "724828186533-155cbfpgtlp23f5ui7mjk4ggkt0ff2b2.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.signlinggo"
+              }
             }
           ]
         }
