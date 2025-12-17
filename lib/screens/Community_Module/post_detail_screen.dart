@@ -1,7 +1,7 @@
 // lib/screens/Community_Module/post_detail_screen.dart
 
 import 'dart:io'; 
-import 'package:flutter/gestures.dart'; // Required for clickable text spans
+import 'package:flutter/gestures.dart'; // For clickable text
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart'; 
 import 'package:cloud_firestore/cloud_firestore.dart'; 
@@ -77,12 +77,11 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     }
   }
 
-  // --- NEW: LOGIC TO START CHAT ---
+  // --- LOGIC TO START CHAT ---
   void _navigateToChat(CommentData comment) {
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser == null) return;
 
-    // 1. Prevent chatting with yourself
     if (currentUser.uid == comment.authorId) {
        ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("You can't chat with yourself!")),
@@ -90,12 +89,11 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       return; 
     }
 
-    // 2. Generate Conversation ID (Sort IDs to ensure uniqueness)
+    // Generate unique Conversation ID (UserA_UserB sorted)
     final List<String> ids = [currentUser.uid, comment.authorId];
     ids.sort();
     final String conversationId = ids.join("_");
 
-    // 3. Navigate
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -116,6 +114,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     super.dispose();
   }
 
+  // The "Repair" function - keeps main feed in sync if errors occur
   void _syncCommentCount(int realCount) {
     if (_post.commentCount != realCount) {
       _post = _post.copyWith(commentCount: realCount);
@@ -258,6 +257,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                       final comments = snapshot.data ?? [];
                       _currentCommentCount = comments.length;
 
+                      // This will now only fire if there is a mismatch
                       WidgetsBinding.instance.addPostFrameCallback((_) {
                         _syncCommentCount(comments.length);
                       });
@@ -395,7 +395,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         children: [
           // --- CLICKABLE AVATAR ---
           GestureDetector(
-            onTap: () => _navigateToChat(comment), // NAVIGATE ON TAP
+            onTap: () => _navigateToChat(comment), 
             child: (comment.authorProfileImage != null && comment.authorProfileImage!.isNotEmpty)
               ? CircleAvatar(
                   radius: avatarRadius,
@@ -423,7 +423,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // --- CLICKABLE NAME using RichText & TapGestureRecognizer ---
+                    // --- CLICKABLE NAME ---
                     RichText(
                       text: TextSpan(
                         children: [
@@ -431,7 +431,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                             text: "${comment.author}  ", 
                             style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 14),
                             recognizer: TapGestureRecognizer()
-                              ..onTap = () => _navigateToChat(comment), // NAVIGATE ON TAP
+                              ..onTap = () => _navigateToChat(comment), 
                           ),
                           TextSpan(text: comment.content, style: const TextStyle(color: Colors.black87, fontSize: 14, height: 1.3)),
                         ],
