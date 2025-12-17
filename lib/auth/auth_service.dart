@@ -27,11 +27,6 @@ class AuthService {
         'name': name,
         'email': email,
         'createdAt': FieldValue.serverTimestamp(),
-      
-        'points': 0,
-        'dayStreak': 0,
-        'totalWatched': 0,
-        'dailyQuizDone': false,
       });
 
       return null; // success
