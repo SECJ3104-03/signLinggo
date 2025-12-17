@@ -93,7 +93,7 @@ class FirestoreService {
     }
   }
 
-  // ================= COMMENTS =================
+  // ================= COMMENTS (UPDATED WITH TRANSACTIONS) =================
 
   Future<void> addComment({
     required String postId, 
@@ -101,17 +101,27 @@ class FirestoreService {
     required CommentData comment,
     String? replyToUserId,
   }) async {
-    try {
-      await _db
-          .collection('posts')
-          .doc(postId)
-          .collection('comments')
-          .add(comment.toMap());
+    final postRef = _db.collection('posts').doc(postId);
+    final commentRef = postRef.collection('comments').doc(); // Auto-gen ID
 
-      await _db.collection('posts').doc(postId).update({
-        'commentCount': FieldValue.increment(1),
+    try {
+      // Use a transaction to ensure atomic updates
+      await _db.runTransaction((transaction) async {
+        final postSnapshot = await transaction.get(postRef);
+        
+        if (!postSnapshot.exists) {
+          throw Exception("Post does not exist!");
+        }
+
+        // 1. Add the comment
+        transaction.set(commentRef, comment.toMap());
+
+        // 2. Increment the count safely based on current value
+        int currentCount = postSnapshot.data()?['commentCount'] ?? 0;
+        transaction.update(postRef, {'commentCount': currentCount + 1});
       });
 
+      // Notifications can happen outside the transaction (non-critical)
       if (replyToUserId != null && replyToUserId.isNotEmpty) {
         await sendNotification(
           recipientId: replyToUserId,
@@ -130,20 +140,28 @@ class FirestoreService {
       
     } catch (e) {
       print("Error adding comment: $e");
+      rethrow; // Rethrow so UI knows it failed
     }
   }
 
   Future<void> deleteComment(String postId, String commentId) async {
+    final postRef = _db.collection('posts').doc(postId);
+    final commentRef = postRef.collection('comments').doc(commentId);
+
     try {
-      await _db
-          .collection('posts')
-          .doc(postId)
-          .collection('comments')
-          .doc(commentId)
-          .delete();
-          
-      await _db.collection('posts').doc(postId).update({
-        'commentCount': FieldValue.increment(-1),
+      await _db.runTransaction((transaction) async {
+        final postSnapshot = await transaction.get(postRef);
+        
+        // 1. Delete the comment
+        transaction.delete(commentRef);
+
+        // 2. Decrement count safely
+        if (postSnapshot.exists) {
+          int currentCount = postSnapshot.data()?['commentCount'] ?? 0;
+          if (currentCount > 0) {
+            transaction.update(postRef, {'commentCount': currentCount - 1});
+          }
+        }
       });
 
     } catch (e) {
@@ -152,6 +170,7 @@ class FirestoreService {
   }
 
   Future<void> updatePostCommentCount(String postId, int newCount) async {
+    // This is the "fixer" function called by PostDetailScreen if needed
     try {
       await _db.collection('posts').doc(postId).update({
         'commentCount': newCount,
@@ -194,19 +213,16 @@ class FirestoreService {
           .doc(commentId);
 
       if (isLiked) {
-        // Unlike
         await docRef.update({
           'likedBy': FieldValue.arrayRemove([currentUserId]),
           'likeCount': FieldValue.increment(-1),
         });
       } else {
-        // Like
         await docRef.update({
           'likedBy': FieldValue.arrayUnion([currentUserId]),
           'likeCount': FieldValue.increment(1),
         });
 
-        // --- FIXED: CHANGED TYPE TO 'comment_like' ---
         await sendNotification(
           recipientId: commentAuthorId,
           type: 'comment_like', 
@@ -252,7 +268,7 @@ class FirestoreService {
 
         await sendNotification(
           recipientId: postAuthorId,
-          type: 'like', // This stays as 'like' for posts
+          type: 'like', 
           postId: postId,
           message: 'Liked your post',
         );
