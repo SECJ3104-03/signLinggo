@@ -34,7 +34,7 @@ class ConversationScreen extends StatefulWidget {
 class _ConversationScreenState extends State<ConversationScreen> {
   String _mode = "Text";
   final Map<String, VideoPlayerController> _videoControllers = {};
-  final Map<String, AudioPlayer> _audioPlayers = {}; // Using just_audio AudioPlayer
+  final Map<String, AudioPlayer> _audioPlayers = {};
   final Map<String, String> _audioLocalPaths = {};
   late final String currentUserId;
   
@@ -46,7 +46,6 @@ class _ConversationScreenState extends State<ConversationScreen> {
     currentUserId = widget.currentUserID;
   }
   
-  // Clean up all controllers to prevent memory leaks
   @override
   void dispose() {
     for (var controller in _videoControllers.values) {
@@ -91,7 +90,6 @@ class _ConversationScreenState extends State<ConversationScreen> {
       final data = snapshot.data()!;
       userIDs = List<String>.from(data['userIDs'] ?? []);
     } else {
-      // If conversation doesn't exist, create it with participants from conversationId
       userIDs = widget.conversationId.split('_');
     }
  
@@ -126,10 +124,9 @@ class _ConversationScreenState extends State<ConversationScreen> {
           return snapshot.docs.map((doc) {
             final data = doc.data();
 
-            // Skip messages deleted FOR ME
             final deletedFor = List<String>.from(data['deletedFor'] ?? []);
             if (deletedFor.contains(currentUserId)) {
-              return {"hidden": true}; // Skip rendering
+              return {"hidden": true};
             }
 
             data['isUser'] = data['senderId'] == currentUserId;
@@ -199,19 +196,16 @@ class _ConversationScreenState extends State<ConversationScreen> {
 
     String newLastMessage = "";
 
-    // Find the latest relevant message
     for (var doc in messagesSnapshot.docs) {
       final data = doc.data();
       final deletedFor = List<String>.from(data['deletedFor'] ?? []);
 
       if (forEveryone) {
-        // Pick the first message not deleted for ANYONE
         if (deletedFor.isEmpty) {
           newLastMessage = _getPreviewText(data['type'], data['content']);
           break;
         }
       } else {
-        // Pick the first message not deleted for CURRENT user
         if (!deletedFor.contains(currentUserId)) {
           newLastMessage = _getPreviewText(data['type'], data['content']);
           break;
@@ -232,13 +226,11 @@ class _ConversationScreenState extends State<ConversationScreen> {
     final lastMessageAtFor = Map<String, dynamic>.from(data['lastMessageAtFor'] ?? {});
 
     if (forEveryone) {
-      // Update lastMessage for all users
       for (var userId in userIDs) {
         lastMessageFor[userId] = newLastMessage;
         lastMessageAtFor[userId] = FieldValue.serverTimestamp();
       }
     } else {
-      // Update lastMessage only for current user
       lastMessageFor[currentUserId] = newLastMessage;
       lastMessageAtFor[currentUserId] = FieldValue.serverTimestamp();
     }
@@ -302,57 +294,47 @@ class _ConversationScreenState extends State<ConversationScreen> {
           color: isUser ? Colors.blue[50] : Colors.grey[200],
           borderRadius: BorderRadius.circular(16),
         ),
-        child: SizedBox(
-          height: 150,
-          child: controller.value.isInitialized
-              ? Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(16),
-                      child: AspectRatio(
-                        aspectRatio: controller.value.aspectRatio,
-                        child: VideoPlayer(controller),
-                      ),
-                    ),
-                    IconButton(
-                      icon: Icon(
-                        controller.value.isPlaying
-                            ? Icons.pause_circle
-                            : Icons.play_circle,
-                        size: 48,
-                        color: Colors.white70,
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          controller.value.isPlaying
-                              ? controller.pause()
-                              : controller.play();
-                        });
-                      },
-                    )
-                  ],
-                )
-              : const Center(child: CircularProgressIndicator()),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: MediaQuery.of(context).size.width * 0.7,
+        ),
+        child: AspectRatio(
+          aspectRatio: controller.value.aspectRatio,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              VideoPlayer(controller),
+              IconButton(
+                icon: Icon(
+                  controller.value.isPlaying ? Icons.pause_circle : Icons.play_circle,
+                  size: 48,
+                  color: Colors.white70,
+                ),
+                onPressed: () {
+                  setState(() {
+                    controller.value.isPlaying ? controller.pause() : controller.play();
+                  });
+                },
+              ),
+            ],
+          ),
+        ),
         ),
       ),
-    );
+    );    
   }
 
   Widget _buildVoiceBubble(String audioUrl, bool isUser) {
     if (!_audioPlayers.containsKey(audioUrl)) {
       final player = AudioPlayer();
       _audioPlayers[audioUrl] = player;
-      
-      // Initialize the player
+
       Future.microtask(() async {
         try {
           await player.setUrl(audioUrl);
           
-          // Handle playback completion
           player.playerStateStream.listen((state) {
             if (state.processingState == ProcessingState.completed) {
-              // Reset to start when completed
               player.seek(Duration.zero);
               if (mounted) setState(() {});
             }
@@ -402,7 +384,6 @@ class _ConversationScreenState extends State<ConversationScreen> {
                         if (isPlaying) {
                           await audioPlayer.pause();
                         } else {
-                          // Check if we're at the end
                           final position = audioPlayer.position;
                           final duration = audioPlayer.duration ?? Duration.zero;
                           
@@ -595,7 +576,6 @@ class _ConversationScreenState extends State<ConversationScreen> {
         return AlertDialog(
           title: const Text("Delete message"),
           actions: [
-            // DELETE FOR ME
             TextButton(
               child: const Text("Delete for me"),
               onPressed: () {
@@ -604,7 +584,6 @@ class _ConversationScreenState extends State<ConversationScreen> {
               },
             ),
 
-            // DELETE FOR EVERYONE (only sender can do this)
             if (isUserMessage)
               TextButton(
                 child: const Text("Delete for everyone", style: TextStyle(color: Colors.red)),
@@ -638,12 +617,12 @@ class _ConversationScreenState extends State<ConversationScreen> {
           children: [
             CircleAvatar(
               backgroundColor: Colors.grey.shade300,
-              backgroundImage: widget.avatar.startsWith('')
+              backgroundImage: (widget.avatar.isNotEmpty && Uri.tryParse(widget.avatar)?.hasAbsolutePath == true)
                   ? NetworkImage(widget.avatar)
                   : null,
-              child: !widget.avatar.startsWith('')
+              child: (widget.avatar.isEmpty || Uri.tryParse(widget.avatar)?.hasAbsolutePath != true)
                   ? Text(
-                      widget.avatar.isNotEmpty ? widget.avatar[0].toUpperCase() : '?',
+                      widget.chatName.isNotEmpty ? widget.chatName[0].toUpperCase() : '?',
                       style: const TextStyle(color: Colors.white))
                   : null,
             ),
