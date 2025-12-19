@@ -161,14 +161,14 @@ class _ChatListScreenState extends State<ChatListScreen> {
 
                   if (otherUserID.isEmpty) return const SizedBox.shrink();
 
-                  return FutureBuilder<DocumentSnapshot>(
-                    future: _firestore.collection('users').doc(otherUserID).get(),
+                  return FutureBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                    future: _firestore.collection('users').where('uid', isEqualTo: otherUserID).limit(1).get(),
                     builder: (context, userSnapshot) {
                       if (userSnapshot.connectionState == ConnectionState.waiting) {
-                        return ListTile(
-                          leading: CircleAvatar(backgroundColor: Colors.grey.shade300),
-                          title: Container(height: 10, width: 100, color: Colors.grey.shade200),
-                          subtitle: Container(height: 8, width: 150, color: Colors.grey.shade200),
+                        return const ListTile(
+                          leading: CircleAvatar(backgroundColor: Colors.grey),
+                          title: SizedBox(height: 10),
+                          subtitle: SizedBox(height: 8),
                         );
                       }
 
@@ -176,9 +176,9 @@ class _ChatListScreenState extends State<ChatListScreen> {
                       String avatar = '?';
                       String? profileUrl;
 
-                      if (userSnapshot.hasData && userSnapshot.data!.exists) {
-                        final userData = userSnapshot.data!.data() as Map<String, dynamic>? ?? {};
-                        chatName = userData['username'] ?? userData['fullName'] ?? "Unknown";
+                      if (userSnapshot.hasData && userSnapshot.data!.docs.isNotEmpty) {
+                        final userData = userSnapshot.data!.docs.first.data() as Map<String, dynamic>;
+                        chatName = userData['name'] ?? userData['username'] ?? userData['fullName'] ?? "Unknown";
                         avatar = chatName.isNotEmpty ? chatName[0].toUpperCase() : '?';
                         profileUrl = userData['profileUrl'];
                       }
