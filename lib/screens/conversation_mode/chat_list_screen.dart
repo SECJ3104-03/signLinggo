@@ -164,19 +164,11 @@ class _ChatListScreenState extends State<ChatListScreen> {
                   return FutureBuilder<DocumentSnapshot>(
                     future: _firestore.collection('users').doc(otherUserID).get(),
                     builder: (context, userSnapshot) {
-                      if (userSnapshot.connectionState ==
-                          ConnectionState.waiting) {
+                      if (userSnapshot.connectionState == ConnectionState.waiting) {
                         return ListTile(
-                          leading:
-                              CircleAvatar(backgroundColor: Colors.grey.shade300),
-                          title: Container(
-                              height: 10,
-                              width: 100,
-                              color: Colors.grey.shade200),
-                          subtitle: Container(
-                              height: 8,
-                              width: 150,
-                              color: Colors.grey.shade200),
+                          leading: CircleAvatar(backgroundColor: Colors.grey.shade300),
+                          title: Container(height: 10, width: 100, color: Colors.grey.shade200),
+                          subtitle: Container(height: 8, width: 150, color: Colors.grey.shade200),
                         );
                       }
 
@@ -184,21 +176,12 @@ class _ChatListScreenState extends State<ChatListScreen> {
                       String avatar = '?';
                       String? profileUrl;
 
-                      if (userSnapshot.hasData &&
-                          userSnapshot.data!.exists) {
-                        final userData =
-                            userSnapshot.data!.data() as Map<String, dynamic>? ??
-                                {};
-                        chatName =
-                            userData['username'] ?? userData['fullName'] ?? "Unknown";
-                        avatar = chatName.isNotEmpty
-                            ? chatName[0].toUpperCase()
-                            : '?';
+                      if (userSnapshot.hasData && userSnapshot.data!.exists) {
+                        final userData = userSnapshot.data!.data() as Map<String, dynamic>? ?? {};
+                        chatName = userData['username'] ?? userData['fullName'] ?? "Unknown";
+                        avatar = chatName.isNotEmpty ? chatName[0].toUpperCase() : '?';
                         profileUrl = userData['profileUrl'];
                       }
-
-                      final lastMessageFor = Map<String, dynamic>.from(data['lastMessageFor'] ?? {});
-                      final lastMessageAtFor = Map<String, dynamic>.from(data['lastMessageAtFor'] ?? {});
 
                       final lastMessage = (data['lastMessageFor'] as Map?)?[currentUserID] ?? '';
                       final lastMessageAt = (data['lastMessageAtFor'] as Map?)?[currentUserID] != null
@@ -207,70 +190,116 @@ class _ChatListScreenState extends State<ChatListScreen> {
 
                       final timeString = _formatLastMessageTime(lastMessageAt);
 
-                      return ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: Colors.grey.shade300,
-                          backgroundImage: profileUrl != null
-                              ? NetworkImage(profileUrl)
-                              : null,
-                          child: (profileUrl == null) ? Text(avatar, style: const TextStyle(color: Colors.white)) : null,
-                        ),
-                        title: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Expanded(
-                              child: Text(
-                                chatName,
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.w600),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
+                      return StreamBuilder<QuerySnapshot>(
+                        stream: _firestore
+                            .collection('conversation')
+                            .doc(conversationId)
+                            .collection('messages')
+                            .where('isRead', isEqualTo: false)
+                            .snapshots(),
+                        builder: (context, msgSnapshot) {
+                          bool hasUnread = false;
+                          if (msgSnapshot.hasData && msgSnapshot.data!.docs.isNotEmpty) {
+                            hasUnread = msgSnapshot.data!.docs.any((msgDoc) {
+                              final msgData = msgDoc.data() as Map<String, dynamic>;
+                              return msgData['senderId'] != currentUserID;
+                            });
+                          }
+
+                          return ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor: Colors.grey.shade300,
+                              backgroundImage: profileUrl != null ? NetworkImage(profileUrl) : null,
+                              child: (profileUrl == null) ? Text(avatar, style: const TextStyle(color: Colors.white)) : null,
                             ),
-                            const SizedBox(width: 8),
-                            Text(
-                              timeString,
-                              style: const TextStyle(color: Colors.grey, fontSize: 12),
+                            title: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    chatName,
+                                    style: const TextStyle(fontWeight: FontWeight.w600),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  timeString,
+                                  style: const TextStyle(color: Colors.grey, fontSize: 12),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
-                        subtitle: Text(
-                          lastMessage,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(color: Colors.grey),
-                        ),
-                        trailing: PopupMenuButton<String>(
-                          icon: const Icon(Icons.more_vert, color: Colors.grey),
-                          onSelected: (String result) {
-                            if (result == 'delete_for_me') {
-                              _deleteConversationForMe(conversationId, currentUserID);
-                            } else if (result == 'delete_for_everyone') {
-                              _deleteConversationForEveryone(conversationId);
-                            }
-                          },
-                          itemBuilder: (context) => [
-                            const PopupMenuItem<String>(
-                              value: 'delete_for_me',
-                              child: Text('Delete for me'),
+                            subtitle: Text(
+                              lastMessage,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(color: Colors.grey),
                             ),
-                            const PopupMenuItem<String>(
-                              value: 'delete_for_everyone',
-                              child: Text('Delete for everyone', style: TextStyle(color: Colors.red)),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (hasUnread)
+                                  Container(
+                                    width: 12,
+                                    height: 12,
+                                    decoration: const BoxDecoration(
+                                      color: Colors.green,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                const SizedBox(width: 8),
+                                PopupMenuButton<String>(
+                                  icon: const Icon(Icons.more_vert, color: Colors.grey),
+                                  onSelected: (String result) {
+                                    if (result == 'delete_for_me') {
+                                      _deleteConversationForMe(conversationId, currentUserID);
+                                    } else if (result == 'delete_for_everyone') {
+                                      _deleteConversationForEveryone(conversationId);
+                                    }
+                                  },
+                                  itemBuilder: (context) => [
+                                    const PopupMenuItem<String>(
+                                      value: 'delete_for_me',
+                                      child: Text('Delete for me'),
+                                    ),
+                                    const PopupMenuItem<String>(
+                                      value: 'delete_for_everyone',
+                                      child: Text('Delete for everyone', style: TextStyle(color: Colors.red)),
+                                    )
+                                  ],
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => ConversationScreen(
-                                chatName: chatName,
-                                avatar: profileUrl ?? avatar,
-                                conversationId: conversationId,
-                                currentUserID: currentUserID,
-                              ),
-                            ),
+                            onTap: () async {
+                              final unreadMessages = await _firestore
+                                  .collection('conversation')
+                                  .doc(conversationId)
+                                  .collection('messages')
+                                  .where('isRead', isEqualTo: false)
+                                  .get();
+
+                              for (var msgDoc in unreadMessages.docs) {
+                                final msgData = msgDoc.data() as Map<String, dynamic>;
+                                if (msgData['senderId'] != currentUserID) {
+                                  await msgDoc.reference.update({'isRead': true});
+                                }
+                              }
+
+                              if (!mounted) return;
+
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => ConversationScreen(
+                                    chatName: chatName,
+                                    avatar: profileUrl ?? avatar,
+                                    conversationId: conversationId,
+                                    currentUserID: currentUserID,
+                                  ),
+                                ),
+                              );
+                            },
                           );
                         },
                       );

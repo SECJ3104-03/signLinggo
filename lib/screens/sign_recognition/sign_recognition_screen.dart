@@ -1,10 +1,3 @@
-/// Sign Recognition Screen
-/// 
-/// Real-time sign language recognition using camera:
-/// - Camera preview with detection overlay
-/// - Zoom and camera switching controls
-/// - Sign-to-text translation
-/// - Mode switching between sign-to-text and text-to-sign
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:camera/camera.dart';
@@ -25,9 +18,7 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
   late bool isSignToText;
 
   int selectedCameraIdx = 0;
-  double _currentZoom = 1.0;
-  double _minZoom = 1.0;
-  double _maxZoom = 1.0;
+
 
   @override
   void initState() {
@@ -40,24 +31,11 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
     _controller = CameraController(cameraDescription, ResolutionPreset.medium);
 
     _initializeControllerFuture = _controller.initialize().then((_) async {
-      try {
-        _minZoom = await _controller.getMinZoomLevel();
-        _maxZoom = await _controller.getMaxZoomLevel();
-        _currentZoom = _minZoom.clamp(1.0, _maxZoom);
-        await _controller.setZoomLevel(_currentZoom);
-      } catch (e) {
-        debugPrint('SignRecognitionScreen: Error setting zoom: $e');
-        _minZoom = 1.0;
-        _maxZoom = 1.0;
-        _currentZoom = 1.0;
-      }
-
       if (mounted) setState(() {});
     }).catchError((error) {
       debugPrint('SignRecognitionScreen: Camera initialization error: $error');
       if (mounted) {
         setState(() {});
-        // Show error message to user
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -132,7 +110,6 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black),
           onPressed: () {
-            // Use pop if there's a route to pop, otherwise go to home
             if (context.canPop()) {
               context.pop();
             } else {
@@ -146,7 +123,6 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            //Top Row: "Sign → Text" and Switch Mode
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               decoration: BoxDecoration(
@@ -186,7 +162,6 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
 
                           if (value) {
                             await _controller.dispose();
-                            // Navigate to text-to-sign screen using GoRouter
                             context.go('/text-to-sign');
                           }
                         },
@@ -199,7 +174,6 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
 
             const SizedBox(height: 20),
 
-            //Camera container
             Container(
               width: width,
               height: 400,
@@ -213,13 +187,11 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    //Camera Preview
                     FutureBuilder<void>(
                       future: _initializeControllerFuture,
                       builder: (context, snapshot) {
                         if (snapshot.connectionState == ConnectionState.done) {
                           if (snapshot.hasError) {
-                            // Show error state if initialization failed
                             return Center(
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
@@ -248,7 +220,6 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
                               ),
                             );
                           }
-                          // Check if controller is initialized before showing preview
                           if (_controller.value.isInitialized) {
                             return CameraPreview(_controller);
                           } else {
@@ -261,7 +232,6 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
                             child: CircularProgressIndicator(),
                           );
                         } else {
-                          // Initial or other states
                           return const Center(
                             child: CircularProgressIndicator(),
                           );
@@ -298,30 +268,6 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
                       right: 16,
                       child: Column(
                         children: [
-                          // Zoom in button
-                          FloatingActionButton(
-                            heroTag: 'zoom',
-                            mini: true,
-                            backgroundColor: Colors.black45,
-                            onPressed: () async {
-                              if (!_controller.value.isInitialized) return;
-
-                              const double step = 0.5;
-                              final double newZoom = (_currentZoom + step).clamp(_minZoom, _maxZoom);
-
-                              try {
-                                await _controller.setZoomLevel(newZoom);
-                                _currentZoom = newZoom;
-                                setState(() {});
-                              } catch (e) {
-                                debugPrint('Zoom failed: $e');
-                              }
-                            },
-                            child: const Icon(Icons.zoom_in, color: Colors.white),
-                          ),
-                          const SizedBox(height: 12),
-
-                          // Flip camera button
                           FloatingActionButton(
                             heroTag: 'flip',
                             mini: true,
