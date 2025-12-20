@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:camera/camera.dart';
 // Import your object detector
-import '../../services/object_detector.dart';
+import '../../services/object_detector.dart'; 
 
 class SignRecognitionScreen extends StatefulWidget {
   final CameraDescription camera;

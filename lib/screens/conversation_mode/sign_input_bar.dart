@@ -48,14 +48,13 @@ class _SignInputBarState extends State<SignInputBar> {
   Timer? _timer;
   
   XFile? _recordedFile;
-  VideoPlayerController? _reviewController;
 
   Future<void>? _initializeControllerFuture;
   final SupabaseClient _supabase = Supabase.instance.client;
   final Uuid _uuid = const Uuid();
 
   bool _isUploading = false;
-  bool _isFrontCamera = false; // Track which camera is active
+  bool _isFrontCamera = false;
 
   @override
   void initState() {
@@ -67,14 +66,12 @@ class _SignInputBarState extends State<SignInputBar> {
   void dispose() {
     _timer?.cancel();
     _cameraController?.dispose();
-    _reviewController?.dispose();
     super.dispose();
   }
 
   Future<void> _initCamera() async {
     _cameras = await availableCameras();
     if (_cameras.isNotEmpty) {
-      // Default to the first camera (usually back)
       _setCamera(_cameras.first);
     }
   }
@@ -82,7 +79,6 @@ class _SignInputBarState extends State<SignInputBar> {
   Future<void> _setCamera(CameraDescription cameraDescription) async {
     final prevController = _cameraController;
     
-    // Create new controller
     final newController = CameraController(
       cameraDescription,
       ResolutionPreset.medium,
@@ -91,7 +87,6 @@ class _SignInputBarState extends State<SignInputBar> {
     
     _cameraController = newController;
     
-    // Initialize
     _initializeControllerFuture = _cameraController!.initialize().then((_) {
        if (mounted) {
          setState(() {
@@ -135,11 +130,7 @@ class _SignInputBarState extends State<SignInputBar> {
       _recordedFile = await _cameraController!.stopVideoRecording();
       widget.onRecordingStateChanged(false);
       setState(() => _isRecording = false);
-
-      _reviewController = VideoPlayerController.file(File(_recordedFile!.path))
-        ..initialize().then((_) => setState(() {}));
-
-      _showReviewDialog();
+      _showSendCancelDialog();
     } catch (e) {
       debugPrint("Error stopping recording: $e");
     }
@@ -148,21 +139,17 @@ class _SignInputBarState extends State<SignInputBar> {
   void _flipCamera() async {
     if (_cameras.length < 2) return;
 
-    // 1. Calculate new lens direction
     final newLens = _isFrontCamera 
         ? CameraLensDirection.back 
         : CameraLensDirection.front;
 
-    // 2. Find the camera with that direction
     final newCamera = _cameras.firstWhere(
       (c) => c.lensDirection == newLens,
       orElse: () => _cameras.first,
     );
 
-    // 3. Set the new camera
     await _setCamera(newCamera);
     
-    // Optional: Show a message so user knows it flipped
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -177,32 +164,28 @@ class _SignInputBarState extends State<SignInputBar> {
     _currentDuration = 0;
   }
 
-  void _showReviewDialog() {
+  void _showSendCancelDialog() {
     showDialog(
       context: context,
-      barrierDismissible: false, // Force user to choose an action
+      barrierDismissible: false,
       builder: (_) => AlertDialog(
-        content: _reviewController != null && _reviewController!.value.isInitialized
-            ? AspectRatio(
-                aspectRatio: _reviewController!.value.aspectRatio,
-                child: VideoPlayer(_reviewController!),
-              )
-            : const SizedBox(height: 100, child: Center(child: CircularProgressIndicator())),
+        title: const Text('Video recorded'),
+        content: const Text('Do you want to send this video?'),
         actions: [
           TextButton(
             onPressed: () {
               Navigator.pop(context);
-              _cleanupReview();
+              _cleanupRecordedFile();
             },
-            child: const Text('Discard', style: TextStyle(color: Colors.red)),
+            child: const Text('Cancel', style: TextStyle(color: Colors.red)),
           ),
           ElevatedButton(
             onPressed: () {
-              Navigator.pop(context); // Close dialog first
+              Navigator.pop(context);
               if (_recordedFile != null) {
                 _uploadAndSendVideo(File(_recordedFile!.path));
               }
-              _cleanupReview();
+              _cleanupRecordedFile();
             },
             child: const Text('Send'),
           ),
@@ -249,13 +232,9 @@ class _SignInputBarState extends State<SignInputBar> {
     }
   }
 
-  void _cleanupReview() {
+  void _cleanupRecordedFile() {
     _recordedFile = null;
-    _reviewController?.dispose();
-    _reviewController = null;
-    if (mounted) {
-      setState(() {});
-    }
+    if (mounted) { setState(() {}); }
   }
 
   @override
@@ -267,14 +246,11 @@ class _SignInputBarState extends State<SignInputBar> {
         height: _isRecording ? constraints.maxHeight : 104,
         child: Stack(
           children: [
-            // ---------- CAMERA PREVIEW ----------
-            // We show the preview if we are recording OR if we are initializing
             if (_isRecording && _cameraController != null && _cameraController!.value.isInitialized)
               Center(
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
-                    // Circular progress ring
                     TweenAnimationBuilder<double>(
                       tween: Tween<double>(end: _currentDuration / _maxDuration),
                       duration: const Duration(milliseconds: 500),
@@ -291,8 +267,6 @@ class _SignInputBarState extends State<SignInputBar> {
                         );
                       },
                     ),
-    
-                    // Camera preview
                     ClipOval(
                       child: SizedBox(
                         width: previewSize,
@@ -301,7 +275,6 @@ class _SignInputBarState extends State<SignInputBar> {
                       ),
                     ),
     
-                    // Timer overlay
                     Positioned(
                       top: -40,
                       child: Container(
@@ -319,8 +292,7 @@ class _SignInputBarState extends State<SignInputBar> {
                   ],
                 ),
               ),
-    
-            // ---------- STOP BUTTON (During Recording) ----------
+
             if (_isRecording)
               Positioned(
                 bottom: 120,
@@ -336,7 +308,6 @@ class _SignInputBarState extends State<SignInputBar> {
                 ),
               ),
     
-            // ---------- CONTROL BAR (Before Recording) ----------
             if (!_isRecording)
               Positioned(
                 left: 20,
@@ -345,7 +316,6 @@ class _SignInputBarState extends State<SignInputBar> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    // 1. FLIP CAMERA BUTTON (Added here!)
                     Container(
                       decoration: BoxDecoration(
                         color: Colors.grey[200],
@@ -359,8 +329,6 @@ class _SignInputBarState extends State<SignInputBar> {
                         onPressed: _flipCamera,
                       ),
                     ),
-                    
-                    // 2. START RECORDING BUTTON
                     Expanded(
                       child: Center(
                         child: GestureDetector(
@@ -377,7 +345,7 @@ class _SignInputBarState extends State<SignInputBar> {
                               borderRadius: BorderRadius.circular(32),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.pink.withOpacity(0.3),
+                                  color: Colors.pink.withValues(alpha:0.3),
                                   blurRadius: 8,
                                   offset: const Offset(0, 4),
                                 )
@@ -395,8 +363,6 @@ class _SignInputBarState extends State<SignInputBar> {
                         ),
                       ),
                     ),
-
-                    // 3. SPACER (To balance the row visually)
                     const SizedBox(width: 48), 
                   ],
                 ),
