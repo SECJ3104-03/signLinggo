@@ -1,14 +1,17 @@
 // lib/screens/Community_Module/post_detail_screen.dart
 
 import 'dart:io'; 
+import 'package:flutter/gestures.dart'; // For clickable text
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart'; 
-import 'package:cloud_firestore/cloud_firestore.dart'; // Added for fetching user data
+import 'package:cloud_firestore/cloud_firestore.dart'; 
 import 'post_data.dart';
 import 'comment_data.dart';
 import 'video_player_widget.dart';
 import 'real_time_widget.dart'; 
 import 'firestore_service.dart'; 
+// Import your conversation screen
+import 'package:signlinggo/screens/conversation_mode/conversation_mode_screen.dart';
 
 class PostDetailScreen extends StatefulWidget {
   final PostData initialPost;
@@ -30,7 +33,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   String? _replyingToId; 
   int _currentCommentCount = 0;
 
-  // --- NEW: Variables to store current user's real profile ---
+  // Variables to store current user's real profile
   String _myRealName = "Loading...";
   String _myInitials = "?";
   String? _myProfileImage;
@@ -39,10 +42,9 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   void initState() {
     super.initState();
     _post = widget.initialPost;
-    _loadCurrentUser(); // Load the correct profile data immediately
+    _loadCurrentUser(); 
   }
 
-  // --- NEW: Fetch "Fluffy" and profileUrl from Firestore ---
   Future<void> _loadCurrentUser() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
@@ -62,7 +64,6 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
           });
         }
       } else {
-        // Fallback
         if (mounted) {
           setState(() {
             _myRealName = user.displayName ?? "User";
@@ -76,6 +77,36 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     }
   }
 
+  // --- LOGIC TO START CHAT ---
+  void _navigateToChat(CommentData comment) {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) return;
+
+    if (currentUser.uid == comment.authorId) {
+       ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("You can't chat with yourself!")),
+      );
+      return; 
+    }
+
+    // Generate unique Conversation ID (UserA_UserB sorted)
+    final List<String> ids = [currentUser.uid, comment.authorId];
+    ids.sort();
+    final String conversationId = ids.join("_");
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ConversationScreen(
+          chatName: comment.author,
+          avatar: comment.authorProfileImage ?? (comment.initials.isNotEmpty ? comment.initials : '?'),
+          conversationId: conversationId,
+          currentUserID: currentUser.uid,
+        ),
+      ),
+    );
+  }
+
   @override
   void dispose() {
     _commentController.dispose();
@@ -83,6 +114,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     super.dispose();
   }
 
+  // The "Repair" function - keeps main feed in sync if errors occur
   void _syncCommentCount(int realCount) {
     if (_post.commentCount != realCount) {
       _post = _post.copyWith(commentCount: realCount);
@@ -96,16 +128,15 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
 
     final String myUid = FirebaseAuth.instance.currentUser?.uid ?? '';
 
-    // --- UPDATED: Use the loaded real profile data ---
     final newComment = CommentData(
       authorId: myUid, 
-      author: _myRealName, // Uses "Fluffy"
+      author: _myRealName, 
       initials: _myInitials,
       content: text,
       timestamp: DateTime.now(), 
       likeCount: 0,
       isReply: _replyingToId != null,
-      authorProfileImage: _myProfileImage, // Saves the picture!
+      authorProfileImage: _myProfileImage, 
     );
 
     _firestoreService.addComment(
@@ -226,6 +257,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                       final comments = snapshot.data ?? [];
                       _currentCommentCount = comments.length;
 
+                      // This will now only fire if there is a mismatch
                       WidgetsBinding.instance.addPostFrameCallback((_) {
                         _syncCommentCount(comments.length);
                       });
@@ -353,8 +385,6 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     final double leftPadding = comment.isReply ? 54.0 : 16.0;
     final double avatarRadius = comment.isReply ? 12.0 : 16.0;
     
-    // We check if it is "my comment" by checking author name, but using UID is safer if you have it.
-    // For now we check name as in original code, or you could update to check UID if available in CommentData.
     final currentUserUid = FirebaseAuth.instance.currentUser?.uid;
     final bool isMyComment = comment.authorId == currentUserUid;
 
@@ -363,20 +393,22 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // --- UPDATED: Show Commenter's Profile Image ---
-          if (comment.authorProfileImage != null && comment.authorProfileImage!.isNotEmpty)
-            CircleAvatar(
-              radius: avatarRadius,
-              backgroundImage: NetworkImage(comment.authorProfileImage!),
-              backgroundColor: Colors.grey[200],
-            )
-          else
-            CircleAvatar(
-              radius: avatarRadius,
-              backgroundColor: Colors.grey[200],
-              child: Text(comment.initials, style: TextStyle(fontSize: avatarRadius * 0.75, color: Colors.black87, fontWeight: FontWeight.bold)),
-            ),
-          // ----------------------------------------------
+          // --- CLICKABLE AVATAR ---
+          GestureDetector(
+            onTap: () => _navigateToChat(comment), 
+            child: (comment.authorProfileImage != null && comment.authorProfileImage!.isNotEmpty)
+              ? CircleAvatar(
+                  radius: avatarRadius,
+                  backgroundImage: NetworkImage(comment.authorProfileImage!),
+                  backgroundColor: Colors.grey[200],
+                )
+              : CircleAvatar(
+                  radius: avatarRadius,
+                  backgroundColor: Colors.grey[200],
+                  child: Text(comment.initials, style: TextStyle(fontSize: avatarRadius * 0.75, color: Colors.black87, fontWeight: FontWeight.bold)),
+                ),
+          ),
+          
           const SizedBox(width: 12),
           
           Expanded(
@@ -391,10 +423,16 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // --- CLICKABLE NAME ---
                     RichText(
                       text: TextSpan(
                         children: [
-                          TextSpan(text: "${comment.author}  ", style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 14)),
+                          TextSpan(
+                            text: "${comment.author}  ", 
+                            style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 14),
+                            recognizer: TapGestureRecognizer()
+                              ..onTap = () => _navigateToChat(comment), 
+                          ),
                           TextSpan(text: comment.content, style: const TextStyle(color: Colors.black87, fontSize: 14, height: 1.3)),
                         ],
                       ),
@@ -462,7 +500,6 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
             child: Row(
               children: [
-                // --- UPDATED: Show Current User's Profile Image in Input ---
                 if (_myProfileImage != null && _myProfileImage!.isNotEmpty)
                   CircleAvatar(
                     radius: 18,
@@ -475,7 +512,6 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                     backgroundColor: const Color(0xFFF2E7FE), 
                     child: Text(_myInitials, style: const TextStyle(fontSize: 14, color: Color(0xFF980FFA)))
                   ),
-                // -----------------------------------------------------------
                 const SizedBox(width: 12),
                 Expanded(
                   child: Container(

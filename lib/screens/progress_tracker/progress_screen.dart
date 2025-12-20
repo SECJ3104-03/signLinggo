@@ -1,4 +1,5 @@
 // screens/progress_tracker/progress_screen.dart
+import 'leaderboard_screen.dart'; // Make sure the path is correct
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -46,6 +47,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FB),
       appBar: AppBar(
+        
         backgroundColor: Colors.white,
         elevation: 1,
         centerTitle: true,
@@ -64,6 +66,18 @@ class _ProgressScreenState extends State<ProgressScreen> {
           style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w600),
         ),
         actions: [
+          // ─── NEW LEADERBOARD ICON ───
+          IconButton(
+            icon: const Icon(Icons.emoji_events, color: Colors.orangeAccent),
+            tooltip: 'Leaderboard',
+            onPressed: () {
+              // Navigate to the Leaderboard Screen
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const LeaderboardScreen()),
+              );
+            },
+          ),
           // Profile Icon Removed Here
           IconButton(
             icon: Badge(

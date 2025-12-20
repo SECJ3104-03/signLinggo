@@ -2,8 +2,9 @@
 
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:open_file/open_file.dart';
-import 'package:path/path.dart' as p; // Import path package
+import 'package:path/path.dart' as p;
+import 'package:share_plus/share_plus.dart';
+import '../Community_Module/full_screen_video_screen.dart';
 
 class OfflineFileListScreen extends StatefulWidget {
   final String folderPath;
@@ -21,61 +22,111 @@ class OfflineFileListScreen extends StatefulWidget {
 
 class _OfflineFileListScreenState extends State<OfflineFileListScreen> {
   bool _isLoading = true;
-  List<FileSystemEntity> _files = [];
+  List<FileSystemEntity> _items = []; // Can be File or Directory
 
   @override
   void initState() {
     super.initState();
-    _loadFiles();
+    _loadContent();
   }
 
-  /// Scans the folder path for all files and updates the list
-  Future<void> _loadFiles() async {
-    setState(() {
-      _isLoading = true;
-    });
+  Future<void> _loadContent() async {
+    setState(() => _isLoading = true);
 
     try {
       final directory = Directory(widget.folderPath);
-      // Get all entities, including from sub-folders
-      final allEntities = await directory.list(recursive: true).toList();
-      
-      // Filter out and keep only the files
-      final filesOnly = allEntities.whereType<File>().toList();
-      
-      setState(() {
-        _files = filesOnly;
-        _isLoading = false;
-      });
+      if (await directory.exists()) {
+        // --- CHANGE 1: recursive is now FALSE ---
+        // We only want to see what is immediately inside this folder
+        final allEntities = await directory.list(recursive: false).toList();
+        
+        // Filter out hidden files (starting with .)
+        final visibleItems = allEntities.where((entity) {
+          final name = p.basename(entity.path);
+          return !name.startsWith('.');
+        }).toList();
 
+        // --- CHANGE 2: Sort Folders first, then Files ---
+        visibleItems.sort((a, b) {
+          if (a is Directory && b is File) return -1;
+          if (a is File && b is Directory) return 1;
+          return p.basename(a.path).compareTo(p.basename(b.path));
+        });
+
+        setState(() {
+          _items = visibleItems;
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _items = [];
+          _isLoading = false;
+        });
+      }
     } catch (e) {
-      print("Error loading files: $e");
-      setState(() {
-        _isLoading = false;
-      });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error loading files: $e'),
-            backgroundColor: Colors.red,
+      print("Error loading content: $e");
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _shareFile(File file) async {
+    try {
+      final String fileName = _beautifyName(file.path);
+      await Share.shareXFiles(
+        [XFile(file.path)],
+        text: 'Learn "$fileName" in Sign Language with SignLinggo!',
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error sharing: $e")),
+      );
+    }
+  }
+
+  Future<void> _deleteItem(FileSystemEntity item) async {
+    bool isFolder = item is Directory;
+    
+    bool? confirm = await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(isFolder ? "Delete Folder" : "Delete Video"),
+        content: Text(
+          isFolder 
+            ? "Are you sure you want to delete this folder and all its contents?" 
+            : "Remove this video from offline storage?",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("Cancel"),
           ),
-        );
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text("Delete", style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      try {
+        await item.delete(recursive: true); // Recursive delete for folders
+        _loadContent(); 
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(isFolder ? "Folder deleted" : "Video deleted")),
+          );
+        }
+      } catch (e) {
+        print("Error deleting: $e");
       }
     }
   }
 
-  /// --- NEW: Cleans up a filename for display ---
-  /// Turns "Minum_2.mp4" into "Minum 2"
-  String _beautifyFileName(String path) {
-    // 1. Get just the filename, without the extension
-    // e.g., "Minum_2"
+  String _beautifyName(String path) {
     String name = p.basenameWithoutExtension(path);
-    
-    // 2. Replace underscores or hyphens with spaces
-    // e.g., "Minum 2"
     name = name.replaceAll('_', ' ').replaceAll('-', ' ');
-    
-    // 3. Capitalize the first letter (optional, but looks nice)
+    name = name.replaceAll(RegExp(r'^\d+\s*'), ''); 
     if (name.isEmpty) return '';
     return name[0].toUpperCase() + name.substring(1);
   }
@@ -83,44 +134,33 @@ class _OfflineFileListScreenState extends State<OfflineFileListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // --- NEW: Added a gradient background ---
       backgroundColor: const Color(0xFFF2E7FE),
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment(0.00, 0.00),
             end: Alignment(1.00, 1.00),
-            colors: [
-              Color(0xFFF2E7FE),
-              Color(0xFFFCE6F3),
-              Color(0xFFFFECD4),
-            ],
+            colors: [Color(0xFFF2E7FE), Color(0xFFFCE6F3), Color(0xFFFFECD4)],
           ),
         ),
         child: CustomScrollView(
           slivers: [
-            // --- NEW: Added a flexible AppBar ---
             SliverAppBar(
               floating: true,
-              pinned: false,
               backgroundColor: Colors.transparent,
               elevation: 0,
               centerTitle: true,
-              leading: IconButton(
-                icon: const Icon(Icons.arrow_back, color: Color(0xFF101727)),
-                onPressed: () => Navigator.of(context).pop(),
-              ),
+              iconTheme: const IconThemeData(color: Color(0xFF101727)),
               title: Text(
-                widget.title, // Shows "Basic Greetings & Phrases"
+                widget.title,
                 style: const TextStyle(
                   color: Color(0xFF101727),
                   fontSize: 20,
                   fontFamily: 'Arimo',
-                  fontWeight: FontWeight.w400,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),
-            // --- NEW: Add the main body content ---
             _buildBody(),
           ],
         ),
@@ -128,106 +168,174 @@ class _OfflineFileListScreenState extends State<OfflineFileListScreen> {
     );
   }
 
-  // --- MODIFIED: This function now builds the GridView ---
   Widget _buildBody() {
     if (_isLoading) {
-      return const SliverFillRemaining(
-        child: Center(child: CircularProgressIndicator()),
-      );
+      return const SliverFillRemaining(child: Center(child: CircularProgressIndicator()));
     }
 
-    if (_files.isEmpty) {
-      return const SliverFillRemaining(
+    if (_items.isEmpty) {
+      return SliverFillRemaining(
         child: Center(
-          child: Text(
-            'No files found in this folder.',
-            style: TextStyle(fontSize: 16, color: Colors.grey),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.folder_open_rounded, size: 60, color: Colors.grey.withOpacity(0.5)),
+              const SizedBox(height: 16),
+              const Text(
+                'Folder is empty.',
+                style: TextStyle(fontSize: 16, color: Colors.grey),
+              ),
+            ],
           ),
         ),
       );
     }
 
-    // --- Use a SliverGrid instead of ListView ---
     return SliverPadding(
-      padding: const EdgeInsets.all(16.0),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 40),
       sliver: SliverGrid(
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2, // 2 columns, just like Learn Mode
+          crossAxisCount: 2,
           crossAxisSpacing: 16,
           mainAxisSpacing: 16,
-          childAspectRatio: 0.75, // Adjust this ratio as needed
+          childAspectRatio: 0.8, 
         ),
         delegate: SliverChildBuilderDelegate(
           (context, index) {
-            final file = _files[index] as File;
-            return _buildFileCard(file); // Build our new card
+            final item = _items[index];
+            
+            if (item is Directory) {
+              return _buildFolderCard(item);
+            } else if (item is File) {
+              return _buildFileCard(item);
+            }
+            return const SizedBox.shrink();
           },
-          childCount: _files.length,
+          childCount: _items.length,
         ),
       ),
     );
   }
 
-  // --- NEW: This widget builds the card UI ---
-  Widget _buildFileCard(File file) {
-    final String beautifulName = _beautifyFileName(file.path);
+  // --- NEW: FOLDER CARD ---
+  Widget _buildFolderCard(Directory dir) {
+    final String folderName = p.basename(dir.path); // Keep name simple
 
     return GestureDetector(
       onTap: () {
-        print("Opening file: ${file.path}");
-        OpenFile.open(file.path);
+        // --- NAVIGATE DEEPER ---
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => OfflineFileListScreen(
+              folderPath: dir.path,
+              title: folderName, // Update title to folder name
+            ),
+          ),
+        );
       },
+      onLongPress: () => _deleteItem(dir),
       child: Container(
         decoration: ShapeDecoration(
-          color: Colors.white.withOpacity(0.85),
+          color: const Color(0xFFFFF8E1), // Light Yellow for folders
           shape: RoundedRectangleBorder(
-            side: const BorderSide(width: 1, color: Color(0x99FFFEFE)),
-            borderRadius: BorderRadius.circular(14),
+            side: const BorderSide(width: 1, color: Color(0xFFFFECB3)),
+            borderRadius: BorderRadius.circular(16),
           ),
+          shadows: [
+            BoxShadow(
+              color: Colors.orange.withOpacity(0.1),
+              blurRadius: 10, offset: const Offset(0, 4),
+            )
+          ],
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.folder, size: 50, color: Color(0xFFFFC107)),
+            const SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12.0),
+              child: Text(
+                folderName,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Color(0xFF101727),
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // --- VIDEO CARD (Same as before) ---
+  Widget _buildFileCard(File file) {
+    final String beautifulName = _beautifyName(file.path);
+
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => FullScreenVideoScreen(videoUrl: file.path),
+          ),
+        );
+      },
+      onLongPress: () => _deleteItem(file),
+      child: Container(
+        decoration: ShapeDecoration(
+          color: Colors.white.withOpacity(0.9),
+          shape: RoundedRectangleBorder(
+            side: const BorderSide(width: 1, color: Colors.white),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          shadows: [
+            BoxShadow(
+              color: Colors.purple.withOpacity(0.05),
+              blurRadius: 10, offset: const Offset(0, 4),
+            )
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // 1. The Video/Image placeholder
             Expanded(
               child: Container(
-                clipBehavior: Clip.antiAlias,
                 decoration: const BoxDecoration(
-                  color: Color(0xFFEEEEEE), // Light grey background
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(14),
-                    topRight: Radius.circular(14),
-                  ),
+                  color: Color(0xFFF0F0F0),
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
                 ),
-                // Stack to place a play button on top
                 child: Stack(
-                  alignment: Alignment.center,
                   children: [
-                    // --- Show a video icon ---
-                    Icon(
-                      Icons.videocam_rounded,
-                      color: Colors.black.withOpacity(0.1),
-                      size: 60,
-                    ),
-                    // --- Blue play button (like Learn Mode) ---
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: Colors.blue,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.2),
-                            blurRadius: 4,
-                            offset: Offset(0, 2),
-                          ),
+                    const Center(child: Icon(Icons.play_circle_outline_rounded, size: 48, color: Colors.black12)),
+                    
+                    Positioned(
+                      top: 4, right: 4,
+                      child: PopupMenuButton<String>(
+                        icon: const Icon(Icons.more_vert, color: Colors.black54),
+                        onSelected: (value) {
+                          if (value == 'share') _shareFile(file);
+                          else if (value == 'delete') _deleteItem(file);
+                        },
+                        itemBuilder: (context) => [
+                          const PopupMenuItem(value: 'share', child: Row(children: [Icon(Icons.share_outlined, size: 20), SizedBox(width: 12), Text("Share")])),
+                          const PopupMenuItem(value: 'delete', child: Row(children: [Icon(Icons.delete_outline, size: 20, color: Colors.red), SizedBox(width: 12), Text("Delete", style: TextStyle(color: Colors.red))])),
                         ],
                       ),
-                      child: const Icon(
-                        Icons.play_arrow,
-                        color: Colors.white,
-                        size: 28,
+                    ),
+                    
+                    Positioned(
+                      bottom: 8, right: 8,
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                        child: const Icon(Icons.play_arrow, size: 16, color: Colors.black),
                       ),
                     ),
                   ],
@@ -235,35 +343,12 @@ class _OfflineFileListScreenState extends State<OfflineFileListScreen> {
               ),
             ),
             
-            // 2. The Text content
             Padding(
               padding: const EdgeInsets.all(12.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    beautifulName, // e.g., "Minum 2"
-                    style: const TextStyle(
-                      color: Color(0xFF101727),
-                      fontSize: 16,
-                      fontFamily: 'Arimo',
-                      fontWeight: FontWeight.w500,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    widget.title, // e.g., "Basic Greetings & Phrases"
-                    style: const TextStyle(
-                      color: Color(0xFF495565),
-                      fontSize: 12,
-                      fontFamily: 'Arimo',
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
+              child: Text(
+                beautifulName,
+                style: const TextStyle(color: Color(0xFF101727), fontSize: 15, fontWeight: FontWeight.w600),
+                maxLines: 1, overflow: TextOverflow.ellipsis,
               ),
             ),
           ],
