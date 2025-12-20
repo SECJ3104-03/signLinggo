@@ -52,6 +52,7 @@ class _PostCardState extends State<PostCard> {
     }
   }
 
+  // --- NEW: Direct Chat Navigation Logic ---
   void _navigateToDirectMessage() {
     if (_videoController != null && _videoController!.value.isPlaying) {
       _videoController!.pause();
@@ -60,9 +61,18 @@ class _PostCardState extends State<PostCard> {
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser == null) return;
 
+    // Prevent user from chatting with themselves
+    if (currentUser.uid == widget.post.authorId) {
+       ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("That's you!")),
+      );
+      return;
+    }
+
     final String currentUserId = currentUser.uid;
     final String targetUserId = widget.post.authorId;
 
+    // Generate consistent Conversation ID
     final List<String> ids = [currentUserId, targetUserId];
     ids.sort();
     final String conversationId = ids.join("_");
@@ -72,7 +82,7 @@ class _PostCardState extends State<PostCard> {
       MaterialPageRoute(
         builder: (context) => ConversationScreen(
           chatName: widget.post.author,
-          avatar: widget.post.initials,
+          avatar: widget.post.authorProfileImage ?? (widget.post.initials.isNotEmpty ? widget.post.initials : '?'),
           conversationId: conversationId,
           currentUserID: currentUserId,
         ),
@@ -81,7 +91,6 @@ class _PostCardState extends State<PostCard> {
   }
 
   Future<void> _sharePost() async {
-    // ... (Keep existing share logic)
     final String shareText = '${widget.post.title}\n\n${widget.post.content}\n\nSent via SignLinggo App';
     final String? mediaPath = widget.post.videoUrl ?? widget.post.imageUrl;
 
@@ -164,78 +173,83 @@ class _PostCardState extends State<PostCard> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // --- UPDATED PROFILE PICTURE LOGIC ---
-          if (widget.post.authorProfileImage != null && widget.post.authorProfileImage!.isNotEmpty)
-            Container(
-              width: 39.98,
-              height: 39.98,
-              clipBehavior: Clip.antiAlias,
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-              ),
-              child: Image.network(
-                widget.post.authorProfileImage!,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  // Fallback to gradient if image fails
-                  return Container(
-                    decoration: ShapeDecoration(
-                      gradient: widget.post.profileGradient,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(41659800)),
+          // 1. CLICKABLE AVATAR
+          GestureDetector(
+            onTap: _navigateToDirectMessage,
+            child: (widget.post.authorProfileImage != null && widget.post.authorProfileImage!.isNotEmpty)
+              ? Container(
+                  width: 39.98,
+                  height: 39.98,
+                  clipBehavior: Clip.antiAlias,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                  ),
+                  child: Image.network(
+                    widget.post.authorProfileImage!,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        decoration: ShapeDecoration(
+                          gradient: widget.post.profileGradient,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(41659800)),
+                        ),
+                        child: Center(
+                          child: Text(
+                            widget.post.initials,
+                            style: const TextStyle(color: Color(0xFF0A0A0A), fontSize: 16),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                )
+              : Container(
+                  width: 39.98,
+                  height: 39.98,
+                  clipBehavior: Clip.antiAlias,
+                  decoration: ShapeDecoration(
+                    gradient: widget.post.profileGradient,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(41659800),
                     ),
-                    child: Center(
-                      child: Text(
-                        widget.post.initials,
-                        style: const TextStyle(color: Color(0xFF0A0A0A), fontSize: 16),
+                  ),
+                  child: Center(
+                    child: Text(
+                      widget.post.initials,
+                      style: const TextStyle(
+                        color: Color(0xFF0A0A0A),
+                        fontSize: 16,
+                        fontFamily: 'Arimo',
+                        fontWeight: FontWeight.w400,
+                        height: 1.50,
                       ),
                     ),
-                  );
-                },
-              ),
-            )
-          else
-            // Fallback to gradient if no image is set
-            Container(
-              width: 39.98,
-              height: 39.98,
-              clipBehavior: Clip.antiAlias,
-              decoration: ShapeDecoration(
-                gradient: widget.post.profileGradient,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(41659800),
-                ),
-              ),
-              child: Center(
-                child: Text(
-                  widget.post.initials,
-                  style: const TextStyle(
-                    color: Color(0xFF0A0A0A),
-                    fontSize: 16,
-                    fontFamily: 'Arimo',
-                    fontWeight: FontWeight.w400,
-                    height: 1.50,
                   ),
                 ),
-              ),
-            ),
-          // -------------------------------------
-
+          ),
+          
           const SizedBox(width: 12),
 
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  widget.post.author,
-                  style: const TextStyle(
-                    color: Color(0xFF101727),
-                    fontSize: 18,
-                    fontFamily: 'Arimo',
-                    fontWeight: FontWeight.w400,
-                    height: 1.50,
+                // 2. CLICKABLE NAME
+                GestureDetector(
+                  onTap: _navigateToDirectMessage,
+                  child: Text(
+                    widget.post.author,
+                    style: const TextStyle(
+                      color: Color(0xFF101727),
+                      fontSize: 18,
+                      fontFamily: 'Arimo',
+                      fontWeight: FontWeight.w400,
+                      height: 1.50,
+                    ),
                   ),
                 ),
+                
+                // 3. TAGS & TIMESTAMP (Not Clickable for Chat)
                 Wrap(
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
