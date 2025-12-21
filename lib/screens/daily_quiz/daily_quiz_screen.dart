@@ -1,9 +1,10 @@
-// screens/daily_quiz/daily_quiz_screen.dart
+// lib/screens/daily_quiz/daily_quiz_screen.dart
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../data/progress_manager.dart';
 import '../../data/quiz_questions.dart';
+import '../../data/adaptive_quiz_generator.dart'; // For Task 1.3
 
 class DailyQuizScreen extends StatefulWidget {
   const DailyQuizScreen({super.key});
@@ -18,6 +19,12 @@ class _DailyQuizScreenState extends State<DailyQuizScreen> {
   bool _answerSubmitted = false;
   bool _showResult = false;
   bool _isCorrect = false;
+  
+  // Track sign ID for adaptive learning (Task 1.3)
+  String? _currentSignId;
+  
+  // Track when the question appeared to calculate response time
+  DateTime? _questionStartTime; 
 
   @override
   void initState() {
@@ -25,14 +32,63 @@ class _DailyQuizScreenState extends State<DailyQuizScreen> {
     _loadDailyQuestion();
   }
 
-  void _loadDailyQuestion() {
+  void _loadDailyQuestion() async {
     setState(() {
-      _currentQuestion = QuizRepository.getRandomQuestion();
       _selectedAnswerIndex = null;
       _answerSubmitted = false;
       _showResult = false;
       _isCorrect = false;
+      _currentSignId = null;
+      _questionStartTime = DateTime.now();
     });
+
+    final progressManager = context.read<ProgressManager>();
+    
+    // Check if user is signed in
+    if (!progressManager.isSignedIn) {
+      // Fallback to random question
+      setState(() {
+        _currentQuestion = QuizRepository.getRandomQuestion();
+      });
+      return;
+    }
+    
+    try {
+      // Use adaptive quiz generator (Task 1.3)
+      final generator = AdaptiveQuizGenerator();
+      final questions = await generator.generateAdaptiveQuiz(
+        userId: progressManager.userId!,
+        numberOfQuestions: 1, // For daily quiz, show 1 question
+      );
+      
+      if (questions.isNotEmpty) {
+        setState(() {
+          _currentQuestion = questions.first;
+          // Extract sign ID from question if possible
+          _currentSignId = _extractSignIdFromQuestion(_currentQuestion!);
+        });
+      } else {
+        // Fallback to random question
+        setState(() {
+          _currentQuestion = QuizRepository.getRandomQuestion();
+          _currentSignId = _extractSignIdFromQuestion(_currentQuestion!);
+        });
+      }
+    } catch (e) {
+      print('Error generating adaptive quiz: $e');
+      // Fallback to random question
+      setState(() {
+        _currentQuestion = QuizRepository.getRandomQuestion();
+        _currentSignId = _extractSignIdFromQuestion(_currentQuestion!);
+      });
+    }
+  }
+
+  /// Extract sign ID from question (helper method)
+  String? _extractSignIdFromQuestion(QuizQuestion question) {
+    // Simple mapping - in real app, you'd have proper sign IDs
+    // This is a placeholder - you should map questions to actual sign IDs
+    return question.question.hashCode.toString();
   }
 
   void _selectAnswer(int index) {
@@ -46,29 +102,50 @@ class _DailyQuizScreenState extends State<DailyQuizScreen> {
   Future<void> _submitAnswer() async {
     if (_selectedAnswerIndex == null || _answerSubmitted) return;
     
+    // 1. Calculate Response Time (Task 1.2)
+    final endTime = DateTime.now();
+    final responseTimeMs = _questionStartTime != null 
+        ? endTime.difference(_questionStartTime!).inMilliseconds 
+        : 0;
+
     setState(() {
       _answerSubmitted = true;
       _isCorrect = _selectedAnswerIndex == _currentQuestion!.correctAnswerIndex;
     });
+
+    final progressManager = context.read<ProgressManager>();
+
+    // 2. Log the Attempt to Firestore (Task 1.2)
+    await progressManager.saveQuizAttempt(
+      questionText: _currentQuestion!.question,
+      signId: _currentSignId,
+      isCorrect: _isCorrect,
+      responseTimeMs: responseTimeMs,
+    );
     
-    // Wait 1.5 seconds before showing result
+    // 3. Update mastery score for adaptive learning (Task 1.3)
+    if (_currentSignId != null) {
+      await progressManager.updateMasteryScore(_currentSignId!, _isCorrect);
+    }
+    
+    // Wait 1.5 seconds before showing result (UI UX)
     await Future.delayed(const Duration(milliseconds: 1500));
     
     setState(() {
       _showResult = true;
     });
     
-    // Complete the quiz in progress manager
-    final progressManager = context.read<ProgressManager>();
+    // 4. Complete the Daily Goal (Score & Streak)
     try {
       await progressManager.completeDailyQuiz(isCorrect: _isCorrect);
     } catch (e) {
-      // Show error if quiz already completed
+      // If quiz is already done, we just swallow the error here 
+      // or show a snackbar if strictly necessary.
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(e.toString()),
-            backgroundColor: Colors.red,
+            content: Text('Quiz completed! $e'),
+            backgroundColor: Colors.orange,
           ),
         );
       }
@@ -144,6 +221,38 @@ class _DailyQuizScreenState extends State<DailyQuizScreen> {
           _buildQuizHeader(),
           
           const SizedBox(height: 24),
+          
+          // Adaptive Learning Indicator (Task 1.3)
+          if (_currentSignId != null)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.purple.shade50,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.purple.shade100),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.auto_awesome,
+                    size: 14,
+                    color: Colors.purple.shade700,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Adaptive Learning',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.purple.shade700,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          
+          const SizedBox(height: 16),
           
           // Category badge
           Container(
@@ -263,6 +372,20 @@ class _DailyQuizScreenState extends State<DailyQuizScreen> {
           ),
           
           const SizedBox(height: 20),
+          
+          // Response Time Indicator (Task 1.2)
+          if (_questionStartTime != null && !_answerSubmitted)
+            Align(
+              alignment: Alignment.centerRight,
+              child: Text(
+                'Time: ${DateTime.now().difference(_questionStartTime!).inSeconds}s',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey.shade600,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ),
         ],
       ),
     );

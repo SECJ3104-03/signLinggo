@@ -1,3 +1,4 @@
+// lib/data/progress_manager.dart
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
@@ -107,7 +108,7 @@ class ProgressManager with ChangeNotifier {
     _dailyQuizDone = data['dailyQuizDone'] ?? false;
     _points = data['points'] ?? 0;
 
-    // Handle both old 'watchedVideos' and new 'learnedSignIds'
+    // Handle watched videos/learned signs
     List<String> loadedSigns = [];
     if (data['learnedSignIds'] != null) {
       loadedSigns = List<String>.from(data['learnedSignIds']);
@@ -116,14 +117,19 @@ class ProgressManager with ChangeNotifier {
     }
     _watchedVideos = Set<String>.from(loadedSigns);
 
-    // Handle Timestamps
-    final lastActiveVal = data['lastAccessed'] ?? data['lastActiveDate'];
+    // Handle lastActiveDate - CRITICAL for streak calculation
+    final lastActiveVal = data['lastActiveDate'] ?? data['lastAccessed'];
     if (lastActiveVal != null) {
       if (lastActiveVal is Timestamp) {
         _lastActiveDate = lastActiveVal.toDate();
       } else if (lastActiveVal is String) {
         _lastActiveDate = DateTime.tryParse(lastActiveVal);
       }
+    }
+    
+    // If still null, initialize with current date
+    if (_lastActiveDate == null) {
+      _lastActiveDate = DateTime.now();
     }
   }
 
@@ -137,7 +143,7 @@ class ProgressManager with ChangeNotifier {
       'userName': userName ?? 'Learner', // Needed for Leaderboard
       'learnedSignIds': _watchedVideos.toList(),
       'masteryScore': { 'overall': _points },
-      'lastAccessed': FieldValue.serverTimestamp(),
+      'lastActiveDate': FieldValue.serverTimestamp(),
       
       // Keep these for app logic
       'points': _points,
@@ -145,11 +151,16 @@ class ProgressManager with ChangeNotifier {
       'dailyQuizDone': _dailyQuizDone,
       'dailyWatchedCount': _dailyWatchedCount,
       'totalWatched': _totalWatched,
+      
+      // Add quiz statistics for Task 1.2
+      'totalQuizAttempts': FieldValue.increment(0), // Will be updated via saveQuizAttempt
+      'correctQuizAttempts': FieldValue.increment(0),
+      'averageResponseTime': 0.0,
     };
 
     // Save Local
     final localData = Map<String, dynamic>.from(progressData);
-    localData['lastAccessed'] = DateTime.now().toIso8601String();
+    localData['lastActiveDate'] = DateTime.now().toIso8601String();
     await _saveToLocalCache(uid, localData);
 
     // Save Cloud (To NEW Collection)
@@ -208,19 +219,109 @@ class ProgressManager with ChangeNotifier {
     _dailyQuizDone = true;
     if (isCorrect) _points += 10;
 
-    await _updateStreak();
+    await _updateStreak(); // UPDATE STREAK BEFORE SAVING
     await _saveUserData(); 
     notifyListeners();
+  }
+
+  // ─── TASK 1.2: QUIZ LOGGING ──────────────────────────────────────
+  /// Logs every single quiz attempt to the 'quiz_attempts' collection
+  Future<void> saveQuizAttempt({
+    required String questionText,
+    required String? signId,
+    required bool isCorrect,
+    required int responseTimeMs,
+  }) async {
+    if (!isSignedIn) return;
+
+    try {
+      // Save to quiz_attempts collection
+      await _firestore.collection('quiz_attempts').add({
+        'userId': userId,
+        'questionText': questionText,
+        'signId': signId ?? questionText, // Use question as fallback
+        'isCorrect': isCorrect,
+        'responseTime': responseTimeMs,
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+
+      // Update user's quiz statistics in user_progress
+      final userRef = _firestore.collection('user_progress').doc(userId!);
+      await userRef.update({
+        'totalQuizAttempts': FieldValue.increment(1),
+        'correctQuizAttempts': isCorrect 
+          ? FieldValue.increment(1) 
+          : FieldValue.increment(0),
+      });
+
+      // Update average response time
+      await _updateAverageResponseTime(responseTimeMs);
+
+      if (kDebugMode) print('📊 Quiz attempt logged: $signId - $isCorrect (${responseTimeMs}ms)');
+    } catch (e) {
+      if (kDebugMode) print('⚠️ Failed to log quiz attempt: $e');
+    }
+  }
+
+  /// Update average response time
+  Future<void> _updateAverageResponseTime(int newResponseTime) async {
+    try {
+      final userRef = _firestore.collection('user_progress').doc(userId!);
+      final doc = await userRef.get();
+      
+      if (doc.exists) {
+        final data = doc.data()!;
+        final currentAvg = data['averageResponseTime'] ?? 0.0;
+        final totalAttempts = data['totalQuizAttempts'] ?? 1;
+        
+        // Calculate new average
+        final newAvg = (currentAvg * (totalAttempts - 1) + newResponseTime) / totalAttempts;
+        
+        await userRef.update({
+          'averageResponseTime': newAvg,
+        });
+      }
+    } catch (e) {
+      if (kDebugMode) print('⚠️ Failed to update average response time: $e');
+    }
+  }
+
+  /// Get user's quiz history
+  Future<List<Map<String, dynamic>>> getQuizHistory() async {
+    if (!isSignedIn) return [];
+
+    try {
+      final snapshot = await _firestore
+          .collection('quiz_attempts')
+          .where('userId', isEqualTo: userId)
+          .orderBy('timestamp', descending: true)
+          .limit(50)
+          .get();
+
+      return snapshot.docs.map((doc) {
+        final data = doc.data();
+        return {
+          'id': doc.id,
+          'signId': data['signId'],
+          'questionText': data['questionText'],
+          'isCorrect': data['isCorrect'],
+          'responseTime': data['responseTime'],
+          'timestamp': (data['timestamp'] as Timestamp).toDate(),
+        };
+      }).toList();
+    } catch (e) {
+      if (kDebugMode) print('Error fetching quiz history: $e');
+      return [];
+    }
   }
 
   /// Fetches ALL users from 'user_progress' sorted by points
   Future<List<Map<String, dynamic>>> fetchLeaderboard() async {
     try {
       final snapshot = await _firestore
-          .collection('user_progress') // Queries the new clean collection
+          .collection('user_progress')
           .orderBy('points', descending: true)
-          // .limit(20) // <--- REMOVED or INCREASED this limit
-          .limit(100)   // Now fetches top 100 users. Change to 1000 if needed.
+          .limit(100)
           .get();
 
       // Transform data to ensure LeaderboardScreen works
@@ -248,6 +349,56 @@ class ProgressManager with ChangeNotifier {
     }
   }
 
+  // ─── TASK 1.3: ADAPTIVE QUIZ SUPPORT ────────────────────────────
+  
+  /// Get user's learned signs and mastery scores
+  Future<Map<String, dynamic>> getUserProgressForQuiz() async {
+    if (!isSignedIn) return {};
+    
+    try {
+      final doc = await _firestore.collection('user_progress').doc(userId!).get();
+      if (doc.exists) {
+        final data = doc.data()!;
+        return {
+          'learnedSignIds': List<String>.from(data['learnedSignIds'] ?? []),
+          'masteryScore': Map<String, int>.from(data['masteryScore'] ?? {}),
+          'totalWatched': data['totalWatched'] ?? 0,
+        };
+      }
+    } catch (e) {
+      if (kDebugMode) print('Error getting user progress for quiz: $e');
+    }
+    return {};
+  }
+
+  /// Update mastery score for a sign after quiz attempt
+  Future<void> updateMasteryScore(String signId, bool isCorrect) async {
+    if (!isSignedIn) return;
+    
+    try {
+      final userRef = _firestore.collection('user_progress').doc(userId!);
+      final doc = await userRef.get();
+      
+      if (doc.exists) {
+        final data = doc.data()!;
+        final masteryScores = Map<String, int>.from(data['masteryScore'] ?? {});
+        
+        // Calculate new mastery score
+        final currentScore = masteryScores[signId] ?? 0;
+        final change = isCorrect ? 10 : -5;
+        final newScore = (currentScore + change).clamp(0, 100);
+        
+        masteryScores[signId] = newScore;
+        
+        await userRef.update({
+          'masteryScore': masteryScores,
+        });
+      }
+    } catch (e) {
+      if (kDebugMode) print('Error updating mastery score: $e');
+    }
+  }
+
   // ─── HELPERS ───────────────────────────────────────────────────────
 
   Future<void> _checkAndResetDailyLogs() async {
@@ -264,19 +415,37 @@ class ProgressManager with ChangeNotifier {
 
   Future<void> _updateStreak() async {
     final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    
+    // Initialize if first time
     if (_lastActiveDate == null) {
       _dayStreak = 1;
       _lastActiveDate = now;
       return;
     }
-    final last = _lastActiveDate!;
-    final dateNow = DateTime(now.year, now.month, now.day);
-    final dateLast = DateTime(last.year, last.month, last.day);
-    final diff = dateNow.difference(dateLast).inDays;
-
-    if (diff == 0) { _lastActiveDate = now; return; }
-    if (diff == 1) { _dayStreak++; } else { _dayStreak = 1; }
-    _lastActiveDate = now;
+    
+    final lastDate = DateTime(
+      _lastActiveDate!.year, 
+      _lastActiveDate!.month, 
+      _lastActiveDate!.day
+    );
+    
+    // Calculate days difference
+    final diffInDays = today.difference(lastDate).inDays;
+    
+    if (diffInDays == 0) {
+      // Same day - no streak change, just update timestamp
+      _lastActiveDate = now;
+    } else if (diffInDays == 1) {
+      // Consecutive day - increase streak
+      _dayStreak++;
+      _lastActiveDate = now;
+    } else if (diffInDays > 1) {
+      // Break in streak - reset to 1
+      _dayStreak = 1;
+      _lastActiveDate = now;
+    }
+    // If diffInDays < 0 (somehow future date), ignore
   }
   
   Map<DateTime, bool> getStreakCalendar() {
@@ -286,5 +455,13 @@ class ProgressManager with ChangeNotifier {
       calendar[now.subtract(Duration(days: i))] = i < _dayStreak;
     }
     return calendar;
+  }
+
+  /// Get user's watched videos count
+  int get watchedVideosCount => _watchedVideos.length;
+  
+  /// Get mastery score for a specific sign
+  int getMasteryScore(String signId) {
+    return _masteryScores[signId] ?? 0;
   }
 }

@@ -5,6 +5,7 @@ class QuizQuestion {
   final int correctAnswerIndex;
   final String? explanation;
   final String category;
+   final String signId;
   final String? imageAsset; // Optional: for visual questions
   final String? videoAsset; // Optional: for video questions
 
@@ -14,6 +15,7 @@ class QuizQuestion {
     required this.correctAnswerIndex,
     this.explanation,
     this.category = 'General',
+    required this.signId,
     this.imageAsset,
     this.videoAsset,
   });
@@ -33,19 +35,7 @@ class QuizRepository {
       correctAnswerIndex: 0,
       explanation: 'Waving hand side to side is the international sign for greeting someone.',
       category: 'Greetings',
-    ),
-    
-    QuizQuestion(
-      question: 'What is the sign for "Goodbye"?',
-      options: [
-        'Open and close hand',
-        'Wave hand up and down',
-        'Peace sign outward',
-        'Hand to forehead'
-      ],
-      correctAnswerIndex: 0,
-      explanation: 'Goodbye is signed by opening and closing your hand, like waving goodbye.',
-      category: 'Greetings',
+      signId: 'Hello',
     ),
     
     QuizQuestion(
@@ -59,6 +49,7 @@ class QuizRepository {
       correctAnswerIndex: 0,
       explanation: 'Move your flat hand from your chin outward to show gratitude.',
       category: 'Greetings',
+      signId: 'ThankYou',
     ),
     
     QuizQuestion(
@@ -72,6 +63,7 @@ class QuizRepository {
       correctAnswerIndex: 0,
       explanation: 'Make a circular motion with your flat hand on your chest.',
       category: 'Greetings',
+      signId: 'Please',
     ),
     
     QuizQuestion(
@@ -84,6 +76,7 @@ class QuizRepository {
       ],
       correctAnswerIndex: 0,
       category: 'Greetings',
+      signId: 'Sorry',
     ),
   ];
 
@@ -99,6 +92,7 @@ class QuizRepository {
       ],
       correctAnswerIndex: 0,
       category: 'Numbers',
+      signId: '1',
     ),
     
     QuizQuestion(
@@ -111,6 +105,7 @@ class QuizRepository {
       ],
       correctAnswerIndex: 0,
       category: 'Numbers',
+      signId: '5',
     ),
     
     QuizQuestion(
@@ -123,6 +118,7 @@ class QuizRepository {
       ],
       correctAnswerIndex: 2,
       category: 'Numbers',
+      signId: '10',
     ),
   ];
 
@@ -138,6 +134,7 @@ class QuizRepository {
       ],
       correctAnswerIndex: 0,
       category: 'Family',
+      signId: 'Mother',
     ),
     
     QuizQuestion(
@@ -150,6 +147,7 @@ class QuizRepository {
       ],
       correctAnswerIndex: 0,
       category: 'Family',
+      signId: 'Father',
     ),
     
     QuizQuestion(
@@ -162,6 +160,7 @@ class QuizRepository {
       ],
       correctAnswerIndex: 0,
       category: 'Family',
+      signId: 'Brother',
     ),
   ];
 
@@ -177,6 +176,7 @@ class QuizRepository {
       ],
       correctAnswerIndex: 0,
       category: 'Food & Drink',
+      signId: 'Water',
     ),
     
     QuizQuestion(
@@ -189,6 +189,7 @@ class QuizRepository {
       ],
       correctAnswerIndex: 0,
       category: 'Food & Drink',
+      signId: 'Eat',
     ),
     
     QuizQuestion(
@@ -201,6 +202,7 @@ class QuizRepository {
       ],
       correctAnswerIndex: 0,
       category: 'Food & Drink',
+      signId: 'Drink',
     ),
   ];
 
@@ -216,6 +218,7 @@ class QuizRepository {
       ],
       correctAnswerIndex: 0,
       category: 'Emotions',
+      signId: 'Happy',
     ),
     
     QuizQuestion(
@@ -228,6 +231,7 @@ class QuizRepository {
       ],
       correctAnswerIndex: 0,
       category: 'Emotions',
+      signId: 'Sad',
     ),
     
     QuizQuestion(
@@ -240,6 +244,7 @@ class QuizRepository {
       ],
       correctAnswerIndex: 0,
       category: 'Emotions',
+      signId: 'Angry',
     ),
     
     QuizQuestion(
@@ -252,6 +257,7 @@ class QuizRepository {
       ],
       correctAnswerIndex: 0,
       category: 'Emotions',
+      signId: 'Love',
     ),
   ];
 
@@ -267,6 +273,7 @@ class QuizRepository {
       ],
       correctAnswerIndex: 0,
       category: 'Time',
+      signId: 'Today',
     ),
     
     QuizQuestion(
@@ -279,6 +286,7 @@ class QuizRepository {
       ],
       correctAnswerIndex: 0,
       category: 'Time',
+      signId: 'Tomorrow',
     ),
     
     QuizQuestion(
@@ -291,6 +299,7 @@ class QuizRepository {
       ],
       correctAnswerIndex: 0,
       category: 'Time',
+      signId: 'Yesterday',
     ),
   ];
 
@@ -306,6 +315,7 @@ class QuizRepository {
       ],
       correctAnswerIndex: 0,
       category: 'Colors',
+      signId: 'Red',
     ),
     
     QuizQuestion(
@@ -318,6 +328,7 @@ class QuizRepository {
       ],
       correctAnswerIndex: 0,
       category: 'Colors',
+      signId: 'Blue',
     ),
     
     QuizQuestion(
@@ -330,6 +341,7 @@ class QuizRepository {
       ],
       correctAnswerIndex: 0,
       category: 'Colors',
+      signId: 'Green',
     ),
   ];
 
@@ -345,6 +357,7 @@ class QuizRepository {
       ],
       correctAnswerIndex: 0,
       category: 'Animals',
+      signId: 'Dog',
     ),
     
     QuizQuestion(
@@ -357,6 +370,7 @@ class QuizRepository {
       ],
       correctAnswerIndex: 0,
       category: 'Animals',
+      signId: 'Cat',
     ),
     
     QuizQuestion(
@@ -369,6 +383,7 @@ class QuizRepository {
       ],
       correctAnswerIndex: 0,
       category: 'Animals',
+      signId: 'Bird',
     ),
   ];
 
