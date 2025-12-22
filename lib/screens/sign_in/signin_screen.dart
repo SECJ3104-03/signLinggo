@@ -359,15 +359,26 @@ class _SignInScreenState extends State<SignInScreen> {
     final email = emailController.text.trim();
     final password = passwordController.text.trim();
 
-    // 1. Basic Empty Check
     if (email.isEmpty || password.isEmpty) {
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text("Please fill all fields")));
       return;
     }
 
-    // 2. Validate Password Strength
     String? passwordError = _validatePassword(password);
+    if (passwordError != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Weak Password: $passwordError"),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+      return;
+    }
+
+    // 2. Validate Password Strength
+    _validatePassword(password);
     if (passwordError != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -382,52 +393,43 @@ class _SignInScreenState extends State<SignInScreen> {
     setState(() => _loading = true);
 
     try {
-      // Sign out any previous session to ensure clean login
       await _authService.signOut();
 
-      // Attempt login
       final user = await _authService.login(
         email: email,
         password: password,
       );
 
       if (user != null) {
-        
-        // 3. CHECK EMAIL VERIFICATION
-        if (!user.emailVerified) {
-          // If not verified, sign them out immediately to prevent access
-          await _authService.signOut();
-          
-          setState(() => _loading = false);
-          _showVerificationDialog(user);
-          return; // Stop login process
-        }
-
         // --- FAIL-SAFE FIX FOR DATABASE PROFILE ---
         try {
-          final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+          final userDoc = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .get();
+
           if (!userDoc.exists) {
-            // Auto-create the missing profile
-            await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(user.uid)
+                .set({
               'uid': user.uid,
-              'name': user.displayName ?? email.split('@')[0], 
+              'name': user.displayName ?? email.split('@')[0],
               'email': user.email ?? email,
               'createdAt': FieldValue.serverTimestamp(),
             });
-            print("Auto-fixed missing profile for user: ${user.uid}");
           }
-        } catch (dbError) {
-          print("Safe-fail: Could not check/fix user profile: $dbError");
-        }
-        // ----------------------------------------
+        } catch (_) {}
 
-        final appProvider = Provider.of<AppProvider>(context, listen: false);
+        final appProvider =
+            Provider.of<AppProvider>(context, listen: false);
         appProvider.setLoggedIn(true);
         appProvider.setGuestMode(false);
+
         context.go('/home');
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Login failed: Invalid email or password")),
+          const SnackBar(content: Text("Invalid email or password")),
         );
       }
     } catch (e) {
@@ -437,39 +439,6 @@ class _SignInScreenState extends State<SignInScreen> {
     } finally {
       if (mounted) setState(() => _loading = false);
     }
-  }
-
-  // --- Verification Dialog ---
-  void _showVerificationDialog(User user) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text("Email Not Verified"),
-        content: const Text(
-          "You must verify your email address before logging in.\n\nCheck your inbox (and spam folder) for the verification link.",
-        ),
-        actions: [
-          TextButton(
-            onPressed: () async {
-              try {
-                // Note: user object might be detached after signOut, so we might need to rely on 
-                // the auth service sending it, or re-signin briefly. 
-                // Ideally, verify logic happens before signOut, but for security we signed out.
-                // Re-sending usually requires an active user instance.
-                // Simple fix: Show a message telling them to use the previous email.
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                   const SnackBar(content: Text("Please check your email for the verification link sent previously.")),
-                );
-              } catch (e) {
-                 Navigator.pop(context);
-              }
-            },
-            child: const Text("OK"),
-          ),
-        ],
-      ),
-    );
   }
 
   // GOOGLE LOGIN

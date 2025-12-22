@@ -35,8 +35,7 @@ android {
     }
     // For YoloV8 Flutter Vision Izzat
     aaptOptions {
-        noCompress 'tflite'
-        noCompress 'lite'
+       noCompress += listOf("tflite", "lite")
     }
 
     

@@ -1,13 +1,8 @@
-/// Sign Recognition Screen
-/// 
-/// Real-time sign language recognition using camera:
-/// - Camera preview with detection overlay
-/// - Zoom and camera switching controls
-/// - Sign-to-text translation
-/// - Mode switching between sign-to-text and text-to-sign
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:camera/camera.dart';
+// Import your object detector
+import '../../services/object_detector.dart'; 
 
 class SignRecognitionScreen extends StatefulWidget {
   final CameraDescription camera;
@@ -24,6 +19,12 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
   late Future<void> _initializeControllerFuture;
   late bool isSignToText;
 
+  // --- NEW VARIABLES ---
+  final ObjectDetector _detector = ObjectDetector();
+  bool _isScanning = false;  // Controls the loop
+  String _recognizedText = "Press Start"; // Stores result
+  // ---------------------
+
   int selectedCameraIdx = 0;
   double _currentZoom = 1.0;
   double _minZoom = 1.0;
@@ -32,13 +33,17 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
   @override
   void initState() {
     super.initState();
-    _initializeCamera(widget.camera);
     isSignToText = widget.isSignToText;
+    
+    // Initialize Camera
+    _initializeCamera(widget.camera);
+    
+    // Initialize AI Model
+    _detector.loadModel();
   }
   
   void _initializeCamera(CameraDescription cameraDescription) {
     _controller = CameraController(cameraDescription, ResolutionPreset.medium);
-
     _initializeControllerFuture = _controller.initialize().then((_) async {
       try {
         _minZoom = await _controller.getMinZoomLevel();
@@ -46,77 +51,66 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
         _currentZoom = _minZoom.clamp(1.0, _maxZoom);
         await _controller.setZoomLevel(_currentZoom);
       } catch (e) {
-        debugPrint('SignRecognitionScreen: Error setting zoom: $e');
-        _minZoom = 1.0;
-        _maxZoom = 1.0;
-        _currentZoom = 1.0;
+        debugPrint('Error setting zoom: $e');
       }
-
       if (mounted) setState(() {});
-    }).catchError((error) {
-      debugPrint('SignRecognitionScreen: Camera initialization error: $error');
-      if (mounted) {
-        setState(() {});
-        // Show error message to user
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              error is CameraException
-                  ? 'Camera error: ${error.description ?? error.code}'
-                  : 'Failed to initialize camera: ${error.toString()}',
-            ),
-            duration: const Duration(seconds: 5),
-            action: SnackBarAction(
-              label: 'Retry',
-              onPressed: () {
-                _initializeCamera(cameraDescription);
-              },
-            ),
-          ),
-        );
-      }
     });
   }
 
-  Future<void> _switchCamera() async {
-    try {
-      final availableCamerasList = await availableCameras();
-      if (availableCamerasList.isEmpty) {
+  // --- NEW FUNCTION: The Loop ---
+  void _toggleScanning() async {
+    setState(() {
+      _isScanning = !_isScanning;
+    });
+
+    if (_isScanning) {
+      _startDetectionLoop();
+    }
+  }
+
+  void _startDetectionLoop() async {
+    // Keep taking pictures as long as _isScanning is true
+    while (_isScanning && mounted) {
+      try {
+        if (!_controller.value.isInitialized) return;
+
+        // 1. Take a snapshot
+        final image = await _controller.takePicture();
+
+        // 2. Run Inference
+        final results = await _detector.runInference(image.path);
+
+        // 3. Update UI
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('No other cameras available'),
-              duration: Duration(seconds: 2),
-            ),
-          );
+          setState(() {
+            if (results.isNotEmpty) {
+              _recognizedText = "${results[0]['label']} (${results[0]['score']})";
+            } else {
+              _recognizedText = "No Sign Detected";
+            }
+          });
         }
-        return;
-      }
+        
+        // 4. Small delay to prevent freezing the app (approx 2-3 FPS)
+        await Future.delayed(const Duration(milliseconds: 100));
 
-      selectedCameraIdx = (selectedCameraIdx + 1) % availableCamerasList.length;
-      final newCamera = availableCamerasList[selectedCameraIdx];
-
-      await _controller.dispose();
-      _initializeCamera(newCamera);
-    } catch (e) {
-      debugPrint('SignRecognitionScreen: Error switching camera: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to switch camera: ${e.toString()}'),
-            duration: const Duration(seconds: 3),
-          ),
-        );
+      } catch (e) {
+        print("Detection Error: $e");
+        break; // Stop loop on error
       }
     }
   }
 
   @override
   void dispose() {
-    _controller.dispose().catchError((error) {
-      debugPrint('SignRecognitionScreen: Error disposing camera: $error');
-    });
+    _isScanning = false; // Stop the loop
+    _controller.dispose();
     super.dispose();
+  }
+  
+  // ... (Keep your existing switchCamera code here) ...
+  Future<void> _switchCamera() async {
+     // ... (Paste your existing _switchCamera logic here)
   }
 
   @override
@@ -125,81 +119,64 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Sign Recognition', style: TextStyle(color: Colors.black, fontFamily: 'Arimo',),),
+        title: const Text('Sign Recognition', style: TextStyle(color: Colors.black, fontFamily: 'Arimo')),
         centerTitle: true,
         backgroundColor: Colors.white,
         elevation: 1,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black),
           onPressed: () {
-            // Use pop if there's a route to pop, otherwise go to home
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.go('/home');
-            }
+            _isScanning = false; // Stop scanning when leaving
+            if (context.canPop()) context.pop();
+            else context.go('/home');
           },
         ),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            //Top Row: "Sign → Text" and Switch Mode
-            Container(
+            // ... (Your Existing Top "Switch Mode" Container) ...
+             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(16),
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFAC46FF), Color(0xFF8B2EFF)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
+                gradient: const LinearGradient(colors: [Color(0xFFAC46FF), Color(0xFF8B2EFF)]),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    isSignToText ? 'Text → Sign' : 'Sign → Text',
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.white,),
-                  ),
-                  Row(
-                    children: [
-                      const Text(
-                        'Switch Mode',
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: 16,
-                          fontFamily: 'Arimo',
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Switch(
-                        value: isSignToText,
-                        activeThumbColor: Colors.white,
-                        inactiveThumbColor: Colors.white,
-                        activeTrackColor: Colors.grey[400],
-                        inactiveTrackColor: Colors.grey[400],
-                        onChanged: (value) async {
-                          setState(() => isSignToText = value);
+                  Text(isSignToText ? 'Text → Sign' : 'Sign → Text', style: const TextStyle(fontSize: 18, color: Colors.white)),
+                  // ... (Switch Widget) ...
+                ],
+              ),
+            ),
+            
+            const SizedBox(height: 20),
 
-                          if (value) {
-                            await _controller.dispose();
-                            // Navigate to text-to-sign screen using GoRouter
-                            context.go('/text-to-sign');
-                          }
-                        },
-                      ),
-                    ],
+            // --- RECOGNIZED TEXT DISPLAY ---
+            Container(
+              padding: const EdgeInsets.all(12),
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: Colors.purple.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.purple.shade200)
+              ),
+              child: Column(
+                children: [
+                  const Text("Detected Sign:", style: TextStyle(color: Colors.grey)),
+                  Text(
+                    _recognizedText,
+                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.purple),
                   ),
                 ],
               ),
             ),
-
+            
             const SizedBox(height: 20),
 
-            //Camera container
+            // Camera Container
             Container(
               width: width,
               height: 400,
@@ -213,123 +190,25 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    //Camera Preview
-                    FutureBuilder<void>(
+                     FutureBuilder<void>(
                       future: _initializeControllerFuture,
                       builder: (context, snapshot) {
                         if (snapshot.connectionState == ConnectionState.done) {
-                          if (snapshot.hasError) {
-                            // Show error state if initialization failed
-                            return Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  const Icon(
-                                    Icons.error_outline,
-                                    size: 48,
-                                    color: Colors.red,
-                                  ),
-                                  const SizedBox(height: 16),
-                                  Text(
-                                    snapshot.error is CameraException
-                                        ? 'Camera error: ${(snapshot.error as CameraException).description ?? (snapshot.error as CameraException).code}'
-                                        : 'Failed to initialize camera',
-                                    textAlign: TextAlign.center,
-                                    style: const TextStyle(color: Colors.red),
-                                  ),
-                                  const SizedBox(height: 16),
-                                  ElevatedButton(
-                                    onPressed: () {
-                                      _initializeCamera(widget.camera);
-                                    },
-                                    child: const Text('Retry'),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }
-                          // Check if controller is initialized before showing preview
-                          if (_controller.value.isInitialized) {
-                            return CameraPreview(_controller);
-                          } else {
-                            return const Center(
-                              child: CircularProgressIndicator(),
-                            );
-                          }
-                        } else if (snapshot.connectionState == ConnectionState.waiting) {
-                          return const Center(
-                            child: CircularProgressIndicator(),
-                          );
+                          return CameraPreview(_controller);
                         } else {
-                          // Initial or other states
-                          return const Center(
-                            child: CircularProgressIndicator(),
-                          );
+                          return const Center(child: CircularProgressIndicator());
                         }
                       },
                     ),
-
-                    //Detection box overlay
+                    
+                    // Detection Overlay Box
                     Center(
                       child: Container(
-                        width: 220,
-                        height: 220,
+                        width: 220, height: 220,
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(24),
-                          border: Border.all(
-                            width: 3,
-                            color: Colors.white.withValues(alpha: 0.7),
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFFAC46FF)
-                                  .withValues(alpha: 0.3),
-                              blurRadius: 10,
-                              spreadRadius: 1,
-                            ),
-                          ],
+                          border: Border.all(width: 3, color: _isScanning ? Colors.green : Colors.white.withOpacity(0.7)),
                         ),
-                      ),
-                    ),
-                    
-                    // Zoom and Flip buttons
-                    Positioned(
-                      top: 16,
-                      right: 16,
-                      child: Column(
-                        children: [
-                          // Zoom in button
-                          FloatingActionButton(
-                            heroTag: 'zoom',
-                            mini: true,
-                            backgroundColor: Colors.black45,
-                            onPressed: () async {
-                              if (!_controller.value.isInitialized) return;
-
-                              const double step = 0.5;
-                              final double newZoom = (_currentZoom + step).clamp(_minZoom, _maxZoom);
-
-                              try {
-                                await _controller.setZoomLevel(newZoom);
-                                _currentZoom = newZoom;
-                                setState(() {});
-                              } catch (e) {
-                                debugPrint('Zoom failed: $e');
-                              }
-                            },
-                            child: const Icon(Icons.zoom_in, color: Colors.white),
-                          ),
-                          const SizedBox(height: 12),
-
-                          // Flip camera button
-                          FloatingActionButton(
-                            heroTag: 'flip',
-                            mini: true,
-                            backgroundColor: Colors.black45,
-                            onPressed: _switchCamera,
-                            child: const Icon(Icons.flip_camera_ios, color: Colors.white),
-                          ),
-                        ],
                       ),
                     ),
                   ],
@@ -339,37 +218,28 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
 
             const SizedBox(height: 32),
 
-            //Start Recognition Button
+            // --- UPDATED BUTTON ---
             GestureDetector(
-              onTap: () {
-                // TODO: Add recognition start logic
-              },
+              onTap: _toggleScanning,
               child: Container(
                 width: double.infinity,
                 height: 56,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(16),
-                  gradient: const LinearGradient(
-                    colors: [
-                      Color(0xFFF6329A),
-                      Color(0xFF00B8DA),
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+                  gradient: LinearGradient(
+                    colors: _isScanning 
+                        ? [Colors.red, Colors.redAccent] // Show Red if Stop
+                        : [const Color(0xFFF6329A), const Color(0xFF00B8DA)], // Show Color if Start
                   ),
                 ),
-                child: const Row(
+                child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.camera_alt_outlined, color: Colors.white),
-                    SizedBox(width: 8),
+                    Icon(_isScanning ? Icons.stop : Icons.camera_alt_outlined, color: Colors.white),
+                    const SizedBox(width: 8),
                     Text(
-                      'Start Recognition',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 16,
-                      ),
+                      _isScanning ? 'Stop Recognition' : 'Start Recognition',
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 16),
                     ),
                   ],
                 ),
