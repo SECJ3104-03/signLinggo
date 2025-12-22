@@ -79,10 +79,12 @@ class _SignInputBarState extends State<SignInputBar> {
   Future<void> _setCamera(CameraDescription cameraDescription) async {
     final prevController = _cameraController;
     
+    // Use ImageFormatGroup.nv21 for Qualcomm devices (Oppo/Realme/OnePlus)
     final newController = CameraController(
       cameraDescription,
       ResolutionPreset.medium,
       enableAudio: true,
+      imageFormatGroup: ImageFormatGroup.nv21, // Critical for Qualcomm devices
     );
     
     _cameraController = newController;
