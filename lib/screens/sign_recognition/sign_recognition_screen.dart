@@ -43,7 +43,14 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
   }
   
   void _initializeCamera(CameraDescription cameraDescription) {
-    _controller = CameraController(cameraDescription, ResolutionPreset.medium);
+    // Use ImageFormatGroup.nv21 for Qualcomm devices (Oppo/Realme/OnePlus)
+    // This fixes the "Invalid format passed: 0x21" error on devices with Adreno GPU
+    _controller = CameraController(
+      cameraDescription, 
+      ResolutionPreset.medium,
+      enableAudio: false,
+      imageFormatGroup: ImageFormatGroup.nv21, // Critical for Qualcomm devices
+    );
     _initializeControllerFuture = _controller.initialize().then((_) async {
       try {
         _minZoom = await _controller.getMinZoomLevel();
@@ -54,6 +61,17 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
         debugPrint('Error setting zoom: $e');
       }
       if (mounted) setState(() {});
+    }).catchError((error) {
+      // Handle initialization errors gracefully
+      debugPrint('Camera initialization error: $error');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Camera error: ${error.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     });
   }
 
