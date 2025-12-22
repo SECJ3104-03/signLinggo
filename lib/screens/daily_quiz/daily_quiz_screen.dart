@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../data/progress_manager.dart';
 import '../../data/quiz_questions.dart';
-import '../../data/adaptive_quiz_generator.dart'; // For Task 1.3
+import '../../data/adaptive_quiz_generator.dart';
 
 class DailyQuizScreen extends StatefulWidget {
   const DailyQuizScreen({super.key});
@@ -25,6 +25,11 @@ class _DailyQuizScreenState extends State<DailyQuizScreen> {
   
   // Track when the question appeared to calculate response time
   DateTime? _questionStartTime; 
+  
+  // Stage tracking variables
+  String? _currentStageCategory;
+  int? _currentStageDay;
+  int? _totalStageDays;
 
   @override
   void initState() {
@@ -40,6 +45,9 @@ class _DailyQuizScreenState extends State<DailyQuizScreen> {
       _isCorrect = false;
       _currentSignId = null;
       _questionStartTime = DateTime.now();
+      _currentStageCategory = null;
+      _currentStageDay = null;
+      _totalStageDays = null;
     });
 
     final progressManager = context.read<ProgressManager>();
@@ -54,25 +62,47 @@ class _DailyQuizScreenState extends State<DailyQuizScreen> {
     }
     
     try {
-      // Use adaptive quiz generator (Task 1.3)
+      // Get current learning stage info
+      final stageInfo = progressManager.getLearningStageInfo();
+      final currentCategory = stageInfo['currentCategory'];
+      final stageDay = stageInfo['stageDay'];
+      final stageLength = stageInfo['stageLength'];
+      
+      // Store stage info for UI
+      setState(() {
+        _currentStageCategory = currentCategory;
+        _currentStageDay = stageDay;
+        _totalStageDays = stageLength;
+      });
+      
+      // Use adaptive quiz generator with current category focus
       final generator = AdaptiveQuizGenerator();
       final questions = await generator.generateAdaptiveQuiz(
         userId: progressManager.userId!,
-        numberOfQuestions: 1, // For daily quiz, show 1 question
+        numberOfQuestions: 1,
       );
       
       if (questions.isNotEmpty) {
         setState(() {
           _currentQuestion = questions.first;
-          // Extract sign ID from question if possible
           _currentSignId = _extractSignIdFromQuestion(_currentQuestion!);
         });
       } else {
-        // Fallback to random question
-        setState(() {
-          _currentQuestion = QuizRepository.getRandomQuestion();
-          _currentSignId = _extractSignIdFromQuestion(_currentQuestion!);
-        });
+        // Fallback to random question from current category
+        final categoryQuestions = QuizRepository.getQuestionsByCategory(currentCategory);
+        if (categoryQuestions.isNotEmpty) {
+          final randomIndex = DateTime.now().millisecondsSinceEpoch % categoryQuestions.length;
+          setState(() {
+            _currentQuestion = categoryQuestions[randomIndex];
+            _currentSignId = _extractSignIdFromQuestion(_currentQuestion!);
+          });
+        } else {
+          // Ultimate fallback
+          setState(() {
+            _currentQuestion = QuizRepository.getRandomQuestion();
+            _currentSignId = _extractSignIdFromQuestion(_currentQuestion!);
+          });
+        }
       }
     } catch (e) {
       print('Error generating adaptive quiz: $e');
@@ -88,7 +118,7 @@ class _DailyQuizScreenState extends State<DailyQuizScreen> {
   String? _extractSignIdFromQuestion(QuizQuestion question) {
     // Simple mapping - in real app, you'd have proper sign IDs
     // This is a placeholder - you should map questions to actual sign IDs
-    return question.question.hashCode.toString();
+    return question.signId;
   }
 
   void _selectAnswer(int index) {
@@ -220,32 +250,62 @@ class _DailyQuizScreenState extends State<DailyQuizScreen> {
           // Streak and progress indicator
           _buildQuizHeader(),
           
-          const SizedBox(height: 24),
-          
-          // Adaptive Learning Indicator (Task 1.3)
-          if (_currentSignId != null)
+          // Stage Progress Indicator
+          if (_currentStageCategory != null && _currentStageDay != null)
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              margin: const EdgeInsets.only(top: 16),
+              padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: Colors.purple.shade50,
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: Colors.purple.shade100),
               ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(
-                    Icons.auto_awesome,
-                    size: 14,
-                    color: Colors.purple.shade700,
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.school,
+                        size: 16,
+                        color: Colors.purple.shade700,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Learning Stage: $_currentStageCategory',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: Colors.purple.shade700,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 6),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: LinearProgressIndicator(
+                          value: _currentStageDay! / _totalStageDays!,
+                          backgroundColor: Colors.purple.shade100,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.purple.shade600),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        'Day $_currentStageDay/$_totalStageDays',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.purple.shade700,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
                   Text(
-                    'Adaptive Learning',
+                    'Master $_currentStageCategory before moving to the next stage!',
                     style: TextStyle(
                       fontSize: 12,
-                      color: Colors.purple.shade700,
-                      fontWeight: FontWeight.w500,
+                      color: Colors.purple.shade600,
                     ),
                   ),
                 ],
@@ -254,6 +314,37 @@ class _DailyQuizScreenState extends State<DailyQuizScreen> {
           
           const SizedBox(height: 16),
           
+          // Adaptive Learning Indicator (Task 1.3)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.purple.shade50,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.purple.shade100),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.auto_awesome,
+                  size: 14,
+                  color: Colors.purple.shade700,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'Adaptive Learning',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.purple.shade700,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          
+          const SizedBox(height: 16),
+        
           // Category badge
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -557,6 +648,8 @@ class _DailyQuizScreenState extends State<DailyQuizScreen> {
 
   Widget _buildResultScreen() {
     final progressManager = context.watch<ProgressManager>();
+    final stageInfo = progressManager.getLearningStageInfo();
+    final nextCategory = _getNextCategory(stageInfo['currentCategory']);
     
     return Padding(
       padding: const EdgeInsets.all(20),
@@ -604,6 +697,65 @@ class _DailyQuizScreenState extends State<DailyQuizScreen> {
           ),
           
           const SizedBox(height: 32),
+          
+          // Learning Stage Progress
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.purple.shade50,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.purple.shade100),
+            ),
+            child: Column(
+              children: [
+                Text(
+                  'Learning Progress:',
+                  style: TextStyle(
+                    color: Colors.purple.shade700,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.school,
+                      color: Colors.purple.shade700,
+                      size: 24,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '${stageInfo['currentCategory']} - Day ${stageInfo['stageDay']}/${stageInfo['stageLength']}',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.purple.shade700,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                LinearProgressIndicator(
+                  value: stageInfo['stageDay'] / stageInfo['stageLength'],
+                  backgroundColor: Colors.purple.shade100,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.purple.shade600),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  stageInfo['daysRemainingInStage'] > 1
+                      ? '${stageInfo['daysRemainingInStage'] - 1} more days in this stage'
+                      : 'Next stage: $nextCategory',
+                  style: TextStyle(
+                    color: Colors.purple.shade600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          
+          const SizedBox(height: 24),
           
           // Streak update
           Container(
@@ -655,7 +807,7 @@ class _DailyQuizScreenState extends State<DailyQuizScreen> {
             ),
           ),
           
-          const SizedBox(height: 32),
+          const SizedBox(height: 24),
           
           // Explanation (if available)
           if (_currentQuestion!.explanation != null)
@@ -733,8 +885,28 @@ class _DailyQuizScreenState extends State<DailyQuizScreen> {
     );
   }
 
+  String _getNextCategory(String currentCategory) {
+    final categories = [
+      'Alphabet',
+      'Numbers',
+      'Family',
+      'Food & Drink',
+      'Emotions',
+      'Time',
+      'Colors',
+      'Animals',
+      'Greetings',
+    ];
+    
+    final currentIndex = categories.indexOf(currentCategory);
+    final nextIndex = (currentIndex + 1) % categories.length;
+    return categories[nextIndex];
+  }
+
   IconData _getCategoryIcon(String category) {
     switch (category) {
+      case 'Alphabet':
+        return Icons.abc;
       case 'Greetings':
         return Icons.waving_hand;
       case 'Numbers':

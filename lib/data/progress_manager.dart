@@ -399,54 +399,126 @@ class ProgressManager with ChangeNotifier {
     }
   }
 
+  // ─── LEARNING STAGE TRACKING ─────────────────────────────────────
+  
+  /// Get current learning stage based on day streak
+  String getCurrentLearningStage() {
+    // Each stage lasts 5 days
+    final stageLength = 5;
+    final stageNumber = (_dayStreak ~/ stageLength) + 1;
+    
+    // Define category sequence
+    final categories = [
+      'Alphabet',
+      'Numbers',
+      'Family',
+      'Food & Drink',
+      'Emotions',
+      'Time',
+      'Colors',
+      'Animals',
+      'Greetings',
+    ];
+    
+    // Cycle through categories if streak exceeds total categories
+    final categoryIndex = (stageNumber - 1) % categories.length;
+    final currentCategory = categories[categoryIndex];
+    
+    return currentCategory;
+  }
+
+  /// Get stage progress info
+  Map<String, dynamic> getLearningStageInfo() {
+    final stageLength = 5;
+    final stageNumber = (_dayStreak ~/ stageLength) + 1;
+    final stageDay = (_dayStreak % stageLength) + 1;
+    final currentCategory = getCurrentLearningStage();
+    
+    return {
+      'currentCategory': currentCategory,
+      'stageNumber': stageNumber,
+      'stageDay': stageDay,
+      'stageLength': stageLength,
+      'daysInCurrentStage': stageDay,
+      'daysRemainingInStage': stageLength - stageDay + 1,
+    };
+  }
+
   // ─── HELPERS ───────────────────────────────────────────────────────
 
   Future<void> _checkAndResetDailyLogs() async {
+    print('🕐 Checking daily logs...');
+    print('🕐 Current time: ${DateTime.now()}');
+    print('🕐 Last active: $_lastActiveDate');
+    
     if (_lastActiveDate != null) {
       final now = DateTime.now();
       final last = _lastActiveDate!;
-      bool isNewDay = now.year != last.year || now.month != last.month || now.day != last.day;
+      bool isNewDay = now.year != last.year || 
+                      now.month != last.month || 
+                      now.day != last.day;
+      
+      print('🕐 Is new day? $isNewDay');
+      print('🕐 Daily quiz done before reset: $_dailyQuizDone');
+      
       if (isNewDay) {
         _dailyQuizDone = false;
         _dailyWatchedCount = 0; 
+        print('🔄 Daily quiz reset to: $_dailyQuizDone');
       }
     }
+    notifyListeners();
   }
 
   Future<void> _updateStreak() async {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    
-    // Initialize if first time
-    if (_lastActiveDate == null) {
-      _dayStreak = 1;
-      _lastActiveDate = now;
-      return;
-    }
-    
-    final lastDate = DateTime(
-      _lastActiveDate!.year, 
-      _lastActiveDate!.month, 
-      _lastActiveDate!.day
-    );
-    
-    // Calculate days difference
-    final diffInDays = today.difference(lastDate).inDays;
-    
-    if (diffInDays == 0) {
-      // Same day - no streak change, just update timestamp
-      _lastActiveDate = now;
-    } else if (diffInDays == 1) {
-      // Consecutive day - increase streak
-      _dayStreak++;
-      _lastActiveDate = now;
-    } else if (diffInDays > 1) {
-      // Break in streak - reset to 1
-      _dayStreak = 1;
-      _lastActiveDate = now;
-    }
-    // If diffInDays < 0 (somehow future date), ignore
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  
+  // If first time or no last active date
+  if (_lastActiveDate == null) {
+    _dayStreak = 1;
+    _lastActiveDate = now;
+    _dailyQuizDone = false; // Ensure quiz is available
+    return;
   }
+  
+  final lastDate = DateTime(
+    _lastActiveDate!.year, 
+    _lastActiveDate!.month, 
+    _lastActiveDate!.day
+  );
+  
+  // Calculate days difference
+  final diffInDays = today.difference(lastDate).inDays;
+  
+  print('📅 Streak Debug:');
+  print('📅 Today: $today');
+  print('📅 Last Date: $lastDate');
+  print('📅 Diff in days: $diffInDays');
+  print('📅 Current streak: $_dayStreak');
+  
+  if (diffInDays == 0) {
+    // Same day - already used today
+    print('📅 Same day - quiz should be done');
+  } else if (diffInDays == 1) {
+    // Consecutive day - increase streak
+    _dayStreak++;
+    _lastActiveDate = now;
+    _dailyQuizDone = false; // NEW QUIZ AVAILABLE!
+    print('📅 New day - streak increased to $_dayStreak');
+    print('📅 Quiz reset to available');
+  } else if (diffInDays > 1) {
+    // Break in streak - reset to 1
+    _dayStreak = 1;
+    _lastActiveDate = now;
+    _dailyQuizDone = false; // NEW QUIZ AVAILABLE!
+    print('📅 Streak broken - reset to 1');
+    print('📅 Quiz reset to available');
+  }
+  // If diffInDays < 0 (future date), ignore
+  
+  await _saveUserData();
+}
   
   Map<DateTime, bool> getStreakCalendar() {
     final calendar = <DateTime, bool>{};

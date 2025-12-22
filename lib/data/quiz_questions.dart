@@ -5,7 +5,7 @@ class QuizQuestion {
   final int correctAnswerIndex;
   final String? explanation;
   final String category;
-   final String signId;
+  final String signId;
   final String? imageAsset; // Optional: for visual questions
   final String? videoAsset; // Optional: for video questions
 
@@ -22,6 +22,79 @@ class QuizQuestion {
 }
 
 class QuizRepository {
+  // ─── ALPHABET CATEGORY ──────────────────────────────────────
+  static final List<QuizQuestion> alphabetQuestions = [
+    QuizQuestion(
+      question: 'What is the sign for letter "A"?',
+      options: [
+        'Closed fist with thumb to side',
+        'Peace sign',
+        'Index finger pointing up',
+        'Open palm facing forward'
+      ],
+      correctAnswerIndex: 0,
+      explanation: 'Letter A is signed by making a fist with thumb resting on the side.',
+      category: 'Alphabet',
+      signId: 'A',
+    ),
+    
+    QuizQuestion(
+      question: 'What is the sign for letter "B"?',
+      options: [
+        'Flat hand with fingers together',
+        'Index and middle finger up',
+        'Thumb and pinky extended',
+        'All fingers spread'
+      ],
+      correctAnswerIndex: 0,
+      explanation: 'Letter B is signed with a flat hand, fingers together, palm facing out.',
+      category: 'Alphabet',
+      signId: 'B',
+    ),
+    
+    QuizQuestion(
+      question: 'What is the sign for letter "C"?',
+      options: [
+        'Curved hand like a C shape',
+        'Closed fist',
+        'Thumb and index making circle',
+        'Peace sign'
+      ],
+      correctAnswerIndex: 0,
+      explanation: 'Letter C is signed by curving your hand into a C shape.',
+      category: 'Alphabet',
+      signId: 'C',
+    ),
+    
+    QuizQuestion(
+      question: 'What is the sign for letter "D"?',
+      options: [
+        'Index finger up, others folded, thumb touches middle finger',
+        'Thumb up',
+        'Index and middle finger up',
+        'Closed fist'
+      ],
+      correctAnswerIndex: 0,
+      explanation: 'Letter D is signed with index finger pointing up, other fingers folded, thumb touching middle finger.',
+      category: 'Alphabet',
+      signId: 'D',
+    ),
+    
+    QuizQuestion(
+      question: 'What is the sign for letter "E"?',
+      options: [
+        'Fingers folded, thumb across fingers',
+        'Open hand',
+        'Peace sign',
+        'Closed fist'
+      ],
+      correctAnswerIndex: 0,
+      explanation: 'Letter E is signed with fingers folded down, thumb across the fingers.',
+      category: 'Alphabet',
+      signId: 'E',
+    ),
+  ];
+
   // ─── GREETINGS CATEGORY ─────────────────────────────────────
   static final List<QuizQuestion> greetingQuestions = [
     QuizQuestion(
@@ -390,6 +463,7 @@ class QuizRepository {
   // ─── ALL QUESTIONS ─────────────────────────────────────────
   static List<QuizQuestion> get allQuestions {
     return [
+      ...alphabetQuestions,
       ...greetingQuestions,
       ...numberQuestions,
       ...familyQuestions,
@@ -414,6 +488,8 @@ class QuizRepository {
   // Get questions by category
   static List<QuizQuestion> getQuestionsByCategory(String category) {
     switch (category) {
+      case 'Alphabet':
+        return alphabetQuestions;
       case 'Greetings':
         return greetingQuestions;
       case 'Numbers':
@@ -438,7 +514,7 @@ class QuizRepository {
   // Get all categories
   static List<String> get allCategories {
     return [
-      'Greetings',
+      'Alphabet',
       'Numbers',
       'Family',
       'Food & Drink',
@@ -446,12 +522,14 @@ class QuizRepository {
       'Time',
       'Colors',
       'Animals',
+      'Greetings',
     ];
   }
 
   // Get question count by category
   static Map<String, int> get questionCountByCategory {
     return {
+      'Alphabet': alphabetQuestions.length,
       'Greetings': greetingQuestions.length,
       'Numbers': numberQuestions.length,
       'Family': familyQuestions.length,
