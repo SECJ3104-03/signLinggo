@@ -25,7 +25,9 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
   String _recognizedText = "Press Start"; // Stores result
   // ---------------------
 
-  int selectedCameraIdx = 0;
+  List<CameraDescription> _availableCameras = [];
+  int _selectedCameraIdx = 0;
+  bool _isFrontCamera = false;
   double _currentZoom = 1.0;
   double _minZoom = 1.0;
   double _maxZoom = 1.0;
@@ -35,8 +37,14 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
     super.initState();
     isSignToText = widget.isSignToText;
     
+    // Get available cameras from CameraService
+    _availableCameras = CameraService.cameras;
+    
     // Initialize Camera
     _initializeCamera(widget.camera);
+    
+    // Check if initial camera is front camera
+    _isFrontCamera = widget.camera.lensDirection == CameraLensDirection.front;
     
     // Initialize AI Model
     _detector.loadModel();
@@ -51,6 +59,7 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
       enableAudio: false,
       imageFormatGroup: ImageFormatGroup.nv21, // Critical for Qualcomm devices
     );
+    
     _initializeControllerFuture = _controller.initialize().then((_) async {
       try {
         _minZoom = await _controller.getMinZoomLevel();
@@ -126,9 +135,85 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
     super.dispose();
   }
   
-  // ... (Keep your existing switchCamera code here) ...
+  /// Switch between front and rear cameras
   Future<void> _switchCamera() async {
-     // ... (Paste your existing _switchCamera logic here)
+    if (_availableCameras.length < 2) {
+      // Only one camera available
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Only one camera available on this device'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+      return;
+    }
+
+    // Stop scanning if active
+    final wasScanning = _isScanning;
+    if (_isScanning) {
+      setState(() {
+        _isScanning = false;
+      });
+    }
+
+    try {
+      // Determine the new camera direction
+      final newLensDirection = _isFrontCamera 
+          ? CameraLensDirection.back 
+          : CameraLensDirection.front;
+
+      // Find the camera with the desired lens direction
+      final newCamera = _availableCameras.firstWhere(
+        (camera) => camera.lensDirection == newLensDirection,
+        orElse: () => _availableCameras[0],
+      );
+
+      // Dispose of the old controller
+      await _controller.dispose();
+
+      // Initialize the new camera
+      _initializeCamera(newCamera);
+
+      // Update state
+      setState(() {
+        _isFrontCamera = newCamera.lensDirection == CameraLensDirection.front;
+      });
+
+      // Show feedback to user
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              _isFrontCamera ? 'Switched to Front Camera' : 'Switched to Rear Camera',
+            ),
+            duration: const Duration(seconds: 1),
+            backgroundColor: Colors.purple,
+          ),
+        );
+      }
+
+      // Resume scanning if it was active
+      if (wasScanning) {
+        // Wait for camera to initialize before resuming
+        await _initializeControllerFuture;
+        setState(() {
+          _isScanning = true;
+        });
+        _startDetectionLoop();
+      }
+    } catch (e) {
+      debugPrint('Error switching camera: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to switch camera: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -229,6 +314,34 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
                         ),
                       ),
                     ),
+                  
+                    
+                    // Flip Camera Button
+                    if (_availableCameras.length > 1)
+                      Positioned(
+                        top: 16,
+                        right: 16,
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: _switchCamera,
+                            borderRadius: BorderRadius.circular(30),
+                            child: Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.5),
+                                shape: BoxShape.circle,
+                                border: Border.all(color: Colors.white.withOpacity(0.3), width: 2),
+                              ),
+                              child: Icon(
+                                _isFrontCamera ? Icons.camera_rear : Icons.camera_front,
+                                color: Colors.white,
+                                size: 28,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),
