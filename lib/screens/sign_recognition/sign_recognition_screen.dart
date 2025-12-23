@@ -21,8 +21,7 @@ class SignRecognitionScreen extends StatefulWidget {
 class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
   late CameraController _controller;
   
-  // FIXED: Removed 'late' to prevent Red Screen Crash. 
-  // Made it nullable (?) so we can check if it is ready.
+  // Nullable to prevent "LateInitializationError" crash
   Future<void>? _initializeControllerFuture;
   
   late bool isSignToText;
@@ -76,7 +75,6 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
       imageFormatGroup: ImageFormatGroup.nv21, 
     );
 
-    // FIXED: Assign the future to the variable without 'late'
     final future = _controller.initialize().then((_) async {
       try {
         _minZoom = await _controller.getMinZoomLevel();
@@ -89,6 +87,7 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
       if (mounted) setState(() {});
     });
 
+    // Assign future without 'late' so UI can check for null
     setState(() {
       _initializeControllerFuture = future;
     });
@@ -114,8 +113,7 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
 
     setState(() {
       _selectedCameraIdx = newIndex;
-      // Reset the future to null so the UI knows we are loading again
-      _initializeControllerFuture = null; 
+      _initializeControllerFuture = null; // Reset to show loading spinner
     });
     
     _initializeCamera(_cameras[_selectedCameraIdx]);
@@ -135,7 +133,6 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
   void _startDetectionLoop() async {
     while (_isScanning && mounted) {
       try {
-        // Safety check: ensure controller is ready
         if (_initializeControllerFuture == null || !_controller.value.isInitialized) return;
 
         final image = await _controller.takePicture();
@@ -241,15 +238,24 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    // FIXED: Check if future is null BEFORE building the FutureBuilder
-                    // This prevents the "LateInitializationError"
+                    // CHECK: Is Camera Ready?
                     _initializeControllerFuture == null 
                     ? const Center(child: CircularProgressIndicator())
                     : FutureBuilder<void>(
                       future: _initializeControllerFuture,
                       builder: (context, snapshot) {
                         if (snapshot.connectionState == ConnectionState.done) {
-                          return CameraPreview(_controller);
+                          // FIX: Use FittedBox to cover the area without stretching
+                          return SizedBox.expand(
+                            child: FittedBox(
+                              fit: BoxFit.cover,
+                              child: SizedBox(
+                                width: _controller.value.previewSize!.height,
+                                height: _controller.value.previewSize!.width,
+                                child: CameraPreview(_controller),
+                              ),
+                            ),
+                          );
                         } else {
                           return const Center(child: CircularProgressIndicator());
                         }
