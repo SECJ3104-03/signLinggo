@@ -20,7 +20,11 @@ class SignRecognitionScreen extends StatefulWidget {
 
 class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
   late CameraController _controller;
-  late Future<void> _initializeControllerFuture;
+  
+  // FIXED: Removed 'late' to prevent Red Screen Crash. 
+  // Made it nullable (?) so we can check if it is ready.
+  Future<void>? _initializeControllerFuture;
+  
   late bool isSignToText;
 
   // --- AI & Logic Variables ---
@@ -29,8 +33,8 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
   String _recognizedText = "Press Start"; 
   
   // --- Camera Management Variables ---
-  List<CameraDescription> _cameras = []; // Stores all available cameras
-  int _selectedCameraIdx = 0; // Tracks which camera is active
+  List<CameraDescription> _cameras = []; 
+  int _selectedCameraIdx = 0; 
   double _currentZoom = 1.0;
   double _minZoom = 1.0;
   double _maxZoom = 1.0;
@@ -49,11 +53,9 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
 
   Future<void> _setupCameras() async {
     try {
-      // Fetch all cameras (Front & Back)
       _cameras = await availableCameras();
       
       // Find the index of the camera passed from the previous screen
-      // Default to 0 if not found
       _selectedCameraIdx = _cameras.indexWhere(
         (c) => c.lensDirection == widget.camera.lensDirection
       );
@@ -67,7 +69,6 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
   }
   
   void _initializeCamera(CameraDescription cameraDescription) {
-    // NV21 format is safer for Android/Qualcomm devices
     _controller = CameraController(
       cameraDescription, 
       ResolutionPreset.medium,
@@ -75,7 +76,8 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
       imageFormatGroup: ImageFormatGroup.nv21, 
     );
 
-    _initializeControllerFuture = _controller.initialize().then((_) async {
+    // FIXED: Assign the future to the variable without 'late'
+    final future = _controller.initialize().then((_) async {
       try {
         _minZoom = await _controller.getMinZoomLevel();
         _maxZoom = await _controller.getMaxZoomLevel();
@@ -85,32 +87,37 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
         debugPrint('Error setting zoom: $e');
       }
       if (mounted) setState(() {});
-    }).catchError((error) {
+    });
+
+    setState(() {
+      _initializeControllerFuture = future;
+    });
+    
+    future.catchError((error) {
       debugPrint('Camera initialization error: $error');
     });
   }
 
   // --- FLIP CAMERA LOGIC ---
   Future<void> _onTapSwitchCamera() async {
-    if (_cameras.length < 2) return; // Need at least 2 cameras to switch
+    if (_cameras.length < 2) return; 
 
-    // Stop scanning if active
     if (_isScanning) {
       setState(() {
         _isScanning = false; 
       });
     }
 
-    // Calculate new index
     final newIndex = (_selectedCameraIdx + 1) % _cameras.length;
     
-    // Dispose old controller
     await _controller.dispose();
 
-    // Initialize new camera
     setState(() {
       _selectedCameraIdx = newIndex;
+      // Reset the future to null so the UI knows we are loading again
+      _initializeControllerFuture = null; 
     });
+    
     _initializeCamera(_cameras[_selectedCameraIdx]);
   }
 
@@ -128,7 +135,8 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
   void _startDetectionLoop() async {
     while (_isScanning && mounted) {
       try {
-        if (!_controller.value.isInitialized) return;
+        // Safety check: ensure controller is ready
+        if (_initializeControllerFuture == null || !_controller.value.isInitialized) return;
 
         final image = await _controller.takePicture();
         final results = await _detector.runInference(image.path);
@@ -142,7 +150,6 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
             }
           });
         }
-        // Small delay to keep UI smooth
         await Future.delayed(const Duration(milliseconds: 100));
 
       } catch (e) {
@@ -182,7 +189,6 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            // Mode Switcher Header
              Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               decoration: BoxDecoration(
@@ -193,7 +199,6 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(isSignToText ? 'Text → Sign' : 'Sign → Text', style: const TextStyle(fontSize: 18, color: Colors.white)),
-                  // Add your Switch widget here if needed
                 ],
               ),
             ),
@@ -236,8 +241,11 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    // 1. Camera Feed
-                     FutureBuilder<void>(
+                    // FIXED: Check if future is null BEFORE building the FutureBuilder
+                    // This prevents the "LateInitializationError"
+                    _initializeControllerFuture == null 
+                    ? const Center(child: CircularProgressIndicator())
+                    : FutureBuilder<void>(
                       future: _initializeControllerFuture,
                       builder: (context, snapshot) {
                         if (snapshot.connectionState == ConnectionState.done) {
@@ -248,7 +256,7 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
                       },
                     ),
                     
-                    // 2. Overlay Box
+                    // Overlay Box
                     Center(
                       child: Container(
                         width: 220, height: 220,
@@ -259,7 +267,7 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
                       ),
                     ),
 
-                    // 3. FLIP CAMERA BUTTON
+                    // Flip Camera Button
                     Positioned(
                       bottom: 16,
                       right: 16,
