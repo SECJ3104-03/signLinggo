@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:camera/camera.dart';
-// Import your object detector
+// Keep your existing ObjectDetector import
 import '../../services/object_detector.dart'; 
-import '../../services/camera_service.dart'; 
 
 class SignRecognitionScreen extends StatefulWidget {
   final CameraDescription camera;
   final bool isSignToText;
 
-  const SignRecognitionScreen({super.key, required this.camera, this.isSignToText = false});
+  const SignRecognitionScreen({
+    super.key, 
+    required this.camera, 
+    this.isSignToText = false
+  });
 
   @override
   State<SignRecognitionScreen> createState() => _SignRecognitionScreenState();
@@ -20,13 +23,14 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
   late Future<void> _initializeControllerFuture;
   late bool isSignToText;
 
-  // --- NEW VARIABLES ---
+  // --- AI & Logic Variables ---
   final ObjectDetector _detector = ObjectDetector();
-  bool _isScanning = false;  // Controls the loop
-  String _recognizedText = "Press Start"; // Stores result
-  // ---------------------
-
-  int selectedCameraIdx = 0;
+  bool _isScanning = false;
+  String _recognizedText = "Press Start"; 
+  
+  // --- Camera Management Variables ---
+  List<CameraDescription> _cameras = []; // Stores all available cameras
+  int _selectedCameraIdx = 0; // Tracks which camera is active
   double _currentZoom = 1.0;
   double _minZoom = 1.0;
   double _maxZoom = 1.0;
@@ -36,22 +40,41 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
     super.initState();
     isSignToText = widget.isSignToText;
     
-    // Initialize Camera
-    _initializeCamera(widget.camera);
-    
-    // Initialize AI Model
+    // 1. Initialize the AI
     _detector.loadModel();
+
+    // 2. Setup Cameras
+    _setupCameras();
+  }
+
+  Future<void> _setupCameras() async {
+    try {
+      // Fetch all cameras (Front & Back)
+      _cameras = await availableCameras();
+      
+      // Find the index of the camera passed from the previous screen
+      // Default to 0 if not found
+      _selectedCameraIdx = _cameras.indexWhere(
+        (c) => c.lensDirection == widget.camera.lensDirection
+      );
+      if (_selectedCameraIdx == -1) _selectedCameraIdx = 0;
+
+      // Initialize the selected camera
+      _initializeCamera(_cameras[_selectedCameraIdx]);
+    } catch (e) {
+      debugPrint("Error fetching cameras: $e");
+    }
   }
   
   void _initializeCamera(CameraDescription cameraDescription) {
-    // Use ImageFormatGroup.nv21 for Qualcomm devices (Oppo/Realme/OnePlus)
-    // This fixes the "Invalid format passed: 0x21" error on devices with Adreno GPU
+    // NV21 format is safer for Android/Qualcomm devices
     _controller = CameraController(
       cameraDescription, 
       ResolutionPreset.medium,
       enableAudio: false,
-      imageFormatGroup: ImageFormatGroup.nv21, // Critical for Qualcomm devices
+      imageFormatGroup: ImageFormatGroup.nv21, 
     );
+
     _initializeControllerFuture = _controller.initialize().then((_) async {
       try {
         _minZoom = await _controller.getMinZoomLevel();
@@ -63,20 +86,35 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
       }
       if (mounted) setState(() {});
     }).catchError((error) {
-      // Handle initialization errors gracefully
       debugPrint('Camera initialization error: $error');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Camera error: ${error.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
     });
   }
 
-  // --- NEW FUNCTION: The Loop ---
+  // --- FLIP CAMERA LOGIC ---
+  Future<void> _onTapSwitchCamera() async {
+    if (_cameras.length < 2) return; // Need at least 2 cameras to switch
+
+    // Stop scanning if active
+    if (_isScanning) {
+      setState(() {
+        _isScanning = false; 
+      });
+    }
+
+    // Calculate new index
+    final newIndex = (_selectedCameraIdx + 1) % _cameras.length;
+    
+    // Dispose old controller
+    await _controller.dispose();
+
+    // Initialize new camera
+    setState(() {
+      _selectedCameraIdx = newIndex;
+    });
+    _initializeCamera(_cameras[_selectedCameraIdx]);
+  }
+
+  // --- SCANNING LOOP ---
   void _toggleScanning() async {
     setState(() {
       _isScanning = !_isScanning;
@@ -88,18 +126,13 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
   }
 
   void _startDetectionLoop() async {
-    // Keep taking pictures as long as _isScanning is true
     while (_isScanning && mounted) {
       try {
         if (!_controller.value.isInitialized) return;
 
-        // 1. Take a snapshot
         final image = await _controller.takePicture();
-
-        // 2. Run Inference
         final results = await _detector.runInference(image.path);
 
-        // 3. Update UI
         if (mounted) {
           setState(() {
             if (results.isNotEmpty) {
@@ -109,27 +142,21 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
             }
           });
         }
-        
-        // 4. Small delay to prevent freezing the app (approx 2-3 FPS)
+        // Small delay to keep UI smooth
         await Future.delayed(const Duration(milliseconds: 100));
 
       } catch (e) {
-        print("Detection Error: $e");
-        break; // Stop loop on error
+        debugPrint("Detection Error: $e");
+        break; 
       }
     }
   }
 
   @override
   void dispose() {
-    _isScanning = false; // Stop the loop
+    _isScanning = false;
     _controller.dispose();
     super.dispose();
-  }
-  
-  // ... (Keep your existing switchCamera code here) ...
-  Future<void> _switchCamera() async {
-     // ... (Paste your existing _switchCamera logic here)
   }
 
   @override
@@ -145,7 +172,7 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black),
           onPressed: () {
-            _isScanning = false; // Stop scanning when leaving
+            _isScanning = false;
             if (context.canPop()) context.pop();
             else context.go('/home');
           },
@@ -155,7 +182,7 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            // ... (Your Existing Top "Switch Mode" Container) ...
+            // Mode Switcher Header
              Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               decoration: BoxDecoration(
@@ -166,14 +193,14 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(isSignToText ? 'Text → Sign' : 'Sign → Text', style: const TextStyle(fontSize: 18, color: Colors.white)),
-                  // ... (Switch Widget) ...
+                  // Add your Switch widget here if needed
                 ],
               ),
             ),
             
             const SizedBox(height: 20),
 
-            // --- RECOGNIZED TEXT DISPLAY ---
+            // Result Display
             Container(
               padding: const EdgeInsets.all(12),
               width: double.infinity,
@@ -195,7 +222,7 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
             
             const SizedBox(height: 20),
 
-            // Camera Container
+            // --- CAMERA PREVIEW SECTION ---
             Container(
               width: width,
               height: 400,
@@ -209,6 +236,7 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
+                    // 1. Camera Feed
                      FutureBuilder<void>(
                       future: _initializeControllerFuture,
                       builder: (context, snapshot) {
@@ -220,7 +248,7 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
                       },
                     ),
                     
-                    // Detection Overlay Box
+                    // 2. Overlay Box
                     Center(
                       child: Container(
                         width: 220, height: 220,
@@ -230,6 +258,18 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
                         ),
                       ),
                     ),
+
+                    // 3. FLIP CAMERA BUTTON
+                    Positioned(
+                      bottom: 16,
+                      right: 16,
+                      child: FloatingActionButton.small(
+                        heroTag: "flip_btn",
+                        backgroundColor: Colors.white.withOpacity(0.8),
+                        onPressed: _onTapSwitchCamera,
+                        child: const Icon(Icons.flip_camera_ios, color: Colors.black),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -237,7 +277,7 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
 
             const SizedBox(height: 32),
 
-            // --- UPDATED BUTTON ---
+            // Start/Stop Button
             GestureDetector(
               onTap: _toggleScanning,
               child: Container(
@@ -247,8 +287,8 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
                   borderRadius: BorderRadius.circular(16),
                   gradient: LinearGradient(
                     colors: _isScanning 
-                        ? [Colors.red, Colors.redAccent] // Show Red if Stop
-                        : [const Color(0xFFF6329A), const Color(0xFF00B8DA)], // Show Color if Start
+                        ? [Colors.red, Colors.redAccent] 
+                        : [const Color(0xFFF6329A), const Color(0xFF00B8DA)],
                   ),
                 ),
                 child: Row(
