@@ -24,10 +24,10 @@ class AuthService {
       // Save user data to Firestore
       await _firestore.collection('users').doc(userCredential.user!.uid).set({
         'uid': userCredential.user!.uid,
-        'name': name,
+        'fullName': name,  // ✅ CHANGED TO 'fullName'
         'email': email,
         'createdAt': FieldValue.serverTimestamp(),
-      });
+      }, SetOptions(merge: true));  // ✅ ADDED MERGE OPTION
 
       return null; // success
     } on FirebaseAuthException catch (e) {
