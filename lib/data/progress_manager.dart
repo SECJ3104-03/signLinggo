@@ -402,10 +402,19 @@ class ProgressManager with ChangeNotifier {
   // ─── LEARNING STAGE TRACKING ─────────────────────────────────────
   
   /// Get current learning stage based on day streak
+  /// Get current learning stage based on day streak
   String getCurrentLearningStage() {
     // Each stage lasts 5 days
     final stageLength = 5;
-    final stageNumber = (_dayStreak ~/ stageLength) + 1;
+    
+    // Handle day streak 0 (new user)
+    if (_dayStreak == 0) {
+      return 'Alphabet'; // Default to first stage
+    }
+    
+    // Day streak 1-5 = Stage 1, 6-10 = Stage 2, etc.
+    // Formula: stage = ceil(dayStreak / 5)
+    final stageNumber = ((_dayStreak - 1) ~/ stageLength) + 1;
     
     // Define category sequence
     final categories = [
@@ -430,8 +439,25 @@ class ProgressManager with ChangeNotifier {
   /// Get stage progress info
   Map<String, dynamic> getLearningStageInfo() {
     final stageLength = 5;
-    final stageNumber = (_dayStreak ~/ stageLength) + 1;
-    final stageDay = (_dayStreak % stageLength) + 1;
+    
+    // Handle day streak 0
+    if (_dayStreak == 0) {
+      return {
+        'currentCategory': 'Alphabet',
+        'stageNumber': 1,
+        'stageDay': 1,
+        'stageLength': stageLength,
+        'daysInCurrentStage': 1,
+        'daysRemainingInStage': stageLength,
+      };
+    }
+    
+    // Calculate stage number (1-based)
+    final stageNumber = ((_dayStreak - 1) ~/ stageLength) + 1;
+    
+    // Day within current stage (1-5)
+    final stageDay = ((_dayStreak - 1) % stageLength) + 1;
+    
     final currentCategory = getCurrentLearningStage();
     
     return {

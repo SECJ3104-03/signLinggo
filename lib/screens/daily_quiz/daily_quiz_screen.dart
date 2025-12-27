@@ -38,79 +38,136 @@ class _DailyQuizScreenState extends State<DailyQuizScreen> {
   }
 
   void _loadDailyQuestion() async {
-    setState(() {
-      _selectedAnswerIndex = null;
-      _answerSubmitted = false;
-      _showResult = false;
-      _isCorrect = false;
-      _currentSignId = null;
-      _questionStartTime = DateTime.now();
-      _currentStageCategory = null;
-      _currentStageDay = null;
-      _totalStageDays = null;
-    });
+  setState(() {
+    _selectedAnswerIndex = null;
+    _answerSubmitted = false;
+    _showResult = false;
+    _isCorrect = false;
+    _currentSignId = null;
+    _questionStartTime = DateTime.now();
+    _currentStageCategory = null;
+    _currentStageDay = null;
+    _totalStageDays = null;
+  });
 
-    final progressManager = context.read<ProgressManager>();
+  final progressManager = context.read<ProgressManager>();
+  
+  // DEBUG: Check raw day streak
+  print('🎯 RAW DAY STREAK: ${progressManager.dayStreak}');
+
+  // Get current learning stage
+  final stageInfo = progressManager.getLearningStageInfo();
+  final currentCategory = stageInfo['currentCategory'];
+  
+  // DEBUG: Print ALL stage info
+  print('🎯 STAGE INFO: $stageInfo');
+  print('🎯 CURRENT CATEGORY: $currentCategory');
+  
+  // Store stage info for UI
+  setState(() {
+    _currentStageCategory = currentCategory;
+    _currentStageDay = stageInfo['stageDay'];
+    _totalStageDays = stageInfo['stageLength'];
+  });
+
+  // DEBUG: Print current category
+  print('📊 Current learning stage category: $currentCategory');
+  
+  // Get questions ONLY from current category using the new method
+  final categoryQuestions = QuizRepository.getQuestionsByCategory(currentCategory);
+  
+  // DEBUG: Print question count
+  print('📊 Questions in $currentCategory category: ${categoryQuestions.length}');
+  
+  if (categoryQuestions.isNotEmpty) {
+    // Pick random question from current category using the new method
+    final randomQuestion = QuizRepository.getRandomQuestionByCategory(currentCategory);
     
-    // Check if user is signed in
-    if (!progressManager.isSignedIn) {
-      // Fallback to random question
+    setState(() {
+      _currentQuestion = randomQuestion;
+      _currentSignId = _currentQuestion!.signId;
+    });
+    
+    // DEBUG: Print selected question
+    print('📊 Selected question: ${_currentQuestion!.question}');
+    print('📊 Question category: ${_currentQuestion!.category}');
+  } else {
+    // Fallback to Alphabet if category has no questions
+    print('⚠️ No questions found for $currentCategory, falling back to Alphabet');
+    
+    final alphabetQuestions = QuizRepository.getQuestionsByCategory('Alphabet');
+    if (alphabetQuestions.isNotEmpty) {
+      final randomQuestion = QuizRepository.getRandomQuestionByCategory('Alphabet');
+      setState(() {
+        _currentQuestion = randomQuestion;
+        _currentSignId = _currentQuestion!.signId;
+        _currentStageCategory = 'Alphabet'; // Force to Alphabet
+        _currentStageDay = 1;
+        _totalStageDays = 5;
+      });
+    } else {
+      // Ultimate fallback
+      print('⚠️ No Alphabet questions found, using random');
       setState(() {
         _currentQuestion = QuizRepository.getRandomQuestion();
+        _currentSignId = _currentQuestion?.signId;
       });
-      return;
     }
-    
+  }
+}
+
+  /// Helper method to get adaptive question from category
+  Future<QuizQuestion> _getAdaptiveQuestionFromCategory(
+    ProgressManager progressManager,
+    List<QuizQuestion> categoryQuestions,
+    String currentCategory,
+  ) async {
     try {
-      // Get current learning stage info
-      final stageInfo = progressManager.getLearningStageInfo();
-      final currentCategory = stageInfo['currentCategory'];
-      final stageDay = stageInfo['stageDay'];
-      final stageLength = stageInfo['stageLength'];
+      // Get user's learned signs from Firestore
+      final userProgress = await progressManager.getUserProgressForQuiz();
+      final learnedSignIds = List<String>.from(userProgress['learnedSignIds'] ?? []);
+      final masteryScores = Map<String, int>.from(userProgress['masteryScore'] ?? {});
       
-      // Store stage info for UI
-      setState(() {
-        _currentStageCategory = currentCategory;
-        _currentStageDay = stageDay;
-        _totalStageDays = stageLength;
-      });
+      // Categorize questions by user's progress
+      final List<QuizQuestion> newQuestions = [];
+      final List<QuizQuestion> weakQuestions = [];
+      final List<QuizQuestion> learnedQuestions = [];
       
-      // Use adaptive quiz generator with current category focus
-      final generator = AdaptiveQuizGenerator();
-      final questions = await generator.generateAdaptiveQuiz(
-        userId: progressManager.userId!,
-        numberOfQuestions: 1,
-      );
-      
-      if (questions.isNotEmpty) {
-        setState(() {
-          _currentQuestion = questions.first;
-          _currentSignId = _extractSignIdFromQuestion(_currentQuestion!);
-        });
-      } else {
-        // Fallback to random question from current category
-        final categoryQuestions = QuizRepository.getQuestionsByCategory(currentCategory);
-        if (categoryQuestions.isNotEmpty) {
-          final randomIndex = DateTime.now().millisecondsSinceEpoch % categoryQuestions.length;
-          setState(() {
-            _currentQuestion = categoryQuestions[randomIndex];
-            _currentSignId = _extractSignIdFromQuestion(_currentQuestion!);
-          });
+      for (final question in categoryQuestions) {
+        if (learnedSignIds.contains(question.signId)) {
+          final mastery = masteryScores[question.signId] ?? 0;
+          if (mastery < 70) {
+            weakQuestions.add(question);
+          } else {
+            learnedQuestions.add(question);
+          }
         } else {
-          // Ultimate fallback
-          setState(() {
-            _currentQuestion = QuizRepository.getRandomQuestion();
-            _currentSignId = _extractSignIdFromQuestion(_currentQuestion!);
-          });
+          newQuestions.add(question);
         }
       }
+      
+      // Priority: New questions > Weak questions > Learned questions
+      final List<QuizQuestion> priorityList = [
+        ...newQuestions,
+        ...weakQuestions,
+        ...learnedQuestions,
+      ];
+      
+      // Shuffle and pick one
+      if (priorityList.isNotEmpty) {
+        priorityList.shuffle();
+        return priorityList.first;
+      }
+      
+      // Fallback: pick random question from category
+      categoryQuestions.shuffle();
+      return categoryQuestions.first;
+      
     } catch (e) {
-      print('Error generating adaptive quiz: $e');
-      // Fallback to random question
-      setState(() {
-        _currentQuestion = QuizRepository.getRandomQuestion();
-        _currentSignId = _extractSignIdFromQuestion(_currentQuestion!);
-      });
+      print('Error in adaptive selection: $e');
+      // Fallback to random question from category
+      categoryQuestions.shuffle();
+      return categoryQuestions.first;
     }
   }
 
@@ -193,7 +250,12 @@ class _DailyQuizScreenState extends State<DailyQuizScreen> {
   @override
   Widget build(BuildContext context) {
     final progressManager = context.watch<ProgressManager>();
-    
+
+    // DEBUG: Check the learning stage
+    final stageInfo = progressManager.getLearningStageInfo();
+    print('🎯 BUILD: User learning stage: ${stageInfo['currentCategory']}');
+    print('🎯 BUILD: Day streak: ${progressManager.dayStreak}');
+
     // Check if quiz already completed today
     if (progressManager.dailyQuizDone && _currentQuestion == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -242,6 +304,10 @@ class _DailyQuizScreenState extends State<DailyQuizScreen> {
   }
 
   Widget _buildQuizScreen() {
+    // Debug output
+    print('🎯 Building quiz screen with question: ${_currentQuestion?.question}');
+    print('🎯 Question category: ${_currentQuestion?.category}');
+    print('🎯 User stage category: $_currentStageCategory');
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(

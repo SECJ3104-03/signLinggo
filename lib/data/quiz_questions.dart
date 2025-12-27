@@ -476,7 +476,17 @@ class QuizRepository {
   }
 
   // ─── HELPER METHODS ────────────────────────────────────────
-  
+  // In QuizRepository class, add this method:
+  static QuizQuestion getRandomQuestionByCategory(String category) {
+    final categoryQuestions = getQuestionsByCategory(category);
+    if (categoryQuestions.isNotEmpty) {
+      final randomIndex = DateTime.now().millisecondsSinceEpoch % categoryQuestions.length;
+      return categoryQuestions[randomIndex];
+    }
+    // Fallback to general random question
+    return getRandomQuestion();
+  }
+
   // Get random question for daily quiz
   static QuizQuestion getRandomQuestion() {
     final now = DateTime.now();
