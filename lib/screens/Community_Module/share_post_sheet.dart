@@ -22,7 +22,6 @@ class _SharePostSheetState extends State<SharePostSheet> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   bool _isSending = false;
 
-  // Helper to generate the conversation ID consistently
   String _getConversationId(String otherUserId) {
     List<String> ids = [widget.currentUserId, otherUserId];
     ids.sort();
@@ -35,35 +34,26 @@ class _SharePostSheetState extends State<SharePostSheet> {
     try {
       final conversationId = _getConversationId(otherUserId);
       
-      // 1. Send the Text Part (Title + Content)
-      final String textContent = "Shared a post:\n\n*${widget.post.title}*\n${widget.post.content}";
-      
       await _sendMessage(
         conversationId: conversationId,
-        content: textContent,
-        type: 'text',
+        type: 'shared_post', 
         previewText: 'Shared a post: ${widget.post.title}',
+        extraData: {
+          'post_id': widget.post.id,
+          'post_author': widget.post.author,
+          'post_author_image': widget.post.authorProfileImage ?? '',
+          'post_initials': widget.post.initials,
+          'post_title': widget.post.title,
+          'post_content': widget.post.content,
+          'post_image': widget.post.imageUrl ?? '',
+          'post_video': widget.post.videoUrl ?? '',
+          // --- FIX: SEND THE ORIGINAL TIMESTAMP ---
+          'post_timestamp': widget.post.timestamp.toIso8601String(), 
+        }
       );
 
-      // 2. Send Media (if any)
-      if (widget.post.videoUrl != null) {
-        await _sendMessage(
-          conversationId: conversationId,
-          content: widget.post.videoUrl!,
-          type: 'video',
-          previewText: 'Sent a video',
-        );
-      } else if (widget.post.imageUrl != null) {
-        await _sendMessage(
-          conversationId: conversationId,
-          content: widget.post.imageUrl!,
-          type: 'image', // Requires support in ConversationScreen
-          previewText: 'Sent an image',
-        );
-      }
-
       if (mounted) {
-        Navigator.pop(context); // Close the sheet
+        Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Sent to $chatName')),
         );
@@ -82,9 +72,9 @@ class _SharePostSheetState extends State<SharePostSheet> {
 
   Future<void> _sendMessage({
     required String conversationId,
-    required String content,
     required String type,
     required String previewText,
+    required Map<String, dynamic> extraData,
   }) async {
     final messageRef = _firestore
         .collection('conversation')
@@ -92,21 +82,21 @@ class _SharePostSheetState extends State<SharePostSheet> {
         .collection('messages')
         .doc();
 
-    // Write message
-    await messageRef.set({
+    final Map<String, dynamic> messageData = {
       'messageId': messageRef.id,
       'senderId': widget.currentUserId,
-      'content': content,
       'type': type,
+      'content': 'Shared a Post', 
       'isRead': false,
       'createdAt': FieldValue.serverTimestamp(),
       'deletedFor': [],
-    });
+      ...extraData, 
+    };
 
-    // Update Conversation Summary
+    await messageRef.set(messageData);
+
     final conversationDoc = _firestore.collection('conversation').doc(conversationId);
     
-    // Use set with merge to ensure basic fields exist
     await conversationDoc.set({
       'userIDs': FieldValue.arrayUnion([widget.currentUserId]), 
       'lastMessageFor': {
@@ -117,7 +107,6 @@ class _SharePostSheetState extends State<SharePostSheet> {
       }
     }, SetOptions(merge: true));
 
-    // Also update for others (simple approach)
     final docSnap = await conversationDoc.get();
     if(docSnap.exists) {
        final data = docSnap.data()!;
@@ -150,8 +139,20 @@ class _SharePostSheetState extends State<SharePostSheet> {
       ),
       child: Column(
         children: [
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 40, height: 4,
+                  decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
+                ),
+              ],
+            ),
+          ),
           const Padding(
-            padding: EdgeInsets.all(16.0),
+            padding: EdgeInsets.only(bottom: 10),
             child: Text(
               "Send to...",
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
@@ -175,7 +176,6 @@ class _SharePostSheetState extends State<SharePostSheet> {
                   itemBuilder: (context, index) {
                     final data = docs[index].data() as Map<String, dynamic>;
                     
-                    // Find the other user ID
                     final List<dynamic> users = data['userIDs'] ?? [];
                     final String otherId = users.firstWhere(
                       (u) => u != widget.currentUserId, 
@@ -184,7 +184,6 @@ class _SharePostSheetState extends State<SharePostSheet> {
 
                     if (otherId.isEmpty) return const SizedBox.shrink();
 
-                    // Fetch Other User Details
                     return FutureBuilder<DocumentSnapshot>(
                       future: _firestore.collection('users').doc(otherId).get(),
                       builder: (context, userSnap) {
