@@ -35,7 +35,7 @@ class _SignInScreenState extends State<SignInScreen> {
   }
 
   // --- HELPER: Password Validation Logic ---
-  String? _validatePassword(String password) {
+  /* String? _validatePassword(String password) {
     if (password.length < 8) {
       return 'Password must be at least 8 characters long';
     }
@@ -47,7 +47,7 @@ class _SignInScreenState extends State<SignInScreen> {
       return 'Password must contain at least one special character';
     }
     return null; // Return null if valid
-  }
+  } */
 
   // --- FORGOT PASSWORD FUNCTION ---
   Future<void> _resetPassword() async {
@@ -365,7 +365,7 @@ class _SignInScreenState extends State<SignInScreen> {
       return;
     }
 
-    String? passwordError = _validatePassword(password);
+    /* String? passwordError = _validatePassword(password);
     if (passwordError != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -375,7 +375,7 @@ class _SignInScreenState extends State<SignInScreen> {
         ),
       );
       return;
-    }
+    } */
 
     // 2. Validate Password Strength
     _validatePassword(password);
@@ -414,7 +414,7 @@ class _SignInScreenState extends State<SignInScreen> {
                 .doc(user.uid)
                 .set({
               'uid': user.uid,
-              'name': user.displayName ?? email.split('@')[0],
+              // 'fullName': user.displayName ?? email.split('@')[0],
               'email': user.email ?? email,
               'createdAt': FieldValue.serverTimestamp(),
             });

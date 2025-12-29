@@ -47,10 +47,12 @@ class FirebaseServices {
 
         if (!doc.exists) {
           await firestore.collection('users').doc(user.uid).set({
-            'name': user.displayName ?? "",
+            'uid': user.uid,  // ✅ ADD UID FIELD
+            'fullName': user.displayName ?? "",  // ✅ CHANGED TO 'fullName'
             'email': user.email ?? "",
-            'createdAt': FieldValue.serverTimestamp(),
-          });
+            'profileUrl': user.photoURL,  // ✅ ADD PROFILE URL
+            'updatedAt': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));  // ✅ ADDED MERGE OPTION
         }
       }
 
