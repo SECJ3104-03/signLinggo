@@ -35,7 +35,6 @@ class _ConversationScreenState extends State<ConversationScreen> {
   String _mode = "Text";
   final Map<String, VideoPlayerController> _videoControllers = {};
   final Map<String, AudioPlayer> _audioPlayers = {};
-  final Map<String, String> _audioLocalPaths = {};
   late final String currentUserId;
   
   bool _isRecording = false; 
@@ -249,6 +248,8 @@ class _ConversationScreenState extends State<ConversationScreen> {
         return "Voice message";
       case 'video':
         return "Video";
+      case 'image': // ADDED
+        return "Image";
       default:
         return "";
     }
@@ -268,6 +269,38 @@ class _ConversationScreenState extends State<ConversationScreen> {
           text,
           style: TextStyle(
               fontSize: 15, color: isUser ? Colors.blue[900] : Colors.black87),
+        ),
+      ),
+    );
+  }
+
+  // --- NEW: Image Bubble for Shared Posts ---
+  Widget _buildImageBubble(String imageUrl, bool isUser) {
+    return Align(
+      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+        width: MediaQuery.of(context).size.width * 0.6,
+        decoration: BoxDecoration(
+          color: isUser ? Colors.blue[50] : Colors.grey[200],
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Image.network(
+            imageUrl,
+            fit: BoxFit.cover,
+            loadingBuilder: (ctx, child, loadingProgress) {
+               if (loadingProgress == null) return child;
+               return Container(
+                 height: 150,
+                 color: Colors.grey[300],
+                 child: const Center(child: CircularProgressIndicator()),
+               );
+            },
+            errorBuilder: (context, error, stackTrace) => 
+               Container(height: 150, color: Colors.grey[300], child: const Icon(Icons.broken_image)),
+          ),
         ),
       ),
     );
@@ -325,6 +358,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
   }
 
   Widget _buildVoiceBubble(String audioUrl, bool isUser) {
+    // ... (Keep existing voice bubble code exactly as is)
     if (!_audioPlayers.containsKey(audioUrl)) {
       final player = AudioPlayer();
       _audioPlayers[audioUrl] = player;
@@ -332,14 +366,12 @@ class _ConversationScreenState extends State<ConversationScreen> {
       Future.microtask(() async {
         try {
           await player.setUrl(audioUrl);
-          
           player.playerStateStream.listen((state) {
             if (state.processingState == ProcessingState.completed) {
               player.seek(Duration.zero);
               if (mounted) setState(() {});
             }
           });
-          
           if (mounted) setState(() {});
         } catch (e) {
           debugPrint("Error setting audio URL: $e");
@@ -371,13 +403,10 @@ class _ConversationScreenState extends State<ConversationScreen> {
                   builder: (context, snapshot) {
                     final state = snapshot.data;
                     final isPlaying = state?.playing ?? false;
-                    
                     return IconButton(
                       iconSize: 36,
                       icon: Icon(
-                        isPlaying
-                            ? Icons.pause_circle_filled
-                            : Icons.play_circle_fill,
+                        isPlaying ? Icons.pause_circle_filled : Icons.play_circle_fill,
                         color: Colors.black87,
                       ),
                       onPressed: () async {
@@ -386,7 +415,6 @@ class _ConversationScreenState extends State<ConversationScreen> {
                         } else {
                           final position = audioPlayer.position;
                           final duration = audioPlayer.duration ?? Duration.zero;
-                          
                           if (position >= duration - const Duration(milliseconds: 100)) {
                             await audioPlayer.seek(Duration.zero);
                           }
@@ -396,7 +424,6 @@ class _ConversationScreenState extends State<ConversationScreen> {
                     );
                   },
                 ),
-
                 Expanded(
                   child: StreamBuilder<Duration>(
                     stream: audioPlayer.positionStream,
@@ -408,12 +435,10 @@ class _ConversationScreenState extends State<ConversationScreen> {
                         builder: (context, durationSnapshot) {
                           final position = positionSnapshot.data ?? Duration.zero;
                           final duration = durationSnapshot.data ?? Duration.zero;
-                          
                           double progress = 0;
                           if (duration.inMilliseconds > 0) {
                             progress = position.inMilliseconds / duration.inMilliseconds;
                           }
-                          
                           return LinearProgressIndicator(
                             value: progress,
                             backgroundColor: Colors.black26,
@@ -426,8 +451,8 @@ class _ConversationScreenState extends State<ConversationScreen> {
                 ),
               ],
             ),
-
-            const SizedBox(height: 6),
+            // ... duration text code ... 
+             const SizedBox(height: 6),
             StreamBuilder<Duration>(
               stream: audioPlayer.positionStream,
               initialData: Duration.zero,
@@ -438,14 +463,8 @@ class _ConversationScreenState extends State<ConversationScreen> {
                   builder: (context, durationSnapshot) {
                     final position = positionSnapshot.data ?? Duration.zero;
                     final duration = durationSnapshot.data ?? Duration.zero;
-                    
-                    String fmt(Duration d) =>
-                        "${d.inMinutes}:${(d.inSeconds % 60).toString().padLeft(2, '0')}";
-
-                    return Text(
-                      "${fmt(position)} / ${fmt(duration)}",
-                      style: const TextStyle(fontSize: 12),
-                    );
+                    String fmt(Duration d) => "${d.inMinutes}:${(d.inSeconds % 60).toString().padLeft(2, '0')}";
+                    return Text("${fmt(position)} / ${fmt(duration)}", style: const TextStyle(fontSize: 12));
                   },
                 );
               },
@@ -478,6 +497,9 @@ class _ConversationScreenState extends State<ConversationScreen> {
         break;
       case 'voice':
         messageBubble = _buildVoiceBubble(content, isUser);
+        break;
+      case 'image': // ADDED THIS CASE
+        messageBubble = _buildImageBubble(content, isUser);
         break;
       default:
         messageBubble = const SizedBox.shrink();
@@ -530,6 +552,9 @@ class _ConversationScreenState extends State<ConversationScreen> {
     );
   }
 
+  // ... (Keep _buildInputBar, _showDeleteDialog, _deleteForMe, etc. exactly as is)
+  
+  // Duplicating these for context, they don't change logic, just need to exist in the class
   Widget _buildInputBar() {
     switch (_mode) {
       case 'Text':
@@ -551,23 +576,8 @@ class _ConversationScreenState extends State<ConversationScreen> {
     }
   }
 
-  Future<String> downloadToLocalFile(String url) async {
-    final tempDir = await getTemporaryDirectory();
-    final filePath = "${tempDir.path}/${DateTime.now().millisecondsSinceEpoch}.m4a";
-
-    final response = await HttpClient().getUrl(Uri.parse(url));
-    final result = await response.close();
-
-    final file = File(filePath);
-    final sink = file.openWrite();
-
-    await result.forEach((chunk) => sink.add(chunk));
-    await sink.close();
-
-    return file.path;
-  }
-
   void _showDeleteDialog(String messageId, String senderId, String type, String content) {
+    // ... (Existing implementation)
     final bool isUserMessage = senderId == currentUserId;
 
     showDialog(
@@ -607,6 +617,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        // ... (Keep existing AppBar)
         backgroundColor: Colors.white,
         elevation: 1,
         leading: IconButton(

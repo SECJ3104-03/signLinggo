@@ -13,6 +13,7 @@ import 'post_data.dart';
 import 'video_player_widget.dart';
 import 'package:signlinggo/screens/conversation_mode/conversation_mode_screen.dart';
 import 'real_time_widget.dart';
+import 'share_post_sheet.dart'; // <--- Import the new sheet
 
 class PostCard extends StatefulWidget {
   final PostData post;
@@ -52,7 +53,6 @@ class _PostCardState extends State<PostCard> {
     }
   }
 
-  // --- NEW: Direct Chat Navigation Logic ---
   void _navigateToDirectMessage() {
     if (_videoController != null && _videoController!.value.isPlaying) {
       _videoController!.pause();
@@ -61,7 +61,6 @@ class _PostCardState extends State<PostCard> {
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser == null) return;
 
-    // Prevent user from chatting with themselves
     if (currentUser.uid == widget.post.authorId) {
        ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("That's you!")),
@@ -90,7 +89,8 @@ class _PostCardState extends State<PostCard> {
     );
   }
 
-  Future<void> _sharePost() async {
+  // --- CHANGED: Renamed from _sharePost to _shareSystem ---
+  Future<void> _shareSystem() async {
     final String shareText = '${widget.post.title}\n\n${widget.post.content}\n\nSent via SignLinggo App';
     final String? mediaPath = widget.post.videoUrl ?? widget.post.imageUrl;
 
@@ -128,6 +128,65 @@ class _PostCardState extends State<PostCard> {
         if (mounted) setState(() { _isSharing = false; });
       }
     }
+  }
+
+  // --- NEW: Shows options to share via system or internal chat ---
+  void _onShareButtonTapped() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.only(topLeft: Radius.circular(20), topRight: Radius.circular(20)),
+        ),
+        child: Wrap(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Center(
+                child: Container(
+                  width: 40, height: 4, 
+                  decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
+                ),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.send_rounded, color: Color(0xFFAC46FF)),
+              title: const Text('Send in SignLinggo'),
+              onTap: () {
+                Navigator.pop(context); // Close option sheet
+                
+                final user = FirebaseAuth.instance.currentUser;
+                if (user != null) {
+                  // Show the Chat Picker Sheet
+                  showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    backgroundColor: Colors.transparent,
+                    builder: (context) => SharePostSheet(
+                      post: widget.post, 
+                      currentUserId: user.uid
+                    ),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please login first")));
+                }
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.share_outlined, color: Colors.black87),
+              title: const Text('Share via...'),
+              onTap: () {
+                Navigator.pop(context);
+                _shareSystem(); // Trigger original share
+              },
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -249,7 +308,7 @@ class _PostCardState extends State<PostCard> {
                   ),
                 ),
                 
-                // 3. TAGS & TIMESTAMP (Not Clickable for Chat)
+                // 3. TAGS & TIMESTAMP
                 Wrap(
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
@@ -477,8 +536,9 @@ class _PostCardState extends State<PostCard> {
 
             const Spacer(),
 
+            // --- CHANGED: Use new share button handler ---
             InkWell(
-              onTap: _isSharing ? null : _sharePost,
+              onTap: _isSharing ? null : _onShareButtonTapped, 
               child: SizedBox(
                 width: 19.98,
                 height: 19.98,
