@@ -13,6 +13,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  tflite_flutter: ^0.11.0
+  image: ^4.1.3
 
   # UI & Icons
   cupertino_icons: ^1.0.8
@@ -48,6 +50,7 @@ dependencies:
   flutter_sound: ^9.2.13
   permission_handler: ^11.1.0
   audio_session: ^0.1.16 #convo
+  #flutter_cache_manager: ^3.3.1 #Learn Page Caching
 
   # Networking
   http: ^1.2.2
@@ -64,6 +67,9 @@ dependencies:
   cached_network_image: ^3.4.1
   intl: ^0.20.2
 
+  #YoloV8 Flutter Vision Izzat
+  flutter_vision: ^1.1.4
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -78,4 +84,6 @@ flutter:
     - assets/assets/videos/
     - assets/assets/placeholder.png
     - assets/assets/offline_materials/ 
+    - assets/assets/models/
+    - assets/models/best_float32.tflite 
 

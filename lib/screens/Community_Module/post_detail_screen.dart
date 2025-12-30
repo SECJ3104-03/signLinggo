@@ -77,7 +77,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     }
   }
 
-  // --- LOGIC TO START CHAT ---
+  // --- LOGIC TO START CHAT FROM COMMENT ---
   void _navigateToChat(CommentData comment) {
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser == null) return;
@@ -100,6 +100,36 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         builder: (context) => ConversationScreen(
           chatName: comment.author,
           avatar: comment.authorProfileImage ?? (comment.initials.isNotEmpty ? comment.initials : '?'),
+          conversationId: conversationId,
+          currentUserID: currentUser.uid,
+        ),
+      ),
+    );
+  }
+
+  // --- NEW: LOGIC TO START CHAT FROM POST AUTHOR ---
+  void _navigateToChatWithAuthor() {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) return;
+
+    if (currentUser.uid == _post.authorId) {
+       ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("That's you!")),
+      );
+      return; 
+    }
+
+    // Generate unique Conversation ID (UserA_UserB sorted)
+    final List<String> ids = [currentUser.uid, _post.authorId];
+    ids.sort();
+    final String conversationId = ids.join("_");
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ConversationScreen(
+          chatName: _post.author,
+          avatar: _post.authorProfileImage ?? (_post.initials.isNotEmpty ? _post.initials : '?'),
           conversationId: conversationId,
           currentUserID: currentUser.uid,
         ),
@@ -289,35 +319,46 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         children: [
           Row(
             children: [
-              if (_post.authorProfileImage != null && _post.authorProfileImage!.isNotEmpty)
-                 Container(
-                  width: 40, height: 40,
-                  decoration: const BoxDecoration(shape: BoxShape.circle),
-                  clipBehavior: Clip.antiAlias,
-                  child: Image.network(
-                    _post.authorProfileImage!,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        decoration: BoxDecoration(gradient: _post.profileGradient, shape: BoxShape.circle),
-                        child: Center(child: Text(_post.initials, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14))),
-                      );
-                    },
+              // 1. CLICKABLE AVATAR
+              GestureDetector(
+                onTap: _navigateToChatWithAuthor, // <--- Add navigation
+                child: (_post.authorProfileImage != null && _post.authorProfileImage!.isNotEmpty)
+                   ? Container(
+                    width: 40, height: 40,
+                    decoration: const BoxDecoration(shape: BoxShape.circle),
+                    clipBehavior: Clip.antiAlias,
+                    child: Image.network(
+                      _post.authorProfileImage!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          decoration: BoxDecoration(gradient: _post.profileGradient, shape: BoxShape.circle),
+                          child: Center(child: Text(_post.initials, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14))),
+                        );
+                      },
+                    ),
+                  )
+                : Container(
+                    width: 40, height: 40,
+                    decoration: BoxDecoration(gradient: _post.profileGradient, shape: BoxShape.circle),
+                    child: Center(child: Text(_post.initials, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14))),
                   ),
-                )
-              else
-                Container(
-                  width: 40, height: 40,
-                  decoration: BoxDecoration(gradient: _post.profileGradient, shape: BoxShape.circle),
-                  child: Center(child: Text(_post.initials, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14))),
-                ),
+              ),
+              
               const SizedBox(width: 10),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(_post.author, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
-                  RealTimeTimestamp(timestamp: _post.timestamp, style: TextStyle(color: Colors.grey[600], fontSize: 12)),
-                ],
+              
+              // 2. CLICKABLE NAME
+              Expanded(
+                child: GestureDetector(
+                  onTap: _navigateToChatWithAuthor, // <--- Add navigation
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(_post.author, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
+                      RealTimeTimestamp(timestamp: _post.timestamp, style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+                    ],
+                  ),
+                ),
               ),
             ],
           ),
