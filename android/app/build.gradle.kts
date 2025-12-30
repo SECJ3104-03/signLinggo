@@ -33,6 +33,10 @@ android {
              signingConfig = signingConfigs.getByName("debug")
         }
     }
+    // For YoloV8 Flutter Vision Izzat
+    aaptOptions {
+       noCompress += listOf("tflite", "lite")
+    }
 
     
 }

@@ -1,3 +1,5 @@
+// lib/screens/conversation_mode/conversation_mode_screen.dart
+
 import 'dart:developer';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -12,6 +14,9 @@ import 'package:audio_session/audio_session.dart';
 import 'text_input_bar.dart';
 import 'sign_input_bar.dart';
 import 'voice_input_bar.dart';
+
+import '../Community_Module/post_detail_screen.dart';
+import '../Community_Module/post_data.dart';
 
 class ConversationScreen extends StatefulWidget {
   final String chatName;
@@ -35,7 +40,6 @@ class _ConversationScreenState extends State<ConversationScreen> {
   String _mode = "Text";
   final Map<String, VideoPlayerController> _videoControllers = {};
   final Map<String, AudioPlayer> _audioPlayers = {};
-  final Map<String, String> _audioLocalPaths = {};
   late final String currentUserId;
   
   bool _isRecording = false; 
@@ -249,6 +253,10 @@ class _ConversationScreenState extends State<ConversationScreen> {
         return "Voice message";
       case 'video':
         return "Video";
+      case 'image': 
+        return "Image";
+      case 'shared_post':
+        return "Shared a post";
       default:
         return "";
     }
@@ -261,17 +269,182 @@ class _ConversationScreenState extends State<ConversationScreen> {
         padding: const EdgeInsets.all(12),
         margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
         decoration: BoxDecoration(
-          color: isUser ? Colors.blue[50] : Colors.grey[200],
+          color: isUser ? const Color(0xFFF2E7FE) : Colors.grey[100],
           borderRadius: BorderRadius.circular(16),
         ),
         child: Text(
           text,
           style: TextStyle(
-              fontSize: 15, color: isUser ? Colors.blue[900] : Colors.black87),
+              fontSize: 15, color: isUser ? const Color(0xFF5B259F) : Colors.black87),
         ),
       ),
     );
   }
+
+  Widget _buildImageBubble(String imageUrl, bool isUser) {
+    return Align(
+      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+        width: MediaQuery.of(context).size.width * 0.6,
+        decoration: BoxDecoration(
+           color: isUser ? const Color(0xFFF2E7FE) : Colors.grey[100],
+           borderRadius: BorderRadius.circular(16),
+        ),
+        padding: const EdgeInsets.all(4),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Image.network(imageUrl, fit: BoxFit.cover),
+        ),
+      ),
+    );
+  }
+
+  // --- UPDATED: Retrieve & Parse Timestamp ---
+  Widget _buildSharedPostBubble(Map<String, dynamic> msg, bool isUser) {
+    final String postTitle = msg['post_title'] ?? '';
+    final String postContent = msg['post_content'] ?? '';
+    final String postAuthor = msg['post_author'] ?? 'Unknown';
+    final String postImage = msg['post_image'] ?? '';
+    final String postVideo = msg['post_video'] ?? '';
+    final String authorImage = msg['post_author_image'] ?? '';
+    final String authorInitials = msg['post_initials'] ?? '?';
+    final String postId = msg['post_id'] ?? '';
+    
+    // --- FIX: Get Original Timestamp ---
+    final String tsString = msg['post_timestamp'] ?? '';
+    final DateTime postDate = tsString.isNotEmpty 
+        ? DateTime.parse(tsString) 
+        : DateTime.now(); // Fallback if missing
+
+    return Align(
+      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+      child: GestureDetector(
+        onTap: () {
+          final post = PostData(
+            id: postId,
+            authorId: '', 
+            author: postAuthor,
+            initials: authorInitials,
+            authorProfileImage: authorImage.isNotEmpty ? authorImage : null,
+            timestamp: postDate, // <--- Use original timestamp
+            tag: 'Shared', 
+            title: postTitle,
+            content: postContent,
+            likes: 0, 
+            commentCount: 0, 
+            imageUrl: postImage.isNotEmpty ? postImage : null,
+            videoUrl: postVideo.isNotEmpty ? postVideo : null,
+            isLiked: false, 
+            isFollowed: false,
+          );
+
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => PostDetailScreen(initialPost: post),
+            ),
+          );
+        },
+        child: Container(
+          width: MediaQuery.of(context).size.width * 0.7,
+          margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+          decoration: BoxDecoration(
+            color: isUser ? const Color(0xFFF2E7FE) : Colors.grey[100], 
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              if (!isUser) 
+                BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2))
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+                child: Text(
+                  "Shared a post",
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isUser ? const Color(0xFF5B259F).withOpacity(0.6) : Colors.grey[600],
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ),
+              
+              Container(
+                margin: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: Row(
+                        children: [
+                           CircleAvatar(
+                              radius: 10,
+                              backgroundColor: Colors.grey.shade300,
+                              backgroundImage: (authorImage.isNotEmpty) ? NetworkImage(authorImage) : null,
+                              child: (authorImage.isEmpty) ? Text(authorInitials, style: const TextStyle(fontSize: 8)) : null,
+                           ),
+                           const SizedBox(width: 8),
+                           Expanded(
+                             child: Text(
+                               postAuthor,
+                               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                               maxLines: 1, overflow: TextOverflow.ellipsis,
+                             ),
+                           )
+                        ],
+                      ),
+                    ),
+      
+                    if (postImage.isNotEmpty)
+                      AspectRatio(
+                        aspectRatio: 16/9,
+                        child: Image.network(postImage, fit: BoxFit.cover, errorBuilder: (_,__,___) => Container(color: Colors.grey)),
+                      )
+                    else if (postVideo.isNotEmpty)
+                       Container(
+                         height: 120,
+                         width: double.infinity,
+                         color: Colors.black,
+                         child: const Center(child: Icon(Icons.play_circle_fill, color: Colors.white, size: 40)),
+                       ),
+      
+                    Padding(
+                      padding: const EdgeInsets.all(10.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (postTitle.isNotEmpty)
+                            Text(postTitle, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14), maxLines: 1, overflow: TextOverflow.ellipsis),
+                          if (postTitle.isNotEmpty) const SizedBox(height: 4),
+                          Text(
+                            postContent,
+                            style: TextStyle(fontSize: 12, color: Colors.grey.shade800),
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    )
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+  // ---------------------------------------------
 
   Widget _buildVideoBubble(String videoURL, bool isUser) {
     if (!_videoControllers.containsKey(videoURL)) {
@@ -291,7 +464,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
         padding: const EdgeInsets.all(12),
         margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
         decoration: BoxDecoration(
-          color: isUser ? Colors.blue[50] : Colors.grey[200],
+          color: isUser ? const Color(0xFFF2E7FE) : Colors.grey[200],
           borderRadius: BorderRadius.circular(16),
         ),
         child: ConstrainedBox(
@@ -358,7 +531,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
           maxWidth: MediaQuery.of(context).size.width * 0.75,
         ),
         decoration: BoxDecoration(
-          color: isUser ? Colors.blue[50] : Colors.grey[200],
+          color: isUser ? const Color(0xFFF2E7FE) : Colors.grey[200],
           borderRadius: BorderRadius.circular(16),
         ),
         child: Column(
@@ -478,6 +651,12 @@ class _ConversationScreenState extends State<ConversationScreen> {
         break;
       case 'voice':
         messageBubble = _buildVoiceBubble(content, isUser);
+        break;
+      case 'image':
+        messageBubble = _buildImageBubble(content, isUser);
+        break;
+      case 'shared_post':
+        messageBubble = _buildSharedPostBubble(msg, isUser);
         break;
       default:
         messageBubble = const SizedBox.shrink();
