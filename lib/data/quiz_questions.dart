@@ -5,6 +5,7 @@ class QuizQuestion {
   final int correctAnswerIndex;
   final String? explanation;
   final String category;
+  final String signId;
   final String? imageAsset; // Optional: for visual questions
   final String? videoAsset; // Optional: for video questions
 
@@ -14,12 +15,86 @@ class QuizQuestion {
     required this.correctAnswerIndex,
     this.explanation,
     this.category = 'General',
+    required this.signId,
     this.imageAsset,
     this.videoAsset,
   });
 }
 
 class QuizRepository {
+  // ─── ALPHABET CATEGORY ──────────────────────────────────────
+  static final List<QuizQuestion> alphabetQuestions = [
+    QuizQuestion(
+      question: 'What is the sign for letter "A"?',
+      options: [
+        'Closed fist with thumb to side',
+        'Peace sign',
+        'Index finger pointing up',
+        'Open palm facing forward'
+      ],
+      correctAnswerIndex: 0,
+      explanation: 'Letter A is signed by making a fist with thumb resting on the side.',
+      category: 'Alphabet',
+      signId: 'A',
+    ),
+    
+    QuizQuestion(
+      question: 'What is the sign for letter "B"?',
+      options: [
+        'Flat hand with fingers together',
+        'Index and middle finger up',
+        'Thumb and pinky extended',
+        'All fingers spread'
+      ],
+      correctAnswerIndex: 0,
+      explanation: 'Letter B is signed with a flat hand, fingers together, palm facing out.',
+      category: 'Alphabet',
+      signId: 'B',
+    ),
+    
+    QuizQuestion(
+      question: 'What is the sign for letter "C"?',
+      options: [
+        'Curved hand like a C shape',
+        'Closed fist',
+        'Thumb and index making circle',
+        'Peace sign'
+      ],
+      correctAnswerIndex: 0,
+      explanation: 'Letter C is signed by curving your hand into a C shape.',
+      category: 'Alphabet',
+      signId: 'C',
+    ),
+    
+    QuizQuestion(
+      question: 'What is the sign for letter "D"?',
+      options: [
+        'Index finger up, others folded, thumb touches middle finger',
+        'Thumb up',
+        'Index and middle finger up',
+        'Closed fist'
+      ],
+      correctAnswerIndex: 0,
+      explanation: 'Letter D is signed with index finger pointing up, other fingers folded, thumb touching middle finger.',
+      category: 'Alphabet',
+      signId: 'D',
+    ),
+    
+    QuizQuestion(
+      question: 'What is the sign for letter "E"?',
+      options: [
+        'Fingers folded, thumb across fingers',
+        'Open hand',
+        'Peace sign',
+        'Closed fist'
+      ],
+      correctAnswerIndex: 0,
+      explanation: 'Letter E is signed with fingers folded down, thumb across the fingers.',
+      category: 'Alphabet',
+      signId: 'E',
+    ),
+  ];
+
   // ─── GREETINGS CATEGORY ─────────────────────────────────────
   static final List<QuizQuestion> greetingQuestions = [
     QuizQuestion(
@@ -33,19 +108,7 @@ class QuizRepository {
       correctAnswerIndex: 0,
       explanation: 'Waving hand side to side is the international sign for greeting someone.',
       category: 'Greetings',
-    ),
-    
-    QuizQuestion(
-      question: 'What is the sign for "Goodbye"?',
-      options: [
-        'Open and close hand',
-        'Wave hand up and down',
-        'Peace sign outward',
-        'Hand to forehead'
-      ],
-      correctAnswerIndex: 0,
-      explanation: 'Goodbye is signed by opening and closing your hand, like waving goodbye.',
-      category: 'Greetings',
+      signId: 'Hello',
     ),
     
     QuizQuestion(
@@ -59,6 +122,7 @@ class QuizRepository {
       correctAnswerIndex: 0,
       explanation: 'Move your flat hand from your chin outward to show gratitude.',
       category: 'Greetings',
+      signId: 'ThankYou',
     ),
     
     QuizQuestion(
@@ -72,6 +136,7 @@ class QuizRepository {
       correctAnswerIndex: 0,
       explanation: 'Make a circular motion with your flat hand on your chest.',
       category: 'Greetings',
+      signId: 'Please',
     ),
     
     QuizQuestion(
@@ -84,6 +149,7 @@ class QuizRepository {
       ],
       correctAnswerIndex: 0,
       category: 'Greetings',
+      signId: 'Sorry',
     ),
   ];
 
@@ -99,6 +165,7 @@ class QuizRepository {
       ],
       correctAnswerIndex: 0,
       category: 'Numbers',
+      signId: '1',
     ),
     
     QuizQuestion(
@@ -111,6 +178,7 @@ class QuizRepository {
       ],
       correctAnswerIndex: 0,
       category: 'Numbers',
+      signId: '5',
     ),
     
     QuizQuestion(
@@ -123,6 +191,7 @@ class QuizRepository {
       ],
       correctAnswerIndex: 2,
       category: 'Numbers',
+      signId: '10',
     ),
   ];
 
@@ -138,6 +207,7 @@ class QuizRepository {
       ],
       correctAnswerIndex: 0,
       category: 'Family',
+      signId: 'Mother',
     ),
     
     QuizQuestion(
@@ -150,6 +220,7 @@ class QuizRepository {
       ],
       correctAnswerIndex: 0,
       category: 'Family',
+      signId: 'Father',
     ),
     
     QuizQuestion(
@@ -162,6 +233,7 @@ class QuizRepository {
       ],
       correctAnswerIndex: 0,
       category: 'Family',
+      signId: 'Brother',
     ),
   ];
 
@@ -177,6 +249,7 @@ class QuizRepository {
       ],
       correctAnswerIndex: 0,
       category: 'Food & Drink',
+      signId: 'Water',
     ),
     
     QuizQuestion(
@@ -189,6 +262,7 @@ class QuizRepository {
       ],
       correctAnswerIndex: 0,
       category: 'Food & Drink',
+      signId: 'Eat',
     ),
     
     QuizQuestion(
@@ -201,6 +275,7 @@ class QuizRepository {
       ],
       correctAnswerIndex: 0,
       category: 'Food & Drink',
+      signId: 'Drink',
     ),
   ];
 
@@ -216,6 +291,7 @@ class QuizRepository {
       ],
       correctAnswerIndex: 0,
       category: 'Emotions',
+      signId: 'Happy',
     ),
     
     QuizQuestion(
@@ -228,6 +304,7 @@ class QuizRepository {
       ],
       correctAnswerIndex: 0,
       category: 'Emotions',
+      signId: 'Sad',
     ),
     
     QuizQuestion(
@@ -240,6 +317,7 @@ class QuizRepository {
       ],
       correctAnswerIndex: 0,
       category: 'Emotions',
+      signId: 'Angry',
     ),
     
     QuizQuestion(
@@ -252,6 +330,7 @@ class QuizRepository {
       ],
       correctAnswerIndex: 0,
       category: 'Emotions',
+      signId: 'Love',
     ),
   ];
 
@@ -267,6 +346,7 @@ class QuizRepository {
       ],
       correctAnswerIndex: 0,
       category: 'Time',
+      signId: 'Today',
     ),
     
     QuizQuestion(
@@ -279,6 +359,7 @@ class QuizRepository {
       ],
       correctAnswerIndex: 0,
       category: 'Time',
+      signId: 'Tomorrow',
     ),
     
     QuizQuestion(
@@ -291,6 +372,7 @@ class QuizRepository {
       ],
       correctAnswerIndex: 0,
       category: 'Time',
+      signId: 'Yesterday',
     ),
   ];
 
@@ -306,6 +388,7 @@ class QuizRepository {
       ],
       correctAnswerIndex: 0,
       category: 'Colors',
+      signId: 'Red',
     ),
     
     QuizQuestion(
@@ -318,6 +401,7 @@ class QuizRepository {
       ],
       correctAnswerIndex: 0,
       category: 'Colors',
+      signId: 'Blue',
     ),
     
     QuizQuestion(
@@ -330,6 +414,7 @@ class QuizRepository {
       ],
       correctAnswerIndex: 0,
       category: 'Colors',
+      signId: 'Green',
     ),
   ];
 
@@ -345,6 +430,7 @@ class QuizRepository {
       ],
       correctAnswerIndex: 0,
       category: 'Animals',
+      signId: 'Dog',
     ),
     
     QuizQuestion(
@@ -357,6 +443,7 @@ class QuizRepository {
       ],
       correctAnswerIndex: 0,
       category: 'Animals',
+      signId: 'Cat',
     ),
     
     QuizQuestion(
@@ -369,12 +456,14 @@ class QuizRepository {
       ],
       correctAnswerIndex: 0,
       category: 'Animals',
+      signId: 'Bird',
     ),
   ];
 
   // ─── ALL QUESTIONS ─────────────────────────────────────────
   static List<QuizQuestion> get allQuestions {
     return [
+      ...alphabetQuestions,
       ...greetingQuestions,
       ...numberQuestions,
       ...familyQuestions,
@@ -387,7 +476,17 @@ class QuizRepository {
   }
 
   // ─── HELPER METHODS ────────────────────────────────────────
-  
+  // In QuizRepository class, add this method:
+  static QuizQuestion getRandomQuestionByCategory(String category) {
+    final categoryQuestions = getQuestionsByCategory(category);
+    if (categoryQuestions.isNotEmpty) {
+      final randomIndex = DateTime.now().millisecondsSinceEpoch % categoryQuestions.length;
+      return categoryQuestions[randomIndex];
+    }
+    // Fallback to general random question
+    return getRandomQuestion();
+  }
+
   // Get random question for daily quiz
   static QuizQuestion getRandomQuestion() {
     final now = DateTime.now();
@@ -399,6 +498,8 @@ class QuizRepository {
   // Get questions by category
   static List<QuizQuestion> getQuestionsByCategory(String category) {
     switch (category) {
+      case 'Alphabet':
+        return alphabetQuestions;
       case 'Greetings':
         return greetingQuestions;
       case 'Numbers':
@@ -423,7 +524,7 @@ class QuizRepository {
   // Get all categories
   static List<String> get allCategories {
     return [
-      'Greetings',
+      'Alphabet',
       'Numbers',
       'Family',
       'Food & Drink',
@@ -431,12 +532,14 @@ class QuizRepository {
       'Time',
       'Colors',
       'Animals',
+      'Greetings',
     ];
   }
 
   // Get question count by category
   static Map<String, int> get questionCountByCategory {
     return {
+      'Alphabet': alphabetQuestions.length,
       'Greetings': greetingQuestions.length,
       'Numbers': numberQuestions.length,
       'Family': familyQuestions.length,

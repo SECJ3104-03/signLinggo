@@ -288,6 +288,83 @@ class _ProgressScreenState extends State<ProgressScreen> {
             ),
             const SizedBox(height: 28),
 
+            // ── Learning Stage Progress ──
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: const [
+                  BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 4))
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.school, color: Colors.purple),
+                      const SizedBox(width: 8),
+                      const Text('Learning Stage',
+                          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // Get learning stage info
+                  Builder(
+                    builder: (context) {
+                      final progressManager = context.read<ProgressManager>();
+                      final stageInfo = progressManager.getLearningStageInfo();
+                      final currentCategory = stageInfo['currentCategory'];
+                      final stageDay = stageInfo['stageDay'];
+                      final stageLength = stageInfo['stageLength'];
+                      final stageNumber = stageInfo['stageNumber'];
+                      
+                      return Column(
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Stage $stageNumber: $currentCategory',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              Text(
+                                'Day $stageDay/$stageLength',
+                                style: const TextStyle(
+                                  color: Colors.purple,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          LinearProgressIndicator(
+                            value: stageDay / stageLength,
+                            backgroundColor: Colors.purple.shade100,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.purple),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Focus on $currentCategory for ${stageLength - stageDay + 1} more day(s)',
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey,
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+
             // ── Quiz Status ──
             Container(
               padding: const EdgeInsets.all(16),
