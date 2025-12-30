@@ -1,7 +1,9 @@
+import 'dart:io';
+import 'dart:async'; 
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:camera/camera.dart';
-// Keep your existing ObjectDetector import
 import '../../services/object_detector.dart'; 
 
 class SignRecognitionScreen extends StatefulWidget {
@@ -23,7 +25,6 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
   
   // Nullable to prevent "LateInitializationError" crash
   Future<void>? _initializeControllerFuture;
-  
   late bool isSignToText;
 
   // --- AI & Logic Variables ---
@@ -34,9 +35,6 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
   // --- Camera Management Variables ---
   List<CameraDescription> _cameras = []; 
   int _selectedCameraIdx = 0; 
-  double _currentZoom = 1.0;
-  double _minZoom = 1.0;
-  double _maxZoom = 1.0;
 
   @override
   void initState() {
@@ -54,13 +52,11 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
     try {
       _cameras = await availableCameras();
       
-      // Find the index of the camera passed from the previous screen
       _selectedCameraIdx = _cameras.indexWhere(
         (c) => c.lensDirection == widget.camera.lensDirection
       );
       if (_selectedCameraIdx == -1) _selectedCameraIdx = 0;
 
-      // Initialize the selected camera
       _initializeCamera(_cameras[_selectedCameraIdx]);
     } catch (e) {
       debugPrint("Error fetching cameras: $e");
@@ -70,30 +66,25 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
   void _initializeCamera(CameraDescription cameraDescription) {
     _controller = CameraController(
       cameraDescription, 
-      ResolutionPreset.medium,
+      // Medium is the "Sweet Spot". Low is too blurry for AI. High is too slow.
+      ResolutionPreset.medium, 
       enableAudio: false,
-      imageFormatGroup: ImageFormatGroup.nv21, 
+      imageFormatGroup: Platform.isAndroid 
+        ? ImageFormatGroup.yuv420 
+        : ImageFormatGroup.bgra8888, 
     );
 
     final future = _controller.initialize().then((_) async {
       try {
-        _minZoom = await _controller.getMinZoomLevel();
-        _maxZoom = await _controller.getMaxZoomLevel();
-        _currentZoom = _minZoom.clamp(1.0, _maxZoom);
-        await _controller.setZoomLevel(_currentZoom);
+        await _controller.setZoomLevel(1.0);
       } catch (e) {
         debugPrint('Error setting zoom: $e');
       }
       if (mounted) setState(() {});
     });
 
-    // Assign future without 'late' so UI can check for null
     setState(() {
       _initializeControllerFuture = future;
-    });
-    
-    future.catchError((error) {
-      debugPrint('Camera initialization error: $error');
     });
   }
 
@@ -102,27 +93,26 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
     if (_cameras.length < 2) return; 
 
     if (_isScanning) {
-      setState(() {
-        _isScanning = false; 
-      });
+      setState(() { _isScanning = false; });
     }
 
     final newIndex = (_selectedCameraIdx + 1) % _cameras.length;
-    
     await _controller.dispose();
 
     setState(() {
       _selectedCameraIdx = newIndex;
-      _initializeControllerFuture = null; // Reset to show loading spinner
+      _initializeControllerFuture = null; 
     });
     
     _initializeCamera(_cameras[_selectedCameraIdx]);
   }
 
-  // --- SCANNING LOOP ---
-  void _toggleScanning() async {
+  // --- SNAPSHOT SCANNING LOOP ---
+  void _toggleScanning() {
     setState(() {
       _isScanning = !_isScanning;
+      // FIX 1: Update text immediately
+      if (_isScanning) _recognizedText = "Initializing...";
     });
 
     if (_isScanning) {
@@ -130,29 +120,41 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
     }
   }
 
-  void _startDetectionLoop() async {
+  Future<void> _startDetectionLoop() async {
+    // While the user wants to scan...
     while (_isScanning && mounted) {
+      
+      // Safety check
+      if (!_controller.value.isInitialized || _controller.value.isTakingPicture) {
+        await Future.delayed(const Duration(milliseconds: 50));
+        continue;
+      }
+
       try {
-        if (_initializeControllerFuture == null || !_controller.value.isInitialized) return;
+        // 1. Capture the image (Snapshot)
+        // This takes ~200-300ms. It is the bottleneck, but it guarantees high quality.
+        final XFile image = await _controller.takePicture();
 
-        final image = await _controller.takePicture();
-        final results = await _detector.runInference(image.path);
+        // 2. Run AI
+        final String? result = await _detector.detect(image.path);
 
-        if (mounted) {
+        // 3. Update the UI
+        if (mounted && _isScanning) {
           setState(() {
-            if (results.isNotEmpty) {
-              _recognizedText = "${results[0]['label']} (${results[0]['score']})";
-            } else {
-              _recognizedText = "No Sign Detected";
-            }
+            // FIX 2: Explicitly show "No Sign Detected" if result is null
+            _recognizedText = result ?? "No Sign Detected";
           });
         }
-        await Future.delayed(const Duration(milliseconds: 100));
+
+        // 4. Delete temp file to save space
+        File(image.path).delete().ignore();
 
       } catch (e) {
-        debugPrint("Detection Error: $e");
-        break; 
+        debugPrint("Error in detection loop: $e");
       }
+
+      // FIX 3: Reduced delay to 100ms. Your Vivo X200 is fast enough for this.
+      await Future.delayed(const Duration(milliseconds: 1000));
     }
   }
 
@@ -245,7 +247,6 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
                       future: _initializeControllerFuture,
                       builder: (context, snapshot) {
                         if (snapshot.connectionState == ConnectionState.done) {
-                          // FIX: Use FittedBox to cover the area without stretching
                           return SizedBox.expand(
                             child: FittedBox(
                               fit: BoxFit.cover,
