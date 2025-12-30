@@ -98,53 +98,51 @@ class AdaptiveQuizGenerator {
 
   /// Get user learning stage from Firestore
   Future<Map<String, dynamic>> _getUserLearningStage(String userId) async {
-    try {
-      final doc = await _firestore.collection('user_progress').doc(userId).get();
-      if (doc.exists) {
-        final data = doc.data()!;
-        final dayStreak = data['dayStreak'] ?? 0;
-        
-        // Calculate stage based on day streak
-        final stageLength = 5;
-        final stageNumber = (dayStreak ~/ stageLength) + 1;
-        final stageDay = (dayStreak % stageLength) + 1;
-        
-        // Define category sequence
-        final categories = [
-          'Alphabet',
-          'Numbers',
-          'Family',
-          'Food & Drink',
-          'Emotions',
-          'Time',
-          'Colors',
-          'Animals',
-          'Greetings',
-        ];
-        
-        // Cycle through categories if streak exceeds total categories
-        final categoryIndex = (stageNumber - 1) % categories.length;
-        final currentCategory = categories[categoryIndex];
-        
-        return {
-          'currentCategory': currentCategory,
-          'stageNumber': stageNumber,
-          'stageDay': stageDay,
-          'stageLength': stageLength,
-        };
-      }
-    } catch (e) {
-      print('Error getting user learning stage: $e');
+  try {
+    final doc = await _firestore.collection('user_progress').doc(userId).get();
+    if (doc.exists) {
+      final data = doc.data()!;
+      final totalActiveDays = data['totalActiveDays'] ?? 0;
+      
+      // Use totalActiveDays instead of dayStreak
+      final stageLength = 5;
+      final stageNumber = (totalActiveDays ~/ stageLength) + 1;
+      final stageDay = (totalActiveDays % stageLength) + 1;
+      
+      final categories = [
+        'Alphabet',
+        'Numbers',
+        'Family',
+        'Food & Drink',
+        'Emotions',
+        'Time',
+        'Colors',
+        'Animals',
+        'Greetings',
+      ];
+      
+      final categoryIndex = (stageNumber - 1) % categories.length;
+      final currentCategory = categories[categoryIndex];
+      
+      return {
+        'currentCategory': currentCategory,
+        'stageNumber': stageNumber,
+        'stageDay': stageDay,
+        'stageLength': stageLength,
+      };
     }
-    
-    // Default to first category if not found
-    return {
-      'currentCategory': 'Alphabet',
-      'stageNumber': 1,
-      'stageDay': 1,
-      'stageLength': 5,
-    };
+  } catch (e) {
+    print('Error getting user learning stage: $e');
   }
+  
+  // Default
+  return {
+    'currentCategory': 'Alphabet',
+    'stageNumber': 1,
+    'stageDay': 1,
+    'stageLength': 5,
+  };
+}
 
   /// Get user progress data
   Future<Map<String, dynamic>> _getUserProgress(String userId) async {

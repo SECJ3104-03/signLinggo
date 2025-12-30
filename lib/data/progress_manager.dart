@@ -11,6 +11,7 @@ class ProgressManager with ChangeNotifier {
   int _totalWatched = 0;
   int _dailyWatchedCount = 0;
   int _dayStreak = 0;
+  int _totalActiveDays = 0; // NEW: Tracks total days user was active
   int _points = 0;
   bool _dailyQuizDone = false;
   
@@ -32,6 +33,7 @@ class ProgressManager with ChangeNotifier {
   int get totalWatched => _totalWatched;
   int get dailyWatchedCount => _dailyWatchedCount;
   int get dayStreak => _dayStreak;
+  int get totalActiveDays => _totalActiveDays; // NEW
   int get points => _points;
   bool get dailyQuizDone => _dailyQuizDone;
 
@@ -105,6 +107,7 @@ class ProgressManager with ChangeNotifier {
     _totalWatched = data['totalWatched'] ?? 0;
     _dailyWatchedCount = data['dailyWatchedCount'] ?? 0; 
     _dayStreak = data['dayStreak'] ?? 0;
+    _totalActiveDays = data['totalActiveDays'] ?? _dayStreak; // NEW: Default to streak for old users
     _dailyQuizDone = data['dailyQuizDone'] ?? false;
     _points = data['points'] ?? 0;
 
@@ -148,6 +151,7 @@ class ProgressManager with ChangeNotifier {
       // Keep these for app logic
       'points': _points,
       'dayStreak': _dayStreak,
+      'totalActiveDays': _totalActiveDays, // NEW: Add total active days
       'dailyQuizDone': _dailyQuizDone,
       'dailyWatchedCount': _dailyWatchedCount,
       'totalWatched': _totalWatched,
@@ -188,6 +192,7 @@ class ProgressManager with ChangeNotifier {
     _totalWatched = 0;
     _dailyWatchedCount = 0;
     _dayStreak = 0;
+    _totalActiveDays = 0; // NEW: Reset active days
     _points = 0;
     _dailyQuizDone = false;
     _watchedVideos = {};
@@ -200,12 +205,13 @@ class ProgressManager with ChangeNotifier {
   Future<void> markAsWatched(String signId) async {
     if (!isSignedIn) return;
     await _checkAndResetDailyLogs();
+    await _updateActiveDays(); // NEW: Update active days when user watches
 
     if (!_watchedVideos.contains(signId)) {
       _watchedVideos.add(signId);
       _totalWatched++;
       _dailyWatchedCount++; 
-      await _updateStreak();
+      await _updateStreak(); // Keep streak for motivation
       await _saveUserData(); 
       notifyListeners();
     }
@@ -214,14 +220,57 @@ class ProgressManager with ChangeNotifier {
   Future<void> completeDailyQuiz({required bool isCorrect}) async {
     if (!isSignedIn) throw Exception('Must be signed in');
     await _checkAndResetDailyLogs();
+    await _updateActiveDays(); // NEW: Update active days when user takes quiz
+    
     if (_dailyQuizDone) throw Exception('Quiz already done');
 
     _dailyQuizDone = true;
     if (isCorrect) _points += 10;
 
-    await _updateStreak(); // UPDATE STREAK BEFORE SAVING
+    await _updateStreak(); // Keep streak for motivation
     await _saveUserData(); 
     notifyListeners();
+  }
+
+  // ─── ACTIVE DAYS TRACKING ──────────────────────────────────────────
+  /// Updates total active days (counts days user was active)
+  Future<void> _updateActiveDays() async {
+    final now = DateTime.now();
+    
+    // If first time
+    if (_lastActiveDate == null) {
+      _totalActiveDays = 1;
+      _lastActiveDate = now;
+      return;
+    }
+    
+    final lastDate = DateTime(
+      _lastActiveDate!.year, 
+      _lastActiveDate!.month, 
+      _lastActiveDate!.day
+    );
+    
+    final today = DateTime(now.year, now.month, now.day);
+    
+    // Calculate days difference
+    final diffInDays = today.difference(lastDate).inDays;
+    
+    print('📅 Active Days Debug:');
+    print('📅 Today: $today');
+    print('📅 Last Date: $lastDate');
+    print('📅 Diff in days: $diffInDays');
+    print('📅 Current active days: $_totalActiveDays');
+    
+    if (diffInDays >= 1) {
+      // New day - increment total active days
+      _totalActiveDays++;
+      _lastActiveDate = now;
+      print('📅 New active day - total: $_totalActiveDays');
+    }
+    // If diffInDays == 0, same day, don't increment
+    // If diffInDays < 0 (future date), ignore
+    
+    await _saveUserData();
   }
 
   // ─── TASK 1.2: QUIZ LOGGING ──────────────────────────────────────
@@ -363,6 +412,7 @@ class ProgressManager with ChangeNotifier {
           'learnedSignIds': List<String>.from(data['learnedSignIds'] ?? []),
           'masteryScore': Map<String, int>.from(data['masteryScore'] ?? {}),
           'totalWatched': data['totalWatched'] ?? 0,
+          'totalActiveDays': data['totalActiveDays'] ?? 0, // NEW
         };
       }
     } catch (e) {
@@ -399,22 +449,23 @@ class ProgressManager with ChangeNotifier {
     }
   }
 
-  // ─── LEARNING STAGE TRACKING ─────────────────────────────────────
+  // ─── LEARNING STAGE TRACKING (UPDATED) ─────────────────────────────
   
-  /// Get current learning stage based on day streak
-  /// Get current learning stage based on day streak
+  /// Get current learning stage based on total active days
   String getCurrentLearningStage() {
-    // Each stage lasts 5 days
     final stageLength = 5;
     
-    // Handle day streak 0 (new user)
-    if (_dayStreak == 0) {
+    // Use totalActiveDays instead of dayStreak
+    final activeDaysForStage = _totalActiveDays;
+    
+    if (activeDaysForStage <= 0) {
       return 'Alphabet'; // Default to first stage
     }
     
-    // Day streak 1-5 = Stage 1, 6-10 = Stage 2, etc.
-    // Formula: stage = ceil(dayStreak / 5)
-    final stageNumber = ((_dayStreak - 1) ~/ stageLength) + 1;
+    // Calculate stage based on total active days
+    // Day 1-5: Stage 1 (Alphabet)
+    // Day 6-10: Stage 2 (Numbers)
+    final stageNumber = ((activeDaysForStage - 1) ~/ stageLength) + 1;
     
     // Define category sequence
     final categories = [
@@ -429,19 +480,25 @@ class ProgressManager with ChangeNotifier {
       'Greetings',
     ];
     
-    // Cycle through categories if streak exceeds total categories
+    // Cycle through categories if active days exceed total categories
     final categoryIndex = (stageNumber - 1) % categories.length;
     final currentCategory = categories[categoryIndex];
+    
+    print('📊 Learning Stage Debug:');
+    print('📊 Total Active Days: $activeDaysForStage');
+    print('📊 Stage Number: $stageNumber');
+    print('📊 Current Category: $currentCategory');
     
     return currentCategory;
   }
 
-  /// Get stage progress info
+  /// Get stage progress info based on total active days
   Map<String, dynamic> getLearningStageInfo() {
     final stageLength = 5;
+    final activeDaysForStage = _totalActiveDays;
     
-    // Handle day streak 0
-    if (_dayStreak == 0) {
+    // Handle day 0 (new user)
+    if (activeDaysForStage == 0) {
       return {
         'currentCategory': 'Alphabet',
         'stageNumber': 1,
@@ -452,11 +509,11 @@ class ProgressManager with ChangeNotifier {
       };
     }
     
-    // Calculate stage number (1-based)
-    final stageNumber = ((_dayStreak - 1) ~/ stageLength) + 1;
+    // Calculate stage number based on active days
+    final stageNumber = ((activeDaysForStage - 1) ~/ stageLength) + 1;
     
     // Day within current stage (1-5)
-    final stageDay = ((_dayStreak - 1) % stageLength) + 1;
+    final stageDay = ((activeDaysForStage - 1) % stageLength) + 1;
     
     final currentCategory = getCurrentLearningStage();
     
@@ -496,55 +553,54 @@ class ProgressManager with ChangeNotifier {
     notifyListeners();
   }
 
+  /// Updates streak for motivational purposes (consecutive days)
   Future<void> _updateStreak() async {
-  final now = DateTime.now();
-  final today = DateTime(now.year, now.month, now.day);
-  
-  // If first time or no last active date
-  if (_lastActiveDate == null) {
-    _dayStreak = 1;
+    final now = DateTime.now();
+    
+    // If first time or no last active date
+    if (_lastActiveDate == null) {
+      _dayStreak = 1;
+      _lastActiveDate = now;
+      _dailyQuizDone = false; // Ensure quiz is available
+      return;
+    }
+    
+    final lastDate = DateTime(
+      _lastActiveDate!.year, 
+      _lastActiveDate!.month, 
+      _lastActiveDate!.day
+    );
+    
+    final today = DateTime(now.year, now.month, now.day);
+    
+    // Calculate days difference
+    final diffInDays = today.difference(lastDate).inDays;
+    
+    print('📅 Streak Debug:');
+    print('📅 Today: $today');
+    print('📅 Last Date: $lastDate');
+    print('📅 Diff in days: $diffInDays');
+    print('📅 Current streak: $_dayStreak');
+    
+    // Keep simple streak logic for motivation only
+    if (diffInDays == 1) {
+      // Consecutive day - increase streak
+      _dayStreak++;
+      print('📅 New day - streak increased to $_dayStreak');
+    } else if (diffInDays > 1) {
+      // Break in streak - reset to 1
+      _dayStreak = 1;
+      print('📅 Streak broken - reset to 1');
+    }
+    // If diffInDays == 0, same day - no change
+    // If diffInDays < 0 (future date), ignore
+    
     _lastActiveDate = now;
-    _dailyQuizDone = false; // Ensure quiz is available
-    return;
-  }
-  
-  final lastDate = DateTime(
-    _lastActiveDate!.year, 
-    _lastActiveDate!.month, 
-    _lastActiveDate!.day
-  );
-  
-  // Calculate days difference
-  final diffInDays = today.difference(lastDate).inDays;
-  
-  print('📅 Streak Debug:');
-  print('📅 Today: $today');
-  print('📅 Last Date: $lastDate');
-  print('📅 Diff in days: $diffInDays');
-  print('📅 Current streak: $_dayStreak');
-  
-  if (diffInDays == 0) {
-    // Same day - already used today
-    print('📅 Same day - quiz should be done');
-  } else if (diffInDays == 1) {
-    // Consecutive day - increase streak
-    _dayStreak++;
-    _lastActiveDate = now;
-    _dailyQuizDone = false; // NEW QUIZ AVAILABLE!
-    print('📅 New day - streak increased to $_dayStreak');
+    _dailyQuizDone = false; // Ensure quiz is available for new day
     print('📅 Quiz reset to available');
-  } else if (diffInDays > 1) {
-    // Break in streak - reset to 1
-    _dayStreak = 1;
-    _lastActiveDate = now;
-    _dailyQuizDone = false; // NEW QUIZ AVAILABLE!
-    print('📅 Streak broken - reset to 1');
-    print('📅 Quiz reset to available');
+    
+    await _saveUserData();
   }
-  // If diffInDays < 0 (future date), ignore
-  
-  await _saveUserData();
-}
   
   Map<DateTime, bool> getStreakCalendar() {
     final calendar = <DateTime, bool>{};
