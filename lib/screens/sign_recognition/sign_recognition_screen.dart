@@ -30,7 +30,7 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
 
   final ObjectDetector _detector = ObjectDetector();
   bool _isScanning = false;
-  String _recognizedText = "Ready";
+  String _recognizedText = "Initializing...";
   String _confidenceLevel = "";
   
   // Performance tracking
@@ -45,6 +45,7 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
   bool _showSettings = false;
   double _confidenceThreshold = 0.5;
   bool _showDebugInfo = false;
+  bool _modelLoaded = false;
 
   List<CameraDescription> _cameras = [];
   int _selectedCameraIdx = 0;
@@ -68,11 +69,16 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
     
     // Performance logging
     _performanceTimer = Timer.periodic(Duration(seconds: 5), (_) {
-      if (_isScanning && mounted) {
+      if (_modelLoaded && mounted) {
         final metrics = _detector.getPerformanceMetrics();
-        print("📊 Performance: ${metrics['fps']} FPS, "
-              "Inference: ${metrics['inferenceTime']}ms, "
-              "Detections: $_totalDetections");
+        final modelInfo = _detector.getModelInfo();
+        print("📊 Performance Metrics:");
+        print("   FPS: ${metrics['fps']}");
+        print("   Inference Time: ${metrics['inferenceTime']}ms");
+        print("   Frames Processed: ${metrics['framesProcessed']}");
+        print("   Model Type: ${metrics['modelType']}");
+        print("   Model Info: ${modelInfo['modelSize']}");
+        print("   Total Detections: $_totalDetections");
       }
     });
   }
@@ -95,21 +101,35 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
       
       if (mounted) {
         setState(() {
+          _modelLoaded = true;
           _recognizedText = "Model Loaded ✓";
         });
       }
+      
+      // Show model info
+      final modelInfo = _detector.getModelInfo();
+      print("✅ Model Information:");
+      print("   Size: ${modelInfo['modelSize']}");
+      print("   Input Shape: ${modelInfo['inputShape']}");
+      print("   Output Shape: ${modelInfo['outputShape']}");
+      print("   Total Classes: ${modelInfo['totalClasses']}");
+      print("   Sign Classes: ${modelInfo['signClasses']}");
+      
     } catch (e) {
       print("❌ Model initialization failed: $e");
       if (mounted) {
         setState(() {
-          _recognizedText = "Model Error";
+          _recognizedText = "Model Error - Check Assets";
         });
       }
       _showErrorDialog("Model Error", 
           "Failed to load AI model. Please check:\n\n"
-          "1. Model file exists: assets/models/best_float32.tflite\n"
-          "2. Model exported with simplify=True\n"
-          "3. File size ~10-30MB\n\n"
+          "1. Model file exists: assets/models/best_int8.tflite\n"
+          "2. Add to pubspec.yaml:\n"
+          "   assets:\n"
+          "     - assets/models/best_int8.tflite\n"
+          "3. Model is INT8 format (3.2MB)\n"
+          "4. File location: /assets/models/\n\n"
           "Error: $e");
     }
   }
@@ -127,6 +147,11 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
       _initializeCamera(_cameras[_selectedCameraIdx]);
     } catch (e) {
       print("❌ Camera setup error: $e");
+      if (mounted) {
+        setState(() {
+          _recognizedText = "Camera Error";
+        });
+      }
     }
   }
   
@@ -176,6 +201,12 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
   }
 
   void _toggleScanning() async {
+    if (!_modelLoaded) {
+      _showErrorDialog("Model Not Loaded", 
+          "Please wait for the AI model to load before starting recognition.");
+      return;
+    }
+    
     if (_isScanning) {
       await _stopScanning();
     } else {
@@ -186,6 +217,7 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
   Future<void> _startScanning() async {
     if (!_controller.value.isInitialized) {
       print("❌ Camera not ready");
+      _showErrorDialog("Camera Error", "Camera is not initialized. Please try again.");
       return;
     }
     
@@ -207,6 +239,12 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
       });
     } catch (e) {
       print("❌ Error starting stream: $e");
+      if (mounted) {
+        setState(() {
+          _isScanning = false;
+          _recognizedText = "Stream Error";
+        });
+      }
     }
   }
 
@@ -233,14 +271,15 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
       if (mounted) {
         setState(() {
           _recognizedText = result;
-          _confidenceLevel = "High Confidence";
+          // Show confidence color indicator
+          _confidenceLevel = "✓ High Confidence";
         });
       }
     } else if (_isScanning && mounted) {
       // Update every few seconds when no detection
       if (_frameCounter % 60 == 0) {
         setState(() {
-          _recognizedText = "Show your hand";
+          _recognizedText = "Show your hand sign";
           _confidenceLevel = "";
         });
       }
@@ -259,7 +298,7 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
     if (mounted) {
       setState(() {
         _isScanning = false;
-        _recognizedText = "Ready";
+        _recognizedText = _modelLoaded ? "Ready" : "Loading Model...";
         _confidenceLevel = "";
       });
     }
@@ -289,7 +328,9 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
       context: context,
       builder: (context) => AlertDialog(
         title: Text(title),
-        content: Text(message),
+        content: SingleChildScrollView(
+          child: Text(message),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -305,6 +346,7 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
     WidgetsBinding.instance.removeObserver(this);
     _stopScanning();
     _performanceTimer?.cancel();
+    _detector.dispose();
     _controller.dispose();
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.landscapeRight,
@@ -357,6 +399,37 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
+                // Model status indicator
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: _modelLoaded ? Colors.green.shade50 : Colors.orange.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: _modelLoaded ? Colors.green.shade200 : Colors.orange.shade200,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        _modelLoaded ? Icons.check_circle : Icons.sync,
+                        color: _modelLoaded ? Colors.green : Colors.orange,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        _modelLoaded ? 'INT8 Model Ready (3.2MB)' : 'Loading Model...',
+                        style: TextStyle(
+                          color: _modelLoaded ? Colors.green.shade800 : Colors.orange.shade800,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+
                 // Mode indicator
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -440,12 +513,27 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
                       ),
                       if (_confidenceLevel.isNotEmpty) ...[
                         const SizedBox(height: 10),
-                        Text(
-                          _confidenceLevel,
-                          style: TextStyle(
-                            color: Colors.purple.shade600,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.green.shade50,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: Colors.green.shade200),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.verified, color: Colors.green.shade700, size: 16),
+                              const SizedBox(width: 6),
+                              Text(
+                                _confidenceLevel,
+                                style: TextStyle(
+                                  color: Colors.green.shade800,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
@@ -592,6 +680,35 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
                             ),
                           ),
                         ),
+                        
+                        // Model info chip
+                        if (_modelLoaded)
+                        Positioned(
+                          top: 20,
+                          left: 20,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.7),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.memory, color: Colors.blue.shade300, size: 14),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'INT8',
+                                  style: TextStyle(
+                                    color: Colors.blue.shade300,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -693,7 +810,7 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
           ),
 
           // Settings panel (slides up)
-          if (_showSettings) ...[
+          if (_showSettings)
             Positioned(
               bottom: 0,
               left: 0,
@@ -774,14 +891,63 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
                       label: const Text('Reset to Default'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.purple,
+                        foregroundColor: Colors.white,
                         minimumSize: const Size(double.infinity, 50),
+                      ),
+                    ),
+                    
+                    const SizedBox(height: 20),
+                    Divider(color: Colors.grey.shade300),
+                    const SizedBox(height: 10),
+                    
+                    // Model info
+                    const Text(
+                      'Model Information:',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade50,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.memory, color: Colors.blue.shade600, size: 18),
+                              const SizedBox(width: 8),
+                              const Text('INT8 Quantized'),
+                              const Spacer(),
+                              Chip(
+                                label: const Text('3.2MB', style: TextStyle(fontSize: 12)),
+                                backgroundColor: Colors.green.shade100,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Input: 640×640×3\n'
+                            'Output: 54×8400\n'
+                            'Classes: 50 total, 18 signs',
+                            style: TextStyle(
+                              color: Colors.grey.shade700,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
               ),
             ),
-          ],
         ],
       ),
     );

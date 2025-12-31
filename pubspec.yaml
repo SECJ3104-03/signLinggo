@@ -85,6 +85,6 @@ flutter:
     - assets/assets/videos/
     - assets/assets/placeholder.png
     - assets/assets/offline_materials/ 
-    - assets/assets/models/
+    #- assets/assets/models/
     - assets/models/best_float32.tflite 
 

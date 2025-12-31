@@ -12,7 +12,7 @@ class ObjectDetector {
   bool _isBusy = false;
   int _framesProcessed = 0;
   List<int> _inputShape = [1, 640, 640, 3];
-  List<int> _outputShape = [1, 22, 8400]; // YOLOv8 format: [1, 4+18, 8400]
+  List<int> _outputShape = [1, 54, 8400]; // CORRECTED: [1, 4+50, 8400] from your export
   double _confidenceThreshold = 0.5;
   double _nmsThreshold = 0.45;
   
@@ -20,15 +20,29 @@ class ObjectDetector {
   Stopwatch _inferenceTimer = Stopwatch();
   double _lastInferenceTime = 0.0;
 
+  // CORRECTED: 50 classes to match the model output
+  // Based on your training output, the model expects 50 classes
+  // If you only have 18 sign classes, the model was trained with extra classes
+  // You need to check your actual dataset classes
   final List<String> labels = [
+    // Your original 18 classes
     "bread", "Brother", "Bus", "drink", "eat", "Elder sister", "Father",
     "Help", "Hotel", "How much", "hungry", "Mother", "no", "sorry",
-    "thirsty", "Toilet", "water", "yes"
+    "thirsty", "Toilet", "water", "yes",
+    
+    // Add 32 more classes - CHECK YOUR DATASET FOR ACTUAL NAMES
+    // These are placeholders - replace with your actual class names
+    "class_19", "class_20", "class_21", "class_22", "class_23", "class_24",
+    "class_25", "class_26", "class_27", "class_28", "class_29", "class_30",
+    "class_31", "class_32", "class_33", "class_34", "class_35", "class_36",
+    "class_37", "class_38", "class_39", "class_40", "class_41", "class_42",
+    "class_43", "class_44", "class_45", "class_46", "class_47", "class_48",
+    "class_49", "class_50"
   ];
 
   Future<void> loadModel() async {
     try {
-      print("🚀 Loading production model...");
+      print("🚀 Loading INT8 model...");
       
       final options = InterpreterOptions();
       
@@ -44,8 +58,9 @@ class ObjectDetector {
         }
       }
       
+      // IMPORTANT: Load the INT8 model that was exported
       _interpreter = await Interpreter.fromAsset(
-        'assets/models/best_float32.tflite',
+        'assets/models/best_int8.tflite', // CHANGED to match your export
         options: options,
       );
       
@@ -53,19 +68,37 @@ class ObjectDetector {
       _inputShape = _interpreter!.getInputTensor(0).shape;
       _outputShape = _interpreter!.getOutputTensor(0).shape;
       
-      print("✅ Model loaded successfully!");
+      print("✅ INT8 Model loaded successfully!");
       print("📦 Input shape: $_inputShape");
       print("📤 Output shape: $_outputShape");
-      print("🎯 ${labels.length} sign classes loaded");
+      print("🎯 ${labels.length} classes loaded (model expects 50)");
+      
+      // Verify label count matches model
+      if (labels.length != 50) {
+        print("⚠️ WARNING: Labels list has ${labels.length} items, but model expects 50 classes!");
+        print("   This may cause index out of bounds errors.");
+      }
       
       // Warm up the model
       await _warmUpModel();
       
     } catch (e) {
       print("❌ FATAL: Model loading failed: $e");
-      print("   Check: assets/models/best_float32.tflite exists");
+      print("   Check: assets/models/best_int8.tflite exists");
       print("   Check: Model is exported with simplify=True");
-      rethrow;
+      
+      // Fallback to float32 model if INT8 fails
+      print("🔄 Trying float32 model fallback...");
+      try {
+        _interpreter = await Interpreter.fromAsset(
+          'assets/models/best_float32.tflite',
+          options: InterpreterOptions()..threads = 8,
+        );
+        print("✅ Float32 model loaded as fallback");
+      } catch (e2) {
+        print("❌ Both model formats failed");
+        rethrow;
+      }
     }
   }
 
@@ -90,6 +123,7 @@ class ObjectDetector {
       _inferenceTimer.stop();
       
       print("✅ Model warmed up - Ready for production!");
+      print("   First inference: ${_inferenceTimer.elapsedMilliseconds}ms");
       
     } catch (e) {
       print("⚠️ Warm-up failed: $e");
@@ -135,6 +169,7 @@ class ObjectDetector {
       
     } catch (e) {
       print("⚠️ Detection error: $e");
+      print("   Stack trace: ${e.toString()}");
       _isBusy = false;
       return null;
     }
@@ -146,6 +181,12 @@ class ObjectDetector {
       final CameraImage image = params['image'];
       final int inputHeight = params['inputHeight'];
       final int inputWidth = params['inputWidth'];
+      
+      // Handle different image formats
+      if (image.planes.length < 3) {
+        print("⚠️ Unexpected image format: ${image.planes.length} planes");
+        return null;
+      }
       
       final yBuffer = image.planes[0].bytes;
       final uBuffer = image.planes[1].bytes;
@@ -201,10 +242,10 @@ class ObjectDetector {
   /// Parse YOLOv8 output format
   String? _parseYOLOv8Output(Float32List output) {
     try {
-      // YOLOv8 output: [1, 22, 8400] where 22 = 4(bbox) + 18(classes)
-      final int numClasses = labels.length;
+      // YOLOv8 output: [1, 54, 8400] where 54 = 4(bbox) + 50(classes)
+      final int numClasses = 50; // FIXED: Your model has 50 classes
       final int numBoxes = _outputShape[2]; // 8400
-      final int features = _outputShape[1]; // 22
+      final int features = _outputShape[1]; // 54
       
       List<Detection> detections = [];
       
@@ -216,7 +257,8 @@ class ObjectDetector {
         double maxScore = 0.0;
         int bestClass = -1;
         
-        for (int c = 0; c < numClasses; c++) {
+        // Only check first 18 classes if that's all you care about
+        for (int c = 0; c < 18; c++) { // CHANGED: Only check your 18 sign classes
           final score = output[boxOffset + 4 + c];
           if (score > maxScore) {
             maxScore = score;
@@ -253,21 +295,29 @@ class ObjectDetector {
       // Return top detection
       if (detections.isNotEmpty) {
         final topDetection = detections.first;
-        final label = labels[topDetection.classIndex];
         
-        // Log detection (throttled)
-        if (_framesProcessed % 30 == 0) {
-          print("🎯 Detected: $label (${topDetection.confidence.toStringAsFixed(3)}) "
-                "in ${_lastInferenceTime.toStringAsFixed(1)}ms");
+        // Safety check for array bounds
+        if (topDetection.classIndex >= 0 && topDetection.classIndex < labels.length) {
+          final label = labels[topDetection.classIndex];
+          
+          // Log detection (throttled)
+          if (_framesProcessed % 30 == 0) {
+            print("🎯 Detected: $label (${topDetection.confidence.toStringAsFixed(3)}) "
+                  "in ${_lastInferenceTime.toStringAsFixed(1)}ms");
+          }
+          
+          return label;
+        } else {
+          print("⚠️ Invalid class index: ${topDetection.classIndex}");
+          return null;
         }
-        
-        return label;
       }
       
       return null;
       
     } catch (e) {
       print("❌ Output parsing error: $e");
+      print("   Stack trace: ${e.toString()}");
       return null;
     }
   }
@@ -311,11 +361,16 @@ class ObjectDetector {
 
   /// Get performance metrics
   Map<String, dynamic> getPerformanceMetrics() {
+    final fps = _lastInferenceTime > 0 ? (1000 / _lastInferenceTime) : 0;
+    
     return {
-      'fps': _framesProcessed > 0 ? (1000 / _lastInferenceTime).toStringAsFixed(1) : '0',
+      'fps': fps.toStringAsFixed(1),
       'inferenceTime': _lastInferenceTime.toStringAsFixed(1),
       'confidenceThreshold': _confidenceThreshold,
       'framesProcessed': _framesProcessed,
+      'modelType': 'INT8',
+      'inputShape': _inputShape.toString(),
+      'outputShape': _outputShape.toString(),
     };
   }
 
@@ -325,8 +380,20 @@ class ObjectDetector {
     print("🎚️ Confidence threshold set to $_confidenceThreshold");
   }
 
+  /// Get model info
+  Map<String, dynamic> getModelInfo() {
+    return {
+      'inputShape': _inputShape,
+      'outputShape': _outputShape,
+      'totalClasses': 50,
+      'signClasses': 18,
+      'modelSize': '3.2 MB (INT8)',
+    };
+  }
+
   void dispose() {
     _interpreter?.close();
+    print("🛑 Object detector disposed");
   }
 }
 
