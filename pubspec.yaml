@@ -51,6 +51,7 @@ dependencies:
   permission_handler: ^11.1.0
   audio_session: ^0.1.16 #convo
   #flutter_cache_manager: ^3.3.1 #Learn Page Caching
+  vector_math: ^2.1.4  # For fast math operations
 
   # Networking
   http: ^1.2.2
