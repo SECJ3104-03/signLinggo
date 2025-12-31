@@ -34,12 +34,10 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
   String _confidenceLevel = "";
   
   // Performance tracking
-  Stopwatch _fpsTimer = Stopwatch();
   int _frameCounter = 0;
   double _fps = 0.0;
-  double _inferenceTime = 0.0;
   int _totalDetections = 0;
-  Timer? _performanceTimer;
+  Timer? _fpsTimer;
   
   // UI state
   bool _showSettings = false;
@@ -54,31 +52,20 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    
-    // Lock to portrait
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-    
     isSignToText = widget.isSignToText;
     
-    // Load production model
+    // 1. Setup Camera & Model
     _initializeModel();
-    
-    // Setup cameras
     _setupCameras();
-    _fpsTimer.start();
     
-    // Performance logging
-    _performanceTimer = Timer.periodic(Duration(seconds: 5), (_) {
-      if (_modelLoaded && mounted) {
-        final metrics = _detector.getPerformanceMetrics();
-        final modelInfo = _detector.getModelInfo();
-        print("📊 Performance Metrics:");
-        print("   FPS: ${metrics['fps']}");
-        print("   Inference Time: ${metrics['inferenceTime']}ms");
-        print("   Frames Processed: ${metrics['framesProcessed']}");
-        print("   Model Type: ${metrics['modelType']}");
-        print("   Model Info: ${modelInfo['modelSize']}");
-        print("   Total Detections: $_totalDetections");
+    // 2. Start FPS Timer (Updates every 1 second)
+    _fpsTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (mounted && _isScanning) {
+        setState(() {
+          _fps = _frameCounter.toDouble();
+          _frameCounter = 0;
+        });
       }
     });
   }
@@ -87,10 +74,8 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused) {
       _stopScanning();
-    } else if (state == AppLifecycleState.resumed && _controller != null) {
-      if (_isScanning) {
-        _startStreaming();
-      }
+    } else if (state == AppLifecycleState.resumed && _controller.value.isInitialized) {
+      if (_isScanning) _startStreaming();
     }
   }
 
@@ -102,111 +87,57 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
       if (mounted) {
         setState(() {
           _modelLoaded = true;
-          _recognizedText = "Model Loaded ✓";
+          _recognizedText = "Ready to Scan";
         });
       }
-      
-      // Show model info
-      final modelInfo = _detector.getModelInfo();
-      print("✅ Model Information:");
-      print("   Size: ${modelInfo['modelSize']}");
-      print("   Input Shape: ${modelInfo['inputShape']}");
-      print("   Output Shape: ${modelInfo['outputShape']}");
-      print("   Total Classes: ${modelInfo['totalClasses']}");
-      print("   Sign Classes: ${modelInfo['signClasses']}");
-      
     } catch (e) {
-      print("❌ Model initialization failed: $e");
       if (mounted) {
-        setState(() {
-          _recognizedText = "Model Error - Check Assets";
-        });
+        setState(() => _recognizedText = "Model Error");
       }
-      _showErrorDialog("Model Error", 
-          "Failed to load AI model. Please check:\n\n"
-          "1. Model file exists: assets/models/best_int8.tflite\n"
-          "2. Add to pubspec.yaml:\n"
-          "   assets:\n"
-          "     - assets/models/best_int8.tflite\n"
-          "3. Model is INT8 format (3.2MB)\n"
-          "4. File location: /assets/models/\n\n"
-          "Error: $e");
+      _showErrorDialog("Model Failed", 
+          "Could not load best_int8.tflite.\nMake sure you downloaded and renamed it correctly!");
     }
   }
 
   Future<void> _setupCameras() async {
     try {
       _cameras = await availableCameras();
-      
-      // Prefer back camera
-      _selectedCameraIdx = _cameras.indexWhere(
-        (c) => c.lensDirection == CameraLensDirection.back,
-      );
+      _selectedCameraIdx = _cameras.indexWhere((c) => c.lensDirection == CameraLensDirection.back);
       if (_selectedCameraIdx == -1) _selectedCameraIdx = 0;
-
       _initializeCamera(_cameras[_selectedCameraIdx]);
     } catch (e) {
-      print("❌ Camera setup error: $e");
-      if (mounted) {
-        setState(() {
-          _recognizedText = "Camera Error";
-        });
-      }
+      print("Camera Error: $e");
     }
   }
   
   void _initializeCamera(CameraDescription cameraDescription) {
     _controller = CameraController(
       cameraDescription,
-      ResolutionPreset.medium, // Good balance for detection
+      ResolutionPreset.high, // Adjust as needed
       enableAudio: false,
-      imageFormatGroup: Platform.isAndroid 
-        ? ImageFormatGroup.yuv420
-        : ImageFormatGroup.bgra8888,
+      imageFormatGroup: Platform.isAndroid ? ImageFormatGroup.yuv420 : ImageFormatGroup.bgra8888,
     );
 
-    final future = _controller.initialize().then((_) async {
-      try {
-        await _controller.setFocusMode(FocusMode.auto);
-        
-        if (mounted) setState(() {});
-      } catch (e) {
-        print("⚠️ Camera optimization error: $e");
-      }
-    }).catchError((e) {
-      print("❌ Camera initialization failed: $e");
-    });
-
-    setState(() {
-      _initializeControllerFuture = future;
+    _initializeControllerFuture = _controller.initialize().then((_) {
+      if (mounted) setState(() {});
     });
   }
 
   Future<void> _onTapSwitchCamera() async {
     if (_cameras.length < 2) return;
-
-    if (_isScanning) {
-      await _stopScanning();
-    }
+    if (_isScanning) await _stopScanning();
 
     final newIndex = (_selectedCameraIdx + 1) % _cameras.length;
     await _controller.dispose();
-
     setState(() {
       _selectedCameraIdx = newIndex;
       _initializeControllerFuture = null;
     });
-    
     _initializeCamera(_cameras[_selectedCameraIdx]);
   }
 
   void _toggleScanning() async {
-    if (!_modelLoaded) {
-      _showErrorDialog("Model Not Loaded", 
-          "Please wait for the AI model to load before starting recognition.");
-      return;
-    }
-    
+    if (!_modelLoaded) return;
     if (_isScanning) {
       await _stopScanning();
     } else {
@@ -215,20 +146,12 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
   }
 
   Future<void> _startScanning() async {
-    if (!_controller.value.isInitialized) {
-      print("❌ Camera not ready");
-      _showErrorDialog("Camera Error", "Camera is not initialized. Please try again.");
-      return;
-    }
-    
+    if (!_controller.value.isInitialized) return;
     setState(() {
       _isScanning = true;
       _recognizedText = "Detecting...";
-      _frameCounter = 0;
-      _fpsTimer.reset();
       _totalDetections = 0;
     });
-    
     await _startStreaming();
   }
 
@@ -238,105 +161,45 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
         _processCameraFrame(image);
       });
     } catch (e) {
-      print("❌ Error starting stream: $e");
-      if (mounted) {
-        setState(() {
-          _isScanning = false;
-          _recognizedText = "Stream Error";
-        });
-      }
+      print("Stream Error: $e");
     }
   }
 
   void _processCameraFrame(CameraImage image) async {
-    // Calculate FPS
     _frameCounter++;
-    if (_fpsTimer.elapsedMilliseconds > 1000) {
-      _fps = _frameCounter / (_fpsTimer.elapsedMilliseconds / 1000);
-      _frameCounter = 0;
-      _fpsTimer.reset();
-      
-      if (mounted) {
-        setState(() {});
-      }
-    }
     
-    // Process detection
+    // Run Detection
     final String? result = await _detector.detectFromStream(image);
     
-    if (result != null && result.isNotEmpty && mounted && _isScanning) {
+    if (result != null && mounted && _isScanning) {
       _totalDetections++;
-      
-      // Update UI
-      if (mounted) {
-        setState(() {
-          _recognizedText = result;
-          // Show confidence color indicator
-          _confidenceLevel = "✓ High Confidence";
-        });
-      }
-    } else if (_isScanning && mounted) {
-      // Update every few seconds when no detection
-      if (_frameCounter % 60 == 0) {
-        setState(() {
-          _recognizedText = "Show your hand sign";
-          _confidenceLevel = "";
-        });
-      }
+      setState(() {
+        _recognizedText = result;
+        _confidenceLevel = "Match Found";
+      });
     }
   }
 
   Future<void> _stopScanning() async {
     if (_controller.value.isStreamingImages) {
-      try {
-        await _controller.stopImageStream();
-      } catch (e) {
-        print("⚠️ Error stopping stream: $e");
-      }
+      await _controller.stopImageStream();
     }
-    
     if (mounted) {
       setState(() {
         _isScanning = false;
-        _recognizedText = _modelLoaded ? "Ready" : "Loading Model...";
+        _recognizedText = "Paused";
         _confidenceLevel = "";
       });
     }
   }
 
-  void _toggleSettings() {
-    setState(() {
-      _showSettings = !_showSettings;
-    });
-  }
-
-  void _updateConfidenceThreshold(double value) {
-    setState(() {
-      _confidenceThreshold = value;
-    });
-    _detector.setConfidenceThreshold(value);
-  }
-
-  void _toggleDebugInfo() {
-    setState(() {
-      _showDebugInfo = !_showDebugInfo;
-    });
-  }
-
   void _showErrorDialog(String title, String message) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (ctx) => AlertDialog(
         title: Text(title),
-        content: SingleChildScrollView(
-          child: Text(message),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text("OK"),
-          ),
-        ],
+        content: Text(message),
+        actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("OK"))],
       ),
     );
   }
@@ -345,230 +208,99 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _stopScanning();
-    _performanceTimer?.cancel();
+    _fpsTimer?.cancel();
     _detector.dispose();
     _controller.dispose();
-    SystemChrome.setPreferredOrientations([
-      DeviceOrientation.landscapeRight,
-      DeviceOrientation.landscapeLeft,
-      DeviceOrientation.portraitUp,
-      DeviceOrientation.portraitDown,
-    ]);
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final double width = MediaQuery.of(context).size.width;
-    final bool isPortrait = MediaQuery.of(context).orientation == Orientation.portrait;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Sign Recognition',
-            style: TextStyle(color: Colors.black, fontFamily: 'Arimo')),
+        title: const Text('Sign Recognition', style: TextStyle(color: Colors.black)),
         centerTitle: true,
         backgroundColor: Colors.white,
-        elevation: 1,
+        elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black),
           onPressed: () {
             _stopScanning();
-            if (context.canPop()) context.pop();
-            else context.go('/home');
+            context.pop(); 
           },
         ),
         actions: [
-          IconButton(
-            icon: Icon(_showSettings ? Icons.settings : Icons.settings_outlined,
-                color: Colors.black),
-            onPressed: _toggleSettings,
-            tooltip: 'Settings',
-          ),
-          IconButton(
-            icon: Icon(_showDebugInfo ? Icons.info : Icons.info_outline,
-                color: Colors.black),
-            onPressed: _toggleDebugInfo,
-            tooltip: 'Debug Info',
+           IconButton(
+            icon: const Icon(Icons.settings, color: Colors.black),
+            onPressed: () => setState(() => _showSettings = !_showSettings),
           ),
         ],
       ),
       body: Stack(
         children: [
-          // Main content
           SingleChildScrollView(
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
-                // Model status indicator
+                // 1. Status Chip
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(
-                    color: _modelLoaded ? Colors.green.shade50 : Colors.orange.shade50,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: _modelLoaded ? Colors.green.shade200 : Colors.orange.shade200,
+                    color: _modelLoaded ? Colors.green.shade50 : Colors.red.shade50,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: _modelLoaded ? Colors.green : Colors.red),
+                  ),
+                  child: Text(
+                    _modelLoaded ? "AI Active (50 Signs)" : "Loading Model...",
+                    style: TextStyle(
+                      color: _modelLoaded ? Colors.green.shade800 : Colors.red.shade800,
+                      fontWeight: FontWeight.bold
                     ),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        _modelLoaded ? Icons.check_circle : Icons.sync,
-                        color: _modelLoaded ? Colors.green : Colors.orange,
-                        size: 20,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        _modelLoaded ? 'INT8 Model Ready (3.2MB)' : 'Loading Model...',
-                        style: TextStyle(
-                          color: _modelLoaded ? Colors.green.shade800 : Colors.orange.shade800,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // Mode indicator
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    gradient: const LinearGradient(
-                        colors: [Color(0xFFAC46FF), Color(0xFF8B2EFF)]),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(isSignToText ? 'Text → Sign' : 'Sign → Text',
-                          style: const TextStyle(fontSize: 18, color: Colors.white)),
-                      Row(
-                        children: [
-                          Container(
-                            width: 10,
-                            height: 10,
-                            decoration: BoxDecoration(
-                              color: _isScanning ? Colors.green : Colors.red,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            _isScanning ? 'LIVE' : 'READY',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
                   ),
                 ),
                 const SizedBox(height: 20),
 
-                // Result display
+                // 2. Main Text Display
                 Container(
-                  padding: const EdgeInsets.all(20),
+                  padding: const EdgeInsets.all(24),
                   width: double.infinity,
                   decoration: BoxDecoration(
                     color: Colors.purple.shade50,
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.purple.shade200),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.purple.withOpacity(0.1),
-                        blurRadius: 15,
-                        offset: const Offset(0, 5),
-                      ),
-                    ],
+                    border: Border.all(color: Colors.purple.shade100, width: 2),
                   ),
                   child: Column(
                     children: [
-                      const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.handshake, color: Colors.purple, size: 24),
-                          SizedBox(width: 10),
-                          Text("DETECTED SIGN",
-                              style: TextStyle(
-                                  color: Colors.purple,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 16)),
-                        ],
+                      const Text("DETECTED SIGN", 
+                        style: TextStyle(color: Colors.purple, fontSize: 12, fontWeight: FontWeight.bold)
                       ),
-                      const SizedBox(height: 15),
-                      AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 300),
-                        child: Text(
-                          _recognizedText,
-                          key: ValueKey(_recognizedText),
-                          style: const TextStyle(
-                              fontSize: 36,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.purple),
-                          textAlign: TextAlign.center,
+                      const SizedBox(height: 10),
+                      Text(
+                        _recognizedText,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 42, 
+                          fontWeight: FontWeight.w900, 
+                          color: Colors.purple
                         ),
                       ),
-                      if (_confidenceLevel.isNotEmpty) ...[
-                        const SizedBox(height: 10),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: Colors.green.shade50,
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: Colors.green.shade200),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.verified, color: Colors.green.shade700, size: 16),
-                              const SizedBox(width: 6),
-                              Text(
-                                _confidenceLevel,
-                                style: TextStyle(
-                                  color: Colors.green.shade800,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                      if (_showDebugInfo) ...[
-                        const SizedBox(height: 15),
-                        Divider(color: Colors.purple.shade200),
-                        const SizedBox(height: 10),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceAround,
-                          children: [
-                            _buildMetricItem("FPS", "${_fps.toStringAsFixed(1)}"),
-                            _buildMetricItem("Detections", "$_totalDetections"),
-                            _buildMetricItem("Confidence", "${(_confidenceThreshold * 100).toInt()}%"),
-                          ],
-                        ),
-                      ],
+                      if (_confidenceLevel.isNotEmpty)
+                        Text(_confidenceLevel, style: TextStyle(color: Colors.green.shade700)),
                     ],
                   ),
                 ),
                 const SizedBox(height: 20),
 
-                // Camera preview
+                // 3. Camera View
                 Container(
+                  height: 350,
                   width: width,
-                  height: isPortrait ? 400 : 300,
                   decoration: BoxDecoration(
                     color: Colors.black,
                     borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.3),
-                        blurRadius: 15,
-                        offset: const Offset(0, 8),
-                      ),
-                    ],
+                    boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 10, offset: Offset(0, 5))],
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(20),
@@ -576,403 +308,103 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
                       fit: StackFit.expand,
                       children: [
                         _initializeControllerFuture == null
-                            ? const Center(
-                                child: CircularProgressIndicator(
-                                  color: Colors.white,
-                                ),
-                              )
-                            : FutureBuilder<void>(
-                                future: _initializeControllerFuture,
-                                builder: (context, snapshot) {
-                                  if (snapshot.connectionState ==
-                                      ConnectionState.done &&
-                                      !snapshot.hasError) {
-                                    return SizedBox.expand(
-                                      child: FittedBox(
-                                        fit: BoxFit.cover,
-                                        child: SizedBox(
-                                          width: _controller
-                                              .value.previewSize!.height,
-                                          height: _controller
-                                              .value.previewSize!.width,
-                                          child: CameraPreview(_controller),
-                                        ),
-                                      ),
-                                    );
-                                  }
-                                  return const Center(
-                                      child: CircularProgressIndicator(
-                                    color: Colors.white,
-                                  ));
-                                },
-                              ),
+                          ? const Center(child: CircularProgressIndicator())
+                          : FittedBox(
+                            fit: BoxFit.cover,
+                          child: SizedBox(
+                            // We swap height/width because camera sensors are landscape
+                            // but your phone is held in portrait.
+                            width: _controller.value.previewSize!.height,
+                            height: _controller.value.previewSize!.width,
+                          child: CameraPreview(_controller),
+                          ),
+                        ),
                         
-                        // Detection overlay
+                        // Overlay Box
                         Center(
                           child: Container(
-                            width: 240,
-                            height: 240,
+                            width: 250, height: 250,
                             decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(24),
                               border: Border.all(
-                                width: 3,
-                                color: _isScanning
-                                    ? Colors.green
-                                    : Colors.white.withOpacity(0.3),
+                                color: _isScanning ? Colors.green : Colors.white54, 
+                                width: 3
                               ),
-                              boxShadow: _isScanning
-                                  ? [
-                                      BoxShadow(
-                                        color: Colors.green.withOpacity(0.3),
-                                        blurRadius: 15,
-                                        spreadRadius: 3,
-                                      ),
-                                    ]
-                                  : null,
+                              borderRadius: BorderRadius.circular(20),
                             ),
                           ),
                         ),
                         
-                        // Camera flip button
+                        // Flip Button
                         Positioned(
-                          bottom: 20,
-                          right: 20,
-                          child: FloatingActionButton(
-                            heroTag: "flip_btn",
-                            backgroundColor: Colors.black.withOpacity(0.7),
+                          bottom: 15, right: 15,
+                          child: FloatingActionButton.small(
+                            backgroundColor: Colors.white24,
                             onPressed: _onTapSwitchCamera,
-                            child: const Icon(Icons.flip_camera_ios,
-                                color: Colors.white, size: 28),
-                          ),
-                        ),
-                        
-                        // Status indicator
-                        Positioned(
-                          top: 20,
-                          right: 20,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.7),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 8,
-                                  height: 8,
-                                  decoration: BoxDecoration(
-                                    color: _isScanning ? Colors.green : Colors.red,
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  _isScanning ? 'DETECTING' : 'IDLE',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        
-                        // Model info chip
-                        if (_modelLoaded)
-                        Positioned(
-                          top: 20,
-                          left: 20,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.7),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(Icons.memory, color: Colors.blue.shade300, size: 14),
-                                const SizedBox(width: 6),
-                                Text(
-                                  'INT8',
-                                  style: TextStyle(
-                                    color: Colors.blue.shade300,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
+                            child: const Icon(Icons.flip_camera_ios, color: Colors.white),
                           ),
                         ),
                       ],
                     ),
                   ),
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 30),
 
-                // Start/Stop button
+                // 4. Start/Stop Button
                 GestureDetector(
                   onTap: _toggleScanning,
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 300),
-                    width: double.infinity,
-                    height: 64,
+                  child: Container(
+                    height: 60,
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(15),
                       gradient: LinearGradient(
-                        colors: _isScanning
-                            ? [Colors.red, Colors.redAccent]
-                            : [const Color(0xFF00B8DA), const Color(0xFFF6329A)],
-                        begin: Alignment.centerLeft,
-                        end: Alignment.centerRight,
+                        colors: _isScanning 
+                          ? [Colors.red.shade400, Colors.red.shade700]
+                          : [const Color(0xFF00B8DA), const Color(0xFFF6329A)],
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: (_isScanning ? Colors.red : const Color(0xFF00B8DA))
-                              .withOpacity(0.4),
-                          blurRadius: 12,
-                          offset: const Offset(0, 6),
-                        ),
+                          color: _isScanning ? Colors.red.withOpacity(0.4) : Colors.pink.withOpacity(0.4),
+                          blurRadius: 10, offset: const Offset(0, 5)
+                        )
                       ],
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(_isScanning ? Icons.stop_circle : Icons.play_circle_filled, 
-                             color: Colors.white, size: 32),
-                        const SizedBox(width: 12),
+                        Icon(_isScanning ? Icons.stop : Icons.play_arrow, color: Colors.white, size: 30),
+                        const SizedBox(width: 10),
                         Text(
-                          _isScanning ? 'STOP RECOGNITION' : 'START RECOGNITION',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 20,
-                            letterSpacing: 0.5,
-                          ),
+                          _isScanning ? "STOP SCANNING" : "START SCANNING",
+                          style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
                         ),
                       ],
                     ),
                   ),
                 ),
-                const SizedBox(height: 20),
-
-                // Instructions
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.shade50,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.blue.shade200),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.lightbulb_outline,
-                          color: Colors.blue.shade700, size: 24),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Tips for Best Results:',
-                              style: TextStyle(
-                                color: Colors.blue.shade800,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 15,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              '• Place hand inside the frame\n'
-                              '• Good lighting (face light source)\n'
-                              '• Make clear, distinct signs\n'
-                              '• Hold for 1-2 seconds\n'
-                              '• Keep background simple',
-                              style: TextStyle(
-                                color: Colors.blue.shade700,
-                                fontSize: 14,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 40), // Extra space for settings panel
+                
+                // Debug Info
+                if (_showSettings) ...[
+                   const SizedBox(height: 20),
+                   Text("FPS: ${_fps.toStringAsFixed(1)} | Detections: $_totalDetections", 
+                     style: TextStyle(color: Colors.grey.shade600)
+                   ),
+                   Slider(
+                     value: _confidenceThreshold,
+                     min: 0.1, max: 0.9,
+                     divisions: 8,
+                     label: "${(_confidenceThreshold*100).toInt()}%",
+                     onChanged: (val) {
+                       setState(() => _confidenceThreshold = val);
+                       _detector.setConfidenceThreshold(val);
+                     },
+                   ),
+                   const Text("Confidence Threshold (Sensitivity)"),
+                ]
               ],
             ),
           ),
-
-          // Settings panel (slides up)
-          if (_showSettings)
-            Positioned(
-              bottom: 0,
-              left: 0,
-              right: 0,
-              child: Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(20),
-                    topRight: Radius.circular(20),
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.2),
-                      blurRadius: 20,
-                      offset: const Offset(0, -5),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Detection Settings',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.close),
-                          onPressed: _toggleSettings,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    
-                    Text(
-                      'Confidence Threshold: ${(_confidenceThreshold * 100).toInt()}%',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 16,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Slider(
-                      value: _confidenceThreshold,
-                      min: 0.1,
-                      max: 0.9,
-                      divisions: 8,
-                      label: (_confidenceThreshold * 100).toInt().toString(),
-                      onChanged: _updateConfidenceThreshold,
-                      activeColor: Colors.purple,
-                      inactiveColor: Colors.purple.shade200,
-                    ),
-                    const SizedBox(height: 20),
-                    
-                    const Text(
-                      'Lower = More detections (but may be wrong)\n'
-                      'Higher = Fewer detections (more accurate)',
-                      style: TextStyle(
-                        color: Colors.grey,
-                        fontSize: 14,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    
-                    ElevatedButton.icon(
-                      onPressed: () {
-                        _detector.setConfidenceThreshold(0.5);
-                        _updateConfidenceThreshold(0.5);
-                      },
-                      icon: const Icon(Icons.restart_alt),
-                      label: const Text('Reset to Default'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.purple,
-                        foregroundColor: Colors.white,
-                        minimumSize: const Size(double.infinity, 50),
-                      ),
-                    ),
-                    
-                    const SizedBox(height: 20),
-                    Divider(color: Colors.grey.shade300),
-                    const SizedBox(height: 10),
-                    
-                    // Model info
-                    const Text(
-                      'Model Information:',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 16,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade50,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: Colors.grey.shade200),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(Icons.memory, color: Colors.blue.shade600, size: 18),
-                              const SizedBox(width: 8),
-                              const Text('INT8 Quantized'),
-                              const Spacer(),
-                              Chip(
-                                label: const Text('3.2MB', style: TextStyle(fontSize: 12)),
-                                backgroundColor: Colors.green.shade100,
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Input: 640×640×3\n'
-                            'Output: 54×8400\n'
-                            'Classes: 50 total, 18 signs',
-                            style: TextStyle(
-                              color: Colors.grey.shade700,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
         ],
       ),
-    );
-  }
-
-  Widget _buildMetricItem(String label, String value) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: Colors.purple,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 12,
-            color: Colors.grey,
-          ),
-        ),
-      ],
     );
   }
 }
