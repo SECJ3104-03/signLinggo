@@ -30,19 +30,15 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
 
   final ObjectDetector _detector = ObjectDetector();
   bool _isScanning = false;
-  String _recognizedText = "Initializing...";
-  String _confidenceLevel = "";
+  List<Map<String, dynamic>> _detections = [];
   
   // Performance tracking
   int _frameCounter = 0;
   double _fps = 0.0;
-  int _totalDetections = 0;
   Timer? _fpsTimer;
   
   // UI state
   bool _showSettings = false;
-  double _confidenceThreshold = 0.5;
-  bool _showDebugInfo = false;
   bool _modelLoaded = false;
 
   List<CameraDescription> _cameras = [];
@@ -80,22 +76,11 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
   }
 
   void _initializeModel() async {
-    try {
-      await _detector.loadModel();
-      _detector.setConfidenceThreshold(_confidenceThreshold);
-      
-      if (mounted) {
-        setState(() {
-          _modelLoaded = true;
-          _recognizedText = "Ready to Scan";
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _recognizedText = "Model Error");
-      }
-      _showErrorDialog("Model Failed", 
-          "Could not load best_int8.tflite.\nMake sure you downloaded and renamed it correctly!");
+    await _detector.loadModel();
+    if (mounted) {
+      setState(() {
+        _modelLoaded = _detector.isLoaded;
+      });
     }
   }
 
@@ -149,8 +134,7 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
     if (!_controller.value.isInitialized) return;
     setState(() {
       _isScanning = true;
-      _recognizedText = "Detecting...";
-      _totalDetections = 0;
+      _detections = [];
     });
     await _startStreaming();
   }
@@ -166,16 +150,16 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
   }
 
   void _processCameraFrame(CameraImage image) async {
+    if (_detector.isBusy) return;
+
     _frameCounter++;
     
     // Run Detection
-    final String? result = await _detector.detectFromStream(image);
+    final results = await _detector.yoloOnFrame(image);
     
-    if (result != null && mounted && _isScanning) {
-      _totalDetections++;
+    if (mounted && _isScanning) {
       setState(() {
-        _recognizedText = result;
-        _confidenceLevel = "Match Found";
+        _detections = results;
       });
     }
   }
@@ -187,21 +171,9 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
     if (mounted) {
       setState(() {
         _isScanning = false;
-        _recognizedText = "Paused";
-        _confidenceLevel = "";
+        _detections = [];
       });
     }
-  }
-
-  void _showErrorDialog(String title, String message) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(title),
-        content: Text(message),
-        actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("OK"))],
-      ),
-    );
   }
 
   @override
@@ -253,7 +225,7 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
                     border: Border.all(color: _modelLoaded ? Colors.green : Colors.red),
                   ),
                   child: Text(
-                    _modelLoaded ? "AI Active (50 Signs)" : "Loading Model...",
+                    _modelLoaded ? "AI Active (YOLOv8)" : "Loading Model...",
                     style: TextStyle(
                       color: _modelLoaded ? Colors.green.shade800 : Colors.red.shade800,
                       fontWeight: FontWeight.bold
@@ -262,40 +234,9 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
                 ),
                 const SizedBox(height: 20),
 
-                // 2. Main Text Display
+                // 2. Camera View
                 Container(
-                  padding: const EdgeInsets.all(24),
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: Colors.purple.shade50,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.purple.shade100, width: 2),
-                  ),
-                  child: Column(
-                    children: [
-                      const Text("DETECTED SIGN", 
-                        style: TextStyle(color: Colors.purple, fontSize: 12, fontWeight: FontWeight.bold)
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        _recognizedText,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          fontSize: 42, 
-                          fontWeight: FontWeight.w900, 
-                          color: Colors.purple
-                        ),
-                      ),
-                      if (_confidenceLevel.isNotEmpty)
-                        Text(_confidenceLevel, style: TextStyle(color: Colors.green.shade700)),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 20),
-
-                // 3. Camera View
-                Container(
-                  height: 350,
+                  height: 500, // Increased height for better view
                   width: width,
                   decoration: BoxDecoration(
                     color: Colors.black,
@@ -309,30 +250,17 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
                       children: [
                         _initializeControllerFuture == null
                           ? const Center(child: CircularProgressIndicator())
-                          : FittedBox(
-                            fit: BoxFit.cover,
-                          child: SizedBox(
-                            // We swap height/width because camera sensors are landscape
-                            // but your phone is held in portrait.
-                            width: _controller.value.previewSize!.height,
-                            height: _controller.value.previewSize!.width,
-                          child: CameraPreview(_controller),
-                          ),
-                        ),
+                          : CameraPreview(_controller),
                         
-                        // Overlay Box
-                        Center(
-                          child: Container(
-                            width: 250, height: 250,
-                            decoration: BoxDecoration(
-                              border: Border.all(
-                                color: _isScanning ? Colors.green : Colors.white54, 
-                                width: 3
-                              ),
-                              borderRadius: BorderRadius.circular(20),
+                        // Bounding Boxes Overlay
+                        if (_isScanning && _detections.isNotEmpty)
+                          CustomPaint(
+                            painter: BoundingBoxPainter(
+                              detections: _detections,
+                              previewSize: _controller.value.previewSize!,
+                              screenSize: Size(width, 500), // Match container size
                             ),
                           ),
-                        ),
                         
                         // Flip Button
                         Positioned(
@@ -349,7 +277,7 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
                 ),
                 const SizedBox(height: 30),
 
-                // 4. Start/Stop Button
+                // 3. Start/Stop Button
                 GestureDetector(
                   onTap: _toggleScanning,
                   child: Container(
@@ -385,20 +313,9 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
                 // Debug Info
                 if (_showSettings) ...[
                    const SizedBox(height: 20),
-                   Text("FPS: ${_fps.toStringAsFixed(1)} | Detections: $_totalDetections", 
+                   Text("FPS: ${_fps.toStringAsFixed(1)} | Detections: ${_detections.length}", 
                      style: TextStyle(color: Colors.grey.shade600)
                    ),
-                   Slider(
-                     value: _confidenceThreshold,
-                     min: 0.1, max: 0.9,
-                     divisions: 8,
-                     label: "${(_confidenceThreshold*100).toInt()}%",
-                     onChanged: (val) {
-                       setState(() => _confidenceThreshold = val);
-                       _detector.setConfidenceThreshold(val);
-                     },
-                   ),
-                   const Text("Confidence Threshold (Sensitivity)"),
                 ]
               ],
             ),
@@ -406,5 +323,68 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
         ],
       ),
     );
+  }
+}
+
+class BoundingBoxPainter extends CustomPainter {
+  final List<Map<String, dynamic>> detections;
+  final Size previewSize;
+  final Size screenSize;
+
+  BoundingBoxPainter({
+    required this.detections,
+    required this.previewSize,
+    required this.screenSize,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final double scaleX = size.width / previewSize.height; // Swap because of rotation
+    final double scaleY = size.height / previewSize.width;
+
+    final Paint paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3.0
+      ..color = Colors.green;
+
+    final TextStyle textStyle = TextStyle(
+      color: Colors.white,
+      fontSize: 16,
+      fontWeight: FontWeight.bold,
+      backgroundColor: Colors.green,
+    );
+
+    for (var detection in detections) {
+      final box = detection['box'];
+      // flutter_vision returns [x1, y1, x2, y2, class_confidence]
+      // or similar depending on the model output, but usually it's normalized or pixel coords.
+      // Assuming flutter_vision returns pixel coordinates relative to the image size.
+      
+      // Check flutter_vision documentation or standard output. 
+      // Usually it's [x1, y1, x2, y2, confidence]
+      
+      final double x1 = box[0] * scaleX;
+      final double y1 = box[1] * scaleY;
+      final double x2 = box[2] * scaleX;
+      final double y2 = box[3] * scaleY;
+
+      final rect = Rect.fromLTRB(x1, y1, x2, y2);
+      canvas.drawRect(rect, paint);
+
+      final String label = "${detection['tag']} ${(detection['box'][4] * 100).toStringAsFixed(0)}%";
+      final TextSpan span = TextSpan(text: label, style: textStyle);
+      final TextPainter tp = TextPainter(
+        text: span,
+        textAlign: TextAlign.left,
+        textDirection: TextDirection.ltr,
+      );
+      tp.layout();
+      tp.paint(canvas, Offset(x1, y1 - 20));
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) {
+    return true;
   }
 }
