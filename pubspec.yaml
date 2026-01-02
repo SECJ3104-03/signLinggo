@@ -87,5 +87,5 @@ flutter:
     - assets/assets/offline_materials/ 
     - assets/models/
     - assets/models/ahmed_best_int8.tflite
-    - assets/labels.txt 
+    - assets/models/labels.txt 
 
