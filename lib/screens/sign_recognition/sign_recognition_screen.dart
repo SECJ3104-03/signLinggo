@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math; // Import math for rotation/flipping
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -36,6 +37,7 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
   int _frameCounter = 0;
   double _fps = 0.0;
   Timer? _fpsTimer;
+  DateTime? _lastRunTime; // Throttler for AI
   
   // UI state
   bool _showSettings = false;
@@ -51,11 +53,10 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     isSignToText = widget.isSignToText;
     
-    // 1. Setup Camera & Model
     _initializeModel();
     _setupCameras();
     
-    // 2. Start FPS Timer (Updates every 1 second)
+    // FPS Display Timer
     _fpsTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (mounted && _isScanning) {
         setState(() {
@@ -68,10 +69,11 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Stop camera when minimizing app to save battery/crash
     if (state == AppLifecycleState.paused) {
       _stopScanning();
     } else if (state == AppLifecycleState.resumed && _controller.value.isInitialized) {
-      if (_isScanning) _startStreaming();
+       // Optional: Auto-resume?
     }
   }
 
@@ -87,6 +89,7 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
   Future<void> _setupCameras() async {
     try {
       _cameras = await availableCameras();
+      // Default to back camera
       _selectedCameraIdx = _cameras.indexWhere((c) => c.lensDirection == CameraLensDirection.back);
       if (_selectedCameraIdx == -1) _selectedCameraIdx = 0;
       _initializeCamera(_cameras[_selectedCameraIdx]);
@@ -98,7 +101,7 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
   void _initializeCamera(CameraDescription cameraDescription) {
     _controller = CameraController(
       cameraDescription,
-      ResolutionPreset.high, // Adjust as needed
+      ResolutionPreset.medium, // 'medium' is faster than 'high' for AI
       enableAudio: false,
       imageFormatGroup: Platform.isAndroid ? ImageFormatGroup.yuv420 : ImageFormatGroup.bgra8888,
     );
@@ -110,15 +113,25 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
 
   Future<void> _onTapSwitchCamera() async {
     if (_cameras.length < 2) return;
-    if (_isScanning) await _stopScanning();
+    // Stop scanning before switching to prevent crashes
+    bool wasScanning = _isScanning;
+    await _stopScanning();
 
     final newIndex = (_selectedCameraIdx + 1) % _cameras.length;
     await _controller.dispose();
+    
     setState(() {
       _selectedCameraIdx = newIndex;
       _initializeControllerFuture = null;
     });
+
     _initializeCamera(_cameras[_selectedCameraIdx]);
+    
+    // Wait a bit for camera to init, then resume if needed
+    if (wasScanning) {
+        await Future.delayed(Duration(seconds: 1));
+        if(mounted) _toggleScanning(); 
+    }
   }
 
   void _toggleScanning() async {
@@ -150,7 +163,17 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
   }
 
   void _processCameraFrame(CameraImage image) async {
+    // 1. Check if AI is already busy
     if (_detector.isBusy) return;
+
+    // 2. THROTTLE: Only run every 100ms (approx 10 FPS)
+    // This prevents the "15 second lag" by dropping frames automatically
+    final now = DateTime.now();
+    if (_lastRunTime != null && 
+        now.difference(_lastRunTime!).inMilliseconds < 100) {
+      return;
+    }
+    _lastRunTime = now;
 
     _frameCounter++;
     
@@ -189,6 +212,17 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
   @override
   Widget build(BuildContext context) {
     final double width = MediaQuery.of(context).size.width;
+    
+    // Logic for "Center Crop" to fix stretching
+    var scale = 1.0;
+    if (_controller.value.isInitialized) {
+      final size = MediaQuery.of(context).size;
+      // Calculate how much to scale to fill the screen width/height
+      // Note: Camera preview size is often landscape (width > height), so we swap for portrait calculation
+      var cameraAspectRatio = _controller.value.previewSize!.height / _controller.value.previewSize!.width;
+      scale = 1 / (cameraAspectRatio * size.aspectRatio);
+      if (scale < 1) scale = 1 / scale;
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -234,9 +268,9 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
                 ),
                 const SizedBox(height: 20),
 
-                // 2. Camera View
+                // 2. Camera View (Fixed Stretching)
                 Container(
-                  height: 500, // Increased height for better view
+                  height: 500,
                   width: width,
                   decoration: BoxDecoration(
                     color: Colors.black,
@@ -250,7 +284,11 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
                       children: [
                         _initializeControllerFuture == null
                           ? const Center(child: CircularProgressIndicator())
-                          : CameraPreview(_controller),
+                          : Transform.scale(
+                              scale: scale, // FIX: Scales image to cover box without stretching
+                              alignment: Alignment.center,
+                              child: CameraPreview(_controller),
+                            ),
                         
                         // Bounding Boxes Overlay
                         if (_isScanning && _detections.isNotEmpty)
@@ -258,7 +296,8 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
                             painter: BoundingBoxPainter(
                               detections: _detections,
                               previewSize: _controller.value.previewSize!,
-                              screenSize: Size(width, 500), // Match container size
+                              screenSize: Size(width, 500),
+                              isFrontCamera: _cameras[_selectedCameraIdx].lensDirection == CameraLensDirection.front,
                             ),
                           ),
                         
@@ -330,16 +369,21 @@ class BoundingBoxPainter extends CustomPainter {
   final List<Map<String, dynamic>> detections;
   final Size previewSize;
   final Size screenSize;
+  final bool isFrontCamera; // Added to fix mirroring
 
   BoundingBoxPainter({
     required this.detections,
     required this.previewSize,
     required this.screenSize,
+    required this.isFrontCamera,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    final double scaleX = size.width / previewSize.height; // Swap because of rotation
+    // Calculate Scaling
+    // Camera is usually 1280x720 (Landscape), but Screen is Portrait.
+    // We need to swap width/height for the calculation
+    final double scaleX = size.width / previewSize.height; 
     final double scaleY = size.height / previewSize.width;
 
     final Paint paint = Paint()
@@ -356,22 +400,26 @@ class BoundingBoxPainter extends CustomPainter {
 
     for (var detection in detections) {
       final box = detection['box'];
-      // flutter_vision returns [x1, y1, x2, y2, class_confidence]
-      // or similar depending on the model output, but usually it's normalized or pixel coords.
-      // Assuming flutter_vision returns pixel coordinates relative to the image size.
+      // box is [x1, y1, x2, y2, confidence]
       
-      // Check flutter_vision documentation or standard output. 
-      // Usually it's [x1, y1, x2, y2, confidence]
-      
-      final double x1 = box[0] * scaleX;
-      final double y1 = box[1] * scaleY;
-      final double x2 = box[2] * scaleX;
-      final double y2 = box[3] * scaleY;
+      double x1 = box[0] * scaleX;
+      double y1 = box[1] * scaleY;
+      double x2 = box[2] * scaleX;
+      double y2 = box[3] * scaleY;
+
+      // FIX: Mirror logic for Front Camera
+      if (isFrontCamera) {
+        // If front camera, flip the X coordinates relative to screen width
+        double tempX1 = x1;
+        x1 = size.width - x2;
+        x2 = size.width - tempX1;
+      }
 
       final rect = Rect.fromLTRB(x1, y1, x2, y2);
       canvas.drawRect(rect, paint);
 
-      final String label = "${detection['tag']} ${(detection['box'][4] * 100).toStringAsFixed(0)}%";
+      // Draw Label
+      final String label = "${detection['tag']} ${(box[4] * 100).toStringAsFixed(0)}%";
       final TextSpan span = TextSpan(text: label, style: textStyle);
       final TextPainter tp = TextPainter(
         text: span,
