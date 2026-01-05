@@ -10,6 +10,9 @@ import 'package:just_audio/just_audio.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 import '../../services/object_detector.dart';
+// --- ADDED IMPORTS FOR POST SHARING ---
+import '../Community_Module/post_detail_screen.dart';
+import '../Community_Module/post_data.dart';
 
 /// Smart Chat Screen - Unified chat interface with Text, Sign, and Voice input modes
 /// This screen displays chat history at all times while allowing dynamic input switching
@@ -124,10 +127,10 @@ class _SmartChatScreenState extends State<SmartChatScreen>
     });
   }
 
-Future<void> _initializeSpeech() async {
-    _speech = stt.SpeechToText();
-    await _speech!.initialize();
-}
+  Future<void> _initializeSpeech() async {
+      _speech = stt.SpeechToText();
+      await _speech!.initialize();
+  }
 
   // ===== Sign Mode: YOLO Detection with Stability Buffer =====
   Future<void> _startScanning() async {
@@ -473,6 +476,159 @@ Future<void> _initializeSpeech() async {
     );
   }
 
+  // ===== SHARED POST BUBBLE (ADDED) =====
+  Widget _buildSharedPostBubble(Map<String, dynamic> msg, bool isUser) {
+    final String postTitle = msg['post_title'] ?? '';
+    final String postContent = msg['post_content'] ?? '';
+    final String postAuthor = msg['post_author'] ?? 'Unknown';
+    final String postImage = msg['post_image'] ?? '';
+    final String postVideo = msg['post_video'] ?? '';
+    final String authorImage = msg['post_author_image'] ?? '';
+    final String authorInitials = msg['post_initials'] ?? '?';
+    final String postId = msg['post_id'] ?? '';
+    
+    // Attempt to parse the original timestamp
+    final String tsString = msg['post_timestamp'] ?? '';
+    final DateTime postDate = tsString.isNotEmpty 
+        ? DateTime.tryParse(tsString) ?? DateTime.now() 
+        : DateTime.now(); 
+
+    return Align(
+      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+      child: GestureDetector(
+        onTap: () {
+          // Reconstruct PostData to open the detail screen
+          final post = PostData(
+            id: postId,
+            authorId: '', // Not critical for viewing
+            author: postAuthor,
+            initials: authorInitials,
+            authorProfileImage: authorImage.isNotEmpty ? authorImage : null,
+            timestamp: postDate,
+            tag: 'Shared', 
+            title: postTitle,
+            content: postContent,
+            likes: 0, 
+            commentCount: 0, 
+            imageUrl: postImage.isNotEmpty ? postImage : null,
+            videoUrl: postVideo.isNotEmpty ? postVideo : null,
+            isLiked: false, 
+            isFollowed: false,
+          );
+
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => PostDetailScreen(initialPost: post),
+            ),
+          );
+        },
+        child: Container(
+          width: MediaQuery.of(context).size.width * 0.7,
+          margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+          decoration: BoxDecoration(
+            color: isUser ? const Color(0xFFF2E7FE) : Colors.grey[100], 
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              if (!isUser) 
+                BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2))
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+                child: Text(
+                  "Shared a post",
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isUser ? const Color(0xFF5B259F).withOpacity(0.6) : Colors.grey[600],
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ),
+              
+              // The Mini Post Card
+              Container(
+                margin: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Header (Author)
+                    Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: Row(
+                        children: [
+                           CircleAvatar(
+                              radius: 10,
+                              backgroundColor: Colors.grey.shade300,
+                              backgroundImage: (authorImage.isNotEmpty) ? NetworkImage(authorImage) : null,
+                              child: (authorImage.isEmpty) ? Text(authorInitials, style: const TextStyle(fontSize: 8)) : null,
+                           ),
+                           const SizedBox(width: 8),
+                           Expanded(
+                             child: Text(
+                               postAuthor,
+                               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                               maxLines: 1, overflow: TextOverflow.ellipsis,
+                             ),
+                           )
+                        ],
+                      ),
+                    ),
+      
+                    // Media Preview
+                    if (postImage.isNotEmpty)
+                      AspectRatio(
+                        aspectRatio: 16/9,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: Image.network(postImage, fit: BoxFit.cover, errorBuilder: (_,__,___) => Container(color: Colors.grey)),
+                        ),
+                      )
+                    else if (postVideo.isNotEmpty)
+                       Container(
+                         height: 120,
+                         width: double.infinity,
+                         color: Colors.black,
+                         child: const Center(child: Icon(Icons.play_circle_fill, color: Colors.white, size: 40)),
+                       ),
+      
+                    // Text Content
+                    Padding(
+                      padding: const EdgeInsets.all(10.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (postTitle.isNotEmpty)
+                            Text(postTitle, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14), maxLines: 1, overflow: TextOverflow.ellipsis),
+                          if (postTitle.isNotEmpty) const SizedBox(height: 4),
+                          Text(
+                            postContent,
+                            style: TextStyle(fontSize: 12, color: Colors.grey.shade800),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    )
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildUserMessage(Map<String, dynamic> msg) {
     final bool isUser = msg['isUser'];
     final String type = msg['type'];
@@ -489,6 +645,10 @@ Future<void> _initializeSpeech() async {
         break;
       case 'voice':
         messageBubble = _buildVoiceBubble(content, isUser);
+        break;
+      // --- ADDED CASE FOR SHARED POSTS ---
+      case 'shared_post':
+        messageBubble = _buildSharedPostBubble(msg, isUser);
         break;
       default:
         messageBubble = const SizedBox.shrink();
