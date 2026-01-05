@@ -23,7 +23,7 @@ class ObjectDetector {
     try {
       await _vision.loadYoloModel(
         modelPath: 'assets/models/ahmed_best_int8.tflite',
-        labels: 'assets/labels.txt',
+        labels: 'assets/models/labels.txt',
         modelVersion: "yolov8",
         quantization: true, // Critical for Int8 models
         numThreads: 2,
