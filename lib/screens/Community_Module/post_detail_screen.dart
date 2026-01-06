@@ -1,7 +1,7 @@
 // lib/screens/Community_Module/post_detail_screen.dart
 
 import 'dart:io'; 
-import 'package:flutter/gestures.dart'; // For clickable text
+import 'package:flutter/gestures.dart'; 
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart'; 
 import 'package:cloud_firestore/cloud_firestore.dart'; 
@@ -10,8 +10,8 @@ import 'comment_data.dart';
 import 'video_player_widget.dart';
 import 'real_time_widget.dart'; 
 import 'firestore_service.dart'; 
-// Import your conversation screen
-import 'package:signlinggo/screens/conversation_mode/conversation_mode_screen.dart';
+// Import the new Smart Chat Screen
+import 'package:signlinggo/screens/conversation_mode/smart_chat_screen.dart';
 
 class PostDetailScreen extends StatefulWidget {
   final PostData initialPost;
@@ -77,7 +77,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     }
   }
 
-  // --- LOGIC TO START CHAT FROM COMMENT ---
+  // --- UPDATED: Navigate to SmartChatScreen ---
   void _navigateToChat(CommentData comment) {
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser == null) return;
@@ -97,7 +97,8 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => ConversationScreen(
+        // CHANGED: Use SmartChatScreen
+        builder: (context) => SmartChatScreen(
           chatName: comment.author,
           avatar: comment.authorProfileImage ?? (comment.initials.isNotEmpty ? comment.initials : '?'),
           conversationId: conversationId,
@@ -107,7 +108,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     );
   }
 
-  // --- NEW: LOGIC TO START CHAT FROM POST AUTHOR ---
+  // --- UPDATED: Navigate to SmartChatScreen ---
   void _navigateToChatWithAuthor() {
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser == null) return;
@@ -127,7 +128,8 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => ConversationScreen(
+        // CHANGED: Use SmartChatScreen
+        builder: (context) => SmartChatScreen(
           chatName: _post.author,
           avatar: _post.authorProfileImage ?? (_post.initials.isNotEmpty ? _post.initials : '?'),
           conversationId: conversationId,
@@ -321,7 +323,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
             children: [
               // 1. CLICKABLE AVATAR
               GestureDetector(
-                onTap: _navigateToChatWithAuthor, // <--- Add navigation
+                onTap: _navigateToChatWithAuthor, 
                 child: (_post.authorProfileImage != null && _post.authorProfileImage!.isNotEmpty)
                    ? Container(
                     width: 40, height: 40,
@@ -350,7 +352,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
               // 2. CLICKABLE NAME
               Expanded(
                 child: GestureDetector(
-                  onTap: _navigateToChatWithAuthor, // <--- Add navigation
+                  onTap: _navigateToChatWithAuthor, 
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
