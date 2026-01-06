@@ -120,8 +120,8 @@ class _OfflineModeState extends State<OfflineMode> with SingleTickerProviderStat
       icon: Icons.book_outlined,
       iconColor: Color(0xFF007AFF),
       backgroundColor: Color(0xFFEBF5FF),
-      downloadUrl: 'https://raw.githubusercontent.com/Assadi-bit/BimTalk-SignLanguage-Recognition/fd3407305f1636c60389519bfad47bd515e6e495/test/sample6.png', 
-      includedVideos: ['Over 200+ signs', 'Full A-Z Alphabet', 'Common Verbs'],
+      downloadUrl: 'assets/assets/offline_materials/Full_BIM_Dictionary.zip', 
+      includedVideos: ['Over 50+ signs', 'Alphabet Signs', 'Numeric Signs', 'Basic Greetings', 'Food & Drink Signs', 'Family & People Signs', 'Travel & Transport Signs' ],
     ),
 
      //2. Numeric
