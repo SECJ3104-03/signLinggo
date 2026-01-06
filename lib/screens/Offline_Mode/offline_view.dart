@@ -116,18 +116,41 @@ class _OfflineModeState extends State<OfflineMode> with SingleTickerProviderStat
     // 1. Full BIM Dictionary
     const _DownloadableItemData(
       title: 'Full BIM Dictionary',
-      description: 'The complete collection of all BIM signs | 200 MB',
+      description: 'The complete collection of all BIM signs',
       icon: Icons.book_outlined,
       iconColor: Color(0xFF007AFF),
       backgroundColor: Color(0xFFEBF5FF),
       downloadUrl: 'https://raw.githubusercontent.com/Assadi-bit/BimTalk-SignLanguage-Recognition/fd3407305f1636c60389519bfad47bd515e6e495/test/sample6.png', 
       includedVideos: ['Over 200+ signs', 'Full A-Z Alphabet', 'Common Verbs'],
     ),
+
+     //2. Numeric
+      const _DownloadableItemData(
+      title: 'Numeric Signs',
+      description: 'Signs for numbers ',
+      icon: Icons.pin,
+      iconColor: Color(0xFF34C759),
+      backgroundColor: Color(0xFFD5FFD4),
+      downloadUrl: 'assets/assets/offline_materials/Numeric.zip',
+      includedVideos: ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'],
+    ),
+
+    // 3. Alphabet Signs
+      const _DownloadableItemData(
+      title: 'Alphabet Signs',
+      description: 'Signs for A-Z Alphabet',
+      icon: Icons.text_fields,
+      iconColor: Color.fromARGB(255, 191, 138, 5),
+      backgroundColor: Color.fromARGB(255, 248, 247, 188),
+      downloadUrl: 'assets/assets/offline_materials/alphabet.zip',
+      includedVideos: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'],
+    ),
     
-    // 2. Basic Greetings
+    
+    // 4. Basic Greetings
     const _DownloadableItemData(
       title: 'Basic Greetings & Phrases',
-      description: 'Essential signs for beginners & daily chat | 15 MB',
+      description: 'Essential signs for beginners & daily chat',
       icon: Icons.waving_hand_outlined,
       iconColor: Color(0xFFE5890A),
       backgroundColor: Color(0xFFFFF2DE),
@@ -135,10 +158,10 @@ class _OfflineModeState extends State<OfflineMode> with SingleTickerProviderStat
       includedVideos: ['Hello', 'I Love You', 'Morning', 'Night', 'No', 'Noon', 'Greet', 'Sorry',  'Thank You', 'Today', 'Yes' ],
     ),
 
-    // 3. Food & Drink (OFFLINE ASSET MODE)
+    // 5. Food & Drink (OFFLINE ASSET MODE)
     const _DownloadableItemData(
       title: 'Food & Drink Signs',
-      description: 'Signs for eating, restaurant, and common foods | 20MB',
+      description: 'Signs for eating, restaurant, and common foods',
       icon: Icons.coffee_outlined,
       iconColor: Color(0xFFD62F0B),
       backgroundColor: Color(0xFFFFD6D1),
@@ -147,7 +170,7 @@ class _OfflineModeState extends State<OfflineMode> with SingleTickerProviderStat
     ),
 
     // 4. Medical
-    const _DownloadableItemData(
+    /* const _DownloadableItemData(
       title: 'Medical & Emergency',
       description: 'Critical signs for health, safety, and emergencies | 25MB',
       icon: Icons.medical_services_outlined,
@@ -156,11 +179,13 @@ class _OfflineModeState extends State<OfflineMode> with SingleTickerProviderStat
       downloadUrl: 'assets/assets/offline_materials/Medical_Emergency.zip',
       includedVideos: ['Help', 'Hurt', 'Doctor'],
     ),
+ */
+    
 
-    // 5. Family
+    // 6. Family
     const _DownloadableItemData(
       title: 'Family & People',
-      description: 'Signs for family members, friends, and relationships | 18 MB',
+      description: 'Signs for family members, friends, and relationships ',
       icon: Icons.groups_outlined,
       iconColor: Color(0xFFD60B95),
       backgroundColor: Color(0xFFFFDFF2),
@@ -168,10 +193,10 @@ class _OfflineModeState extends State<OfflineMode> with SingleTickerProviderStat
       includedVideos: ['Father', 'Mother', 'Friend', 'Brother', 'Sister', 'I/Me'],
     ),
 
-    // 6. Travel
+    // 7. Travel
     const _DownloadableItemData(
       title: 'Travel & Transport',
-      description: 'Signs for travel, transport, and common actions | 22 MB',
+      description: 'Signs for travel, transport, and common actions',
       icon: Icons.travel_explore_outlined,
       iconColor: Color(0xFF5E0BD6),
       backgroundColor: Color(0xFFF5F1FF),
