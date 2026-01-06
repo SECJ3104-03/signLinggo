@@ -1,13 +1,11 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:math' as math; // Import math for rotation calculations
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:camera/camera.dart';
 import 'package:flutter/services.dart';
 
-// Assuming this is your existing import path
 import '../../services/object_detector.dart';
 
 class SignRecognitionScreen extends StatefulWidget {
@@ -34,11 +32,10 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
   bool _isScanning = false;
   List<Map<String, dynamic>> _detections = [];
 
-  // Performance & Throttling
+  // Performance tracking (Logging only, no throttling)
   int _frameCounter = 0;
   double _fps = 0.0;
   Timer? _fpsTimer;
-  int _lastRunTime = 0; // To control detection speed
 
   // UI state
   bool _showSettings = false;
@@ -54,10 +51,11 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     isSignToText = widget.isSignToText;
 
+    // 1. Setup Camera & Model
     _initializeModel();
     _setupCameras();
 
-    // FPS Timer
+    // 2. Start FPS Timer (Updates every 1 second just for display)
     _fpsTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (mounted && _isScanning) {
         setState(() {
@@ -70,14 +68,10 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Re-initialize camera on resume to prevent black screen
-    if (_controller.value.isInitialized == false) return;
-    
-    if (state == AppLifecycleState.inactive) {
+    if (state == AppLifecycleState.paused) {
       _stopScanning();
-      _controller.dispose();
-    } else if (state == AppLifecycleState.resumed) {
-      _initializeCamera(_cameras[_selectedCameraIdx]);
+    } else if (state == AppLifecycleState.resumed && _controller.value.isInitialized) {
+      if (_isScanning) _startStreaming();
     }
   }
 
@@ -93,9 +87,7 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
   Future<void> _setupCameras() async {
     try {
       _cameras = await availableCameras();
-      // Try to find the camera passed in widget, otherwise default to back
-      _selectedCameraIdx = _cameras.indexWhere(
-          (c) => c.lensDirection == widget.camera.lensDirection);
+      _selectedCameraIdx = _cameras.indexWhere((c) => c.lensDirection == CameraLensDirection.back);
       if (_selectedCameraIdx == -1) _selectedCameraIdx = 0;
       _initializeCamera(_cameras[_selectedCameraIdx]);
     } catch (e) {
@@ -106,11 +98,9 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
   void _initializeCamera(CameraDescription cameraDescription) {
     _controller = CameraController(
       cameraDescription,
-      ResolutionPreset.medium, // Changed to MEDIUM for faster processing
+      ResolutionPreset.high, // Kept at HIGH as per your working code
       enableAudio: false,
-      imageFormatGroup: Platform.isAndroid
-          ? ImageFormatGroup.yuv420
-          : ImageFormatGroup.bgra8888,
+      imageFormatGroup: Platform.isAndroid ? ImageFormatGroup.yuv420 : ImageFormatGroup.bgra8888,
     );
 
     _initializeControllerFuture = _controller.initialize().then((_) {
@@ -120,16 +110,14 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
 
   Future<void> _onTapSwitchCamera() async {
     if (_cameras.length < 2) return;
-    await _stopScanning();
-    await _controller.dispose();
+    if (_isScanning) await _stopScanning();
 
     final newIndex = (_selectedCameraIdx + 1) % _cameras.length;
-    
+    await _controller.dispose();
     setState(() {
       _selectedCameraIdx = newIndex;
       _initializeControllerFuture = null;
     });
-    
     _initializeCamera(_cameras[_selectedCameraIdx]);
   }
 
@@ -164,15 +152,7 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
   void _processCameraFrame(CameraImage image) async {
     if (_detector.isBusy) return;
 
-    // --- FIX: Throttle Detection (Prevents Lag) ---
-    // Only run detection every 500ms (approx 2 times per second)
-    int currentTime = DateTime.now().millisecondsSinceEpoch;
-    if (currentTime - _lastRunTime < 500) {
-      return; 
-    }
-    _lastRunTime = currentTime;
-    // ----------------------------------------------
-
+    // NO THROTTLING - Runs as fast as possible, exactly like your working version
     _frameCounter++;
 
     final results = await _detector.yoloOnFrame(image);
@@ -208,9 +188,7 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
 
   @override
   Widget build(BuildContext context) {
-    final double width = MediaQuery.of(context).size.width;
-    // We define a fixed height for the camera container
-    final double containerHeight = 500; 
+    // Removed width variable, using responsive widgets instead
 
     return Scaffold(
       appBar: AppBar(
@@ -232,33 +210,36 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
           ),
         ],
       ),
-      body: Stack(
-        children: [
-          SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                // 1. Status Chip
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: _modelLoaded ? Colors.green.shade50 : Colors.red.shade50,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: _modelLoaded ? Colors.green : Colors.red),
-                  ),
-                  child: Text(
-                    _modelLoaded ? "AI Active (YOLOv8)" : "Loading Model...",
-                    style: TextStyle(
-                        color: _modelLoaded ? Colors.green.shade800 : Colors.red.shade800,
-                        fontWeight: FontWeight.bold),
-                  ),
+      // SafeArea ensures we don't draw behind Android system buttons
+      body: SafeArea(
+        child: Column(
+          children: [
+            // 1. Status Chip
+            Padding(
+              padding: const EdgeInsets.all(10.0),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: _modelLoaded ? Colors.green.shade50 : Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: _modelLoaded ? Colors.green : Colors.red),
                 ),
-                const SizedBox(height: 20),
+                child: Text(
+                  _modelLoaded ? "AI Active (YOLOv8)" : "Loading Model...",
+                  style: TextStyle(
+                      color: _modelLoaded ? Colors.green.shade800 : Colors.red.shade800,
+                      fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
 
-                // 2. Camera View (FIXED STRETCHING)
-                Container(
-                  height: containerHeight,
-                  width: width,
+            // 2. Camera View
+            // CHANGED: Using Expanded instead of fixed height 500
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Container(
+                  width: double.infinity,
                   decoration: BoxDecoration(
                     color: Colors.black,
                     borderRadius: BorderRadius.circular(20),
@@ -269,32 +250,19 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(20),
                     child: Stack(
-                      fit: StackFit.expand,
+                      fit: StackFit.expand, // Ensures camera fills the container
                       children: [
-                        if (_initializeControllerFuture == null)
-                          const Center(child: CircularProgressIndicator())
-                        else
-                          // --- FIX: Aspect Ratio Handling ---
-                          FittedBox(
-                            fit: BoxFit.cover,
-                            child: SizedBox(
-                              width: _controller.value.previewSize!.height,
-                              height: _controller.value.previewSize!.width,
-                              child: CameraPreview(_controller),
-                            ),
-                          ),
-                        // ----------------------------------
+                        _initializeControllerFuture == null
+                            ? const Center(child: CircularProgressIndicator())
+                            : CameraPreview(_controller),
 
                         // Bounding Boxes Overlay
                         if (_isScanning && _detections.isNotEmpty)
                           CustomPaint(
                             painter: BoundingBoxPainter(
                               detections: _detections,
-                              // IMPORTANT: Pass the logic to check for front camera
-                              isFrontCamera: _cameras.isNotEmpty && 
-                                  _cameras[_selectedCameraIdx].lensDirection == CameraLensDirection.front,
                               previewSize: _controller.value.previewSize!,
-                              screenSize: Size(width, containerHeight),
+                              // We just pass the current context size implicitly via the paint method
                             ),
                           ),
 
@@ -312,91 +280,83 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
                     ),
                   ),
                 ),
-                const SizedBox(height: 30),
+              ),
+            ),
 
-                // 3. Start/Stop Button
-                GestureDetector(
-                  onTap: _toggleScanning,
-                  child: Container(
-                    height: 60,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(15),
-                      gradient: LinearGradient(
-                        colors: _isScanning
-                            ? [Colors.red.shade400, Colors.red.shade700]
-                            : [const Color(0xFF00B8DA), const Color(0xFFF6329A)],
+            const SizedBox(height: 20),
+
+            // 3. Start/Stop Button
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: GestureDetector(
+                onTap: _toggleScanning,
+                child: Container(
+                  height: 60,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(15),
+                    gradient: LinearGradient(
+                      colors: _isScanning
+                          ? [Colors.red.shade400, Colors.red.shade700]
+                          : [const Color(0xFF00B8DA), const Color(0xFFF6329A)],
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                          color: _isScanning
+                              ? Colors.red.withOpacity(0.4)
+                              : Colors.pink.withOpacity(0.4),
+                          blurRadius: 10,
+                          offset: const Offset(0, 5))
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(_isScanning ? Icons.stop : Icons.play_arrow,
+                          color: Colors.white, size: 30),
+                      const SizedBox(width: 10),
+                      Text(
+                        _isScanning ? "STOP SCANNING" : "START SCANNING",
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold),
                       ),
-                      boxShadow: [
-                        BoxShadow(
-                            color: _isScanning
-                                ? Colors.red.withOpacity(0.4)
-                                : Colors.pink.withOpacity(0.4),
-                            blurRadius: 10,
-                            offset: const Offset(0, 5))
-                      ],
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(_isScanning ? Icons.stop : Icons.play_arrow,
-                            color: Colors.white, size: 30),
-                        const SizedBox(width: 10),
-                        Text(
-                          _isScanning ? "STOP SCANNING" : "START SCANNING",
-                          style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold),
-                        ),
-                      ],
-                    ),
+                    ],
                   ),
                 ),
-
-                // Debug Info
-                if (_showSettings) ...[
-                  const SizedBox(height: 20),
-                  Text(
-                    "FPS: ${_fps.toStringAsFixed(1)} | Detections: ${_detections.length}",
-                    style: TextStyle(color: Colors.grey.shade600),
-                  ),
-                ]
-              ],
+              ),
             ),
-          ),
-        ],
+
+            // Debug Info
+            if (_showSettings) ...[
+              Text(
+                "FPS: ${_fps.toStringAsFixed(1)} | Detections: ${_detections.length}",
+                style: TextStyle(color: Colors.grey.shade600),
+              ),
+              const SizedBox(height: 10),
+            ]
+          ],
+        ),
       ),
     );
   }
 }
 
-// --- UPDATED PAINTER ---
+// Reverted to your exact working Painter logic
 class BoundingBoxPainter extends CustomPainter {
   final List<Map<String, dynamic>> detections;
   final Size previewSize;
-  final Size screenSize;
-  final bool isFrontCamera; // Added to handle mirroring
 
   BoundingBoxPainter({
     required this.detections,
     required this.previewSize,
-    required this.screenSize,
-    this.isFrontCamera = false,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    // We calculate scales based on the FittedBox logic (BoxFit.cover)
-    // The camera image (previewSize) is likely rotated 90deg on phones, so we swap width/height logic
-    double scaleX = size.width / previewSize.height;
-    double scaleY = size.height / previewSize.width;
-    
-    // Use the larger scale to ensure BoxFit.cover behavior matches the preview
-    final double scale = math.max(scaleX, scaleY);
-
-    // Calculate the offset to center the drawing area
-    double offsetX = (size.width - (previewSize.height * scale)) / 2;
-    double offsetY = (size.height - (previewSize.width * scale)) / 2;
+    // Exact scaling math from your working version
+    final double scaleX = size.width / previewSize.height;
+    final double scaleY = size.height / previewSize.width;
 
     final Paint paint = Paint()
       ..style = PaintingStyle.stroke
@@ -413,22 +373,10 @@ class BoundingBoxPainter extends CustomPainter {
     for (var detection in detections) {
       final box = detection['box'];
       
-      // Standard output from many models: [x1, y1, x2, y2, confidence]
-      // Coordinates are usually based on the PreviewSize
-      double x1 = box[0] * scale + offsetX;
-      double y1 = box[1] * scale + offsetY;
-      double x2 = box[2] * scale + offsetX;
-      double y2 = box[3] * scale + offsetY;
-
-      // --- FIX: Mirror Front Camera ---
-      if (isFrontCamera) {
-        // Flip the X coordinates relative to the screen width
-        double tempX1 = size.width - x2;
-        double tempX2 = size.width - x1;
-        x1 = tempX1;
-        x2 = tempX2;
-      }
-      // --------------------------------
+      final double x1 = box[0] * scaleX;
+      final double y1 = box[1] * scaleY;
+      final double x2 = box[2] * scaleX;
+      final double y2 = box[3] * scaleY;
 
       final rect = Rect.fromLTRB(x1, y1, x2, y2);
       canvas.drawRect(rect, paint);
