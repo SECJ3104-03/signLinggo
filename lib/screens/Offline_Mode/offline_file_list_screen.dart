@@ -4,7 +4,9 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 import 'package:share_plus/share_plus.dart';
+import 'package:firebase_auth/firebase_auth.dart'; 
 import '../Community_Module/full_screen_video_screen.dart';
+import 'share_local_file_sheet.dart'; 
 
 class OfflineFileListScreen extends StatefulWidget {
   final String folderPath;
@@ -22,7 +24,7 @@ class OfflineFileListScreen extends StatefulWidget {
 
 class _OfflineFileListScreenState extends State<OfflineFileListScreen> {
   bool _isLoading = true;
-  List<FileSystemEntity> _items = []; // Can be File or Directory
+  List<FileSystemEntity> _items = []; 
 
   @override
   void initState() {
@@ -36,17 +38,15 @@ class _OfflineFileListScreenState extends State<OfflineFileListScreen> {
     try {
       final directory = Directory(widget.folderPath);
       if (await directory.exists()) {
-        // --- CHANGE 1: recursive is now FALSE ---
-        // We only want to see what is immediately inside this folder
         final allEntities = await directory.list(recursive: false).toList();
         
-        // Filter out hidden files (starting with .)
+        // Filter out hidden files
         final visibleItems = allEntities.where((entity) {
           final name = p.basename(entity.path);
           return !name.startsWith('.');
         }).toList();
 
-        // --- CHANGE 2: Sort Folders first, then Files ---
+        // Sort: Folders first, then Files
         visibleItems.sort((a, b) {
           if (a is Directory && b is File) return -1;
           if (a is File && b is Directory) return 1;
@@ -69,11 +69,26 @@ class _OfflineFileListScreenState extends State<OfflineFileListScreen> {
     }
   }
 
-  Future<void> _shareFile(File file) async {
+  // --- FIX: EXTERNAL SHARE WITH MIME TYPE ---
+  Future<void> _shareFileExternally(File file) async {
     try {
       final String fileName = _beautifyName(file.path);
+      
+      // Determine MIME type (WhatsApp is picky about this!)
+      String mimeType = 'video/mp4'; 
+      if (file.path.endsWith('.jpg') || file.path.endsWith('.jpeg')) {
+        mimeType = 'image/jpeg';
+      } else if (file.path.endsWith('.png')) {
+        mimeType = 'image/png';
+      }
+
       await Share.shareXFiles(
-        [XFile(file.path)],
+        [
+          XFile(
+            file.path, 
+            mimeType: mimeType, // <--- CRITICAL FIX: Tell the app this is a video
+          )
+        ],
         text: 'Learn "$fileName" in Sign Language with SignLinggo!',
       );
     } catch (e) {
@@ -81,6 +96,63 @@ class _OfflineFileListScreenState extends State<OfflineFileListScreen> {
         SnackBar(content: Text("Error sharing: $e")),
       );
     }
+  }
+
+  // --- INTERNAL SHARE (Chat) ---
+  void _showShareOptions(File file) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.only(topLeft: Radius.circular(20), topRight: Radius.circular(20)),
+        ),
+        child: Wrap(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Center(
+                child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2))),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.send_rounded, color: Color(0xFFAC46FF)),
+              title: const Text('Send in SignLinggo'),
+              subtitle: const Text('Send as video message'),
+              onTap: () {
+                Navigator.pop(context); 
+                
+                final user = FirebaseAuth.instance.currentUser;
+                if (user != null) {
+                  showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true, 
+                    backgroundColor: Colors.transparent,
+                    builder: (context) => ShareLocalFileSheet(
+                      file: file,
+                      currentUserId: user.uid,
+                    ),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please login first")));
+                }
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.share_outlined, color: Colors.black87),
+              title: const Text('Share externally...'),
+              subtitle: const Text('WhatsApp, Telegram, etc.'),
+              onTap: () {
+                Navigator.pop(context);
+                _shareFileExternally(file); // Calls the fixed function
+              },
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _deleteItem(FileSystemEntity item) async {
@@ -110,7 +182,7 @@ class _OfflineFileListScreenState extends State<OfflineFileListScreen> {
 
     if (confirm == true) {
       try {
-        await item.delete(recursive: true); // Recursive delete for folders
+        await item.delete(recursive: true); 
         _loadContent(); 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -217,19 +289,17 @@ class _OfflineFileListScreenState extends State<OfflineFileListScreen> {
     );
   }
 
-  // --- NEW: FOLDER CARD ---
   Widget _buildFolderCard(Directory dir) {
-    final String folderName = p.basename(dir.path); // Keep name simple
+    final String folderName = p.basename(dir.path); 
 
     return GestureDetector(
       onTap: () {
-        // --- NAVIGATE DEEPER ---
         Navigator.push(
           context,
           MaterialPageRoute(
             builder: (context) => OfflineFileListScreen(
               folderPath: dir.path,
-              title: folderName, // Update title to folder name
+              title: folderName, 
             ),
           ),
         );
@@ -237,7 +307,7 @@ class _OfflineFileListScreenState extends State<OfflineFileListScreen> {
       onLongPress: () => _deleteItem(dir),
       child: Container(
         decoration: ShapeDecoration(
-          color: const Color(0xFFFFF8E1), // Light Yellow for folders
+          color: const Color(0xFFFFF8E1),
           shape: RoundedRectangleBorder(
             side: const BorderSide(width: 1, color: Color(0xFFFFECB3)),
             borderRadius: BorderRadius.circular(16),
@@ -274,7 +344,6 @@ class _OfflineFileListScreenState extends State<OfflineFileListScreen> {
     );
   }
 
-  // --- VIDEO CARD (Same as before) ---
   Widget _buildFileCard(File file) {
     final String beautifulName = _beautifyName(file.path);
 
@@ -320,8 +389,11 @@ class _OfflineFileListScreenState extends State<OfflineFileListScreen> {
                       child: PopupMenuButton<String>(
                         icon: const Icon(Icons.more_vert, color: Colors.black54),
                         onSelected: (value) {
-                          if (value == 'share') _shareFile(file);
-                          else if (value == 'delete') _deleteItem(file);
+                          if (value == 'share') {
+                            _showShareOptions(file); 
+                          } else if (value == 'delete') {
+                            _deleteItem(file);
+                          }
                         },
                         itemBuilder: (context) => [
                           const PopupMenuItem(value: 'share', child: Row(children: [Icon(Icons.share_outlined, size: 20), SizedBox(width: 12), Text("Share")])),

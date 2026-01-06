@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:signlinggo/screens/conversation_mode/conversation_mode_screen.dart';
+import 'package:signlinggo/screens/conversation_mode/smart_chat_screen.dart';
 
 class AddChatScreen extends StatefulWidget {
   final String currentUserID;
@@ -52,7 +52,7 @@ class _AddChatScreenState extends State<AddChatScreen> {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (context) => ConversationScreen(
+          builder: (context) => SmartChatScreen(
             chatName: chatName, 
             avatar: avatar ?? (chatName.isNotEmpty ? chatName[0].toUpperCase() : '?'),
             conversationId: conversationId,

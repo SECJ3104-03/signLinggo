@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:signlinggo/screens/conversation_mode/conversation_mode_screen.dart';
+import 'package:signlinggo/screens/conversation_mode/smart_chat_screen.dart';
 import 'package:signlinggo/screens/conversation_mode/add_chat_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -291,7 +291,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (_) => ConversationScreen(
+                                  builder: (_) => SmartChatScreen(
                                     chatName: chatName,
                                     avatar: profileUrl ?? avatar,
                                     conversationId: conversationId,
