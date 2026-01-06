@@ -168,30 +168,46 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
   }
 
   // --- MODIFIED: Filtering Logic ---
-  void _processCameraFrame(CameraImage image) async {
+void _processCameraFrame(CameraImage image) async {
     if (_detector.isBusy) return;
 
     _frameCounter++;
     final results = await _detector.yoloOnFrame(image);
 
+    // --- DEBUG LOGGING --- 
+    // This prints exactly what the model sees to your bottom console
+    for (var result in results) {
+      print("AI DETECTED: '${result['tag']}'"); 
+    }
+    // ---------------------
+
     List<Map<String, dynamic>> filteredResults = [];
 
     if (_selectedCategory == 'Alphabets') {
-      // Logic: Show it ONLY if it is NOT a number and NOT a word
-      // This catches A, B, C... Z automatically
       filteredResults = results.where((result) {
-        String label = result['tag'];
-        return !_numberLabels.contains(label) && !_wordLabels.contains(label);
+        String tag = result['tag'].toString().trim(); // Remove spaces
+        
+        // Check if it's a Number
+        bool isNumber = _numberLabels.any((label) => label.toLowerCase() == tag.toLowerCase());
+        // Check if it's a Word
+        bool isWord = _wordLabels.any((label) => label.toLowerCase() == tag.toLowerCase());
+
+        // Show ONLY if it is NOT a number AND NOT a word
+        return !isNumber && !isWord;
       }).toList();
+
     } else if (_selectedCategory == 'Numbers') {
-      // Logic: Show ONLY if it is in the number list
       filteredResults = results.where((result) {
-        return _numberLabels.contains(result['tag']);
+        String tag = result['tag'].toString().trim();
+        // Smart Check: Ignore case and spaces
+        return _numberLabels.any((label) => label.toLowerCase() == tag.toLowerCase());
       }).toList();
+
     } else if (_selectedCategory == 'Words') {
-      // Logic: Show ONLY if it is in the word list
       filteredResults = results.where((result) {
-        return _wordLabels.contains(result['tag']);
+        String tag = result['tag'].toString().trim();
+        // Smart Check: Ignore case and spaces
+        return _wordLabels.any((label) => label.toLowerCase() == tag.toLowerCase());
       }).toList();
     }
 
