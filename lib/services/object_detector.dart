@@ -26,7 +26,7 @@ class ObjectDetector {
         labels: 'assets/models/labels.txt',
         modelVersion: "yolov8",
         quantization: true, // Critical for Int8 models
-        numThreads: 2,
+        numThreads: 4,
         useGpu: true,
       );
       _isLoaded = true;
@@ -45,9 +45,9 @@ class ObjectDetector {
         bytesList: cameraImage.planes.map((plane) => plane.bytes).toList(),
         imageHeight: cameraImage.height,
         imageWidth: cameraImage.width,
-        iouThreshold: 0.4,
-        confThreshold: 0.4,
-        classThreshold: 0.4,
+        iouThreshold: 0.25,
+        confThreshold: 0.25,
+        classThreshold: 0.25,
       );
       _yoloResults = result;
       _isBusy = false;
