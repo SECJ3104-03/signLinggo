@@ -1,14 +1,16 @@
 /// App Router Configuration
-/// 
+///
 /// Defines all routes for the SignLinggo app using GoRouter.
 /// Handles navigation between screens and manages route parameters.
+
 library;
+
+import 'dart:async';
+
 import 'package:flutter/material.dart';
-import '../screens/profile/profile_screen.dart' show ProfileScreen;
 import 'package:go_router/go_router.dart';
-import 'package:signlinggo/screens/conversation_mode/chat_list_screen.dart';
-import 'package:signlinggo/screens/profile/profile_screen.dart';
-import 'package:signlinggo/screens/profile/edit_profile_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
 import '../screens/landing/landing_screen.dart';
 import '../screens/sign_in/signin_screen.dart';
 import '../screens/register/register_screen.dart';
@@ -16,24 +18,56 @@ import '../screens/home/home_screen.dart' show HomePage;
 import '../screens/learn_mode/learn_screen.dart' show LearnModePage;
 import '../screens/learn_mode/category.dart' show CategoriesPage;
 import '../screens/progress_tracker/progress_screen.dart';
+import '../screens/profile/profile_screen.dart';
+import '../screens/profile/edit_profile_screen.dart';
 import '../screens/sign_recognition/sign_recognition_screen.dart';
-import '../services/camera_service.dart';
 import '../screens/Community_Module/community_hub.dart' show CommunityHubEdited;
 import '../screens/Offline_Mode/offline_view.dart' show OfflineMode;
-import '../screens/conversation_mode/conversation_mode_screen.dart' show ConversationScreen;
-import '../screens/text_to_sign/text_to_sign_screen.dart' show TextTranslationScreen;
 import '../screens/Offline_Mode/offline_file_list_screen.dart';
+import '../screens/conversation_mode/chat_list_screen.dart';
+import '../screens/conversation_mode/conversation_mode_screen.dart'
+    show ConversationScreen;
+import '../screens/text_to_sign/text_to_sign_screen.dart'
+    show TextTranslationScreen;
 import '../screens/Community_Module/notification_screen.dart';
 import '../screens/daily_quiz/daily_quiz_screen.dart' show DailyQuizScreen;
 
-// Note: Speech output and onboarding screens are placeholders for future implementation
+import '../services/camera_service.dart';
 
 /// Router configuration for the app
 class AppRouter {
   static final GoRouter router = GoRouter(
     initialLocation: '/landing',
+
+    // 🔁 Rebuild router when Firebase auth state changes
+    refreshListenable: GoRouterRefreshStream(
+      FirebaseAuth.instance.authStateChanges(),
+    ),
+
+    // 🔐 Global auth guard
+    redirect: (context, state) {
+      final user = FirebaseAuth.instance.currentUser;
+      final location = state.uri.toString();
+
+      final isAuthRoute = location == '/signin' ||
+          location == '/register' ||
+          location == '/landing';
+
+      // ❌ Not logged in → force Sign In
+      if (user == null && !isAuthRoute) {
+        return '/signin';
+      }
+
+      // ✅ Logged in → block auth pages
+      if (user != null && isAuthRoute) {
+        return '/home';
+      }
+
+      return null; // allow navigation
+    },
+
     routes: [
-      // Landing and Authentication Routes
+      // ================= AUTH / LANDING =================
       GoRoute(
         path: '/landing',
         name: 'landing',
@@ -49,21 +83,8 @@ class AppRouter {
         name: 'register',
         builder: (context, state) => const RegisterScreen(),
       ),
-      // Note: OnboardingScreen and WelcomeScreen need to be created or imported
-      GoRoute(
-        path: '/onboarding',
-        name: 'onboarding',
-        builder: (context, state) => const Scaffold(
-          body: Center(child: Text('Onboarding Screen - To be implemented')),
-        ),
-      ),
-      GoRoute(
-        path: '/welcome',
-        name: 'welcome',
-        builder: (context, state) => const Scaffold(
-          body: Center(child: Text('Welcome Screen - To be implemented')),
-        ),
-      ),
+
+      // ================= PROFILE =================
       GoRoute(
         path: '/profile',
         name: 'profile',
@@ -71,11 +92,9 @@ class AppRouter {
           return CustomTransitionPage(
             key: state.pageKey,
             child: const ProfileScreen(),
-            transitionsBuilder: (context, animation, secondaryAnimation, child) {
-              return FadeTransition(
-                opacity: animation,
-                child: child,
-              );
+            transitionsBuilder:
+                (context, animation, secondaryAnimation, child) {
+              return FadeTransition(opacity: animation, child: child);
             },
           );
         },
@@ -86,7 +105,7 @@ class AppRouter {
         builder: (context, state) => const EditProfilePage(),
       ),
 
-      // Main App Routes
+      // ================= MAIN APP =================
       GoRoute(
         path: '/home',
         name: 'home',
@@ -100,11 +119,7 @@ class AppRouter {
       GoRoute(
         path: '/category',
         name: 'category',
-        builder: (context, state) {
-          // Category parameter can be used in future implementation
-          // final category = state.uri.queryParameters['category'] ?? 'All';
-          return CategoriesPage();
-        },
+        builder: (context, state) => CategoriesPage(),
       ),
       GoRoute(
         path: '/daily-quiz',
@@ -116,13 +131,13 @@ class AppRouter {
         name: 'progress',
         builder: (context, state) => const ProgressScreen(),
       ),
+
+      // ================= SIGN RECOGNITION =================
       GoRoute(
         path: '/sign-recognition',
         name: 'sign-recognition',
         builder: (context, state) {
-          // Check if cameras are available
           if (!CameraService.hasCameras) {
-            // Show error screen if no cameras available
             return Scaffold(
               appBar: AppBar(
                 title: const Text('Sign Recognition'),
@@ -132,96 +147,63 @@ class AppRouter {
                 ),
               ),
               body: Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(24.0),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(
-                        Icons.camera_alt_outlined,
-                        size: 80,
-                        color: Colors.grey,
-                      ),
-                      const SizedBox(height: 24),
-                      const Text(
-                        'Camera Not Available',
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        CameraService.errorMessage ?? 
-                        'No camera found on this device. Please connect a camera or use a device with a camera.',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          color: Colors.grey,
-                        ),
-                      ),
-                      const SizedBox(height: 32),
-                      ElevatedButton.icon(
-                        onPressed: () async {
-                          // Try to re-initialize cameras
-                          final initialized = await CameraService.initializeCameras();
-                          if (initialized && CameraService.hasCameras) {
-                            // Navigate to sign recognition if camera is now available
-                            context.go('/sign-recognition');
-                          } else {
-                            // Show snackbar with error
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  CameraService.errorMessage ?? 
-                                  'Camera is still not available',
-                                ),
-                                duration: const Duration(seconds: 3),
-                              ),
-                            );
-                          }
-                        },
-                        icon: const Icon(Icons.refresh),
-                        label: const Text('Retry Camera'),
-                      ),
-                      const SizedBox(height: 16),
-                      TextButton(
-                        onPressed: () => context.go('/text-to-sign'),
-                        child: const Text('Use Text to Sign Instead'),
-                      ),
-                    ],
-                  ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.camera_alt_outlined, size: 80),
+                    const SizedBox(height: 24),
+                    Text(
+                      CameraService.errorMessage ??
+                          'Camera not available on this device',
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 24),
+                    ElevatedButton(
+                      onPressed: () async {
+                        final ok =
+                            await CameraService.initializeCameras();
+                        if (ok) context.go('/sign-recognition');
+                      },
+                      child: const Text('Retry Camera'),
+                    ),
+                  ],
                 ),
               ),
             );
           }
 
-          // Get first available camera
           final camera = CameraService.getFirstCamera();
-          if (camera == null) {
-            // Fallback if camera is null (shouldn't happen if hasCameras is true)
-            return Scaffold(
-              body: Center(
-                child: Text(
-                  CameraService.errorMessage ?? 
-                  'Camera initialization failed',
-                ),
-              ),
-            );
-          }
-
-          // Navigate to sign recognition screen with camera
           return SignRecognitionScreen(
-            camera: camera,
+            camera: camera!,
             isSignToText: false,
           );
         },
       ),
+
+      // ================= COMMUNITY =================
       GoRoute(
         path: '/community',
         name: 'community',
         builder: (context, state) => const CommunityHubEdited(),
       ),
+      GoRoute(
+        path: '/conversation',
+        name: 'conversation',
+        builder: (context, state) => const ChatListScreen(),
+      ),
+      GoRoute(
+        path: '/text-to-sign',
+        name: 'text-to-sign',
+        builder: (context, state) =>
+            const TextTranslationScreen(),
+      ),
+      GoRoute(
+        path: '/notifications',
+        name: 'notifications',
+        builder: (context, state) => const NotificationScreen(),
+      ),
+
+      // ================= OFFLINE =================
       GoRoute(
         path: '/offline',
         name: 'offline',
@@ -231,43 +213,28 @@ class AppRouter {
         path: '/offline-files',
         name: 'offline-files',
         builder: (context, state) {
-          // Get the parameters we passed
           final params = state.extra as Map<String, String>;
-          final String folderPath = params['path']!;
-          final String title = params['title']!;
-
           return OfflineFileListScreen(
-            folderPath: folderPath,
-            title: title,
+            folderPath: params['path']!,
+            title: params['title']!,
           );
         },
-       ),
-      GoRoute(
-        path: '/conversation',
-        name: 'conversation',
-        builder: (context, state) => const ChatListScreen(),
       ),
-      GoRoute(
-        path: '/text-to-sign',
-        name: 'text-to-sign',
-        builder: (context, state) => const TextTranslationScreen(),
-      ),
-      // Note: SpeechOutputScreen and OfflineView need to be created or imported
-      GoRoute(
-        path: '/speech-output',
-        name: 'speech-output',
-        builder: (context, state) => const Scaffold(
-          body: Center(child: Text('Speech Output Screen - To be implemented')),
-        ),
-      ),
-
-      GoRoute(
-        path: '/notifications',
-        name: 'notifications',
-        builder: (context, state) => const NotificationScreen(),
-      ),
-      
     ],
   );
 }
 
+/// 🔁 Helper class to refresh GoRouter on Firebase auth changes
+class GoRouterRefreshStream extends ChangeNotifier {
+  GoRouterRefreshStream(Stream<dynamic> stream) {
+    _subscription = stream.listen((_) => notifyListeners());
+  }
+
+  late final StreamSubscription<dynamic> _subscription;
+
+  @override
+  void dispose() {
+    _subscription.cancel();
+    super.dispose();
+  }
+}
