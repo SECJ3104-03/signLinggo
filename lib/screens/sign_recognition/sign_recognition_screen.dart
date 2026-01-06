@@ -1,326 +1,400 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:camera/camera.dart';
-// Keep your existing ObjectDetector import
-import '../../services/object_detector.dart'; 
+import 'package:flutter/services.dart';
+
+import '../../services/object_detector.dart';
 
 class SignRecognitionScreen extends StatefulWidget {
   final CameraDescription camera;
   final bool isSignToText;
 
   const SignRecognitionScreen({
-    super.key, 
-    required this.camera, 
-    this.isSignToText = false
+    super.key,
+    required this.camera,
+    this.isSignToText = false,
   });
 
   @override
   State<SignRecognitionScreen> createState() => _SignRecognitionScreenState();
 }
 
-class _SignRecognitionScreenState extends State<SignRecognitionScreen> {
+class _SignRecognitionScreenState extends State<SignRecognitionScreen>
+    with WidgetsBindingObserver {
   late CameraController _controller;
-  
-  // Nullable to prevent "LateInitializationError" crash
   Future<void>? _initializeControllerFuture;
-  
   late bool isSignToText;
 
-  // --- AI & Logic Variables ---
   final ObjectDetector _detector = ObjectDetector();
   bool _isScanning = false;
-  String _recognizedText = "Press Start"; 
-  
-  // --- Camera Management Variables ---
-  List<CameraDescription> _cameras = []; 
-  int _selectedCameraIdx = 0; 
-  double _currentZoom = 1.0;
-  double _minZoom = 1.0;
-  double _maxZoom = 1.0;
+  List<Map<String, dynamic>> _detections = [];
+
+  // Performance tracking (Logging only, no throttling)
+  int _frameCounter = 0;
+  double _fps = 0.0;
+  Timer? _fpsTimer;
+
+  // UI state
+  bool _showSettings = false;
+  bool _modelLoaded = false;
+
+  List<CameraDescription> _cameras = [];
+  int _selectedCameraIdx = 0;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     isSignToText = widget.isSignToText;
-    
-    // 1. Initialize the AI
-    _detector.loadModel();
 
-    // 2. Setup Cameras
+    // 1. Setup Camera & Model
+    _initializeModel();
     _setupCameras();
+
+    // 2. Start FPS Timer (Updates every 1 second just for display)
+    _fpsTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (mounted && _isScanning) {
+        setState(() {
+          _fps = _frameCounter.toDouble();
+          _frameCounter = 0;
+        });
+      }
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused) {
+      _stopScanning();
+    } else if (state == AppLifecycleState.resumed && _controller.value.isInitialized) {
+      if (_isScanning) _startStreaming();
+    }
+  }
+
+  void _initializeModel() async {
+    await _detector.loadModel();
+    if (mounted) {
+      setState(() {
+        _modelLoaded = _detector.isLoaded;
+      });
+    }
   }
 
   Future<void> _setupCameras() async {
     try {
       _cameras = await availableCameras();
-      
-      // Find the index of the camera passed from the previous screen
-      _selectedCameraIdx = _cameras.indexWhere(
-        (c) => c.lensDirection == widget.camera.lensDirection
-      );
+      _selectedCameraIdx = _cameras.indexWhere((c) => c.lensDirection == CameraLensDirection.back);
       if (_selectedCameraIdx == -1) _selectedCameraIdx = 0;
-
-      // Initialize the selected camera
       _initializeCamera(_cameras[_selectedCameraIdx]);
     } catch (e) {
-      debugPrint("Error fetching cameras: $e");
+      print("Camera Error: $e");
     }
   }
-  
+
   void _initializeCamera(CameraDescription cameraDescription) {
     _controller = CameraController(
-      cameraDescription, 
-      ResolutionPreset.medium,
+      cameraDescription,
+      ResolutionPreset.high, // Kept at HIGH as per your working code
       enableAudio: false,
-      imageFormatGroup: ImageFormatGroup.nv21, 
+      imageFormatGroup: Platform.isAndroid ? ImageFormatGroup.yuv420 : ImageFormatGroup.bgra8888,
     );
 
-    final future = _controller.initialize().then((_) async {
-      try {
-        _minZoom = await _controller.getMinZoomLevel();
-        _maxZoom = await _controller.getMaxZoomLevel();
-        _currentZoom = _minZoom.clamp(1.0, _maxZoom);
-        await _controller.setZoomLevel(_currentZoom);
-      } catch (e) {
-        debugPrint('Error setting zoom: $e');
-      }
+    _initializeControllerFuture = _controller.initialize().then((_) {
       if (mounted) setState(() {});
-    });
-
-    // Assign future without 'late' so UI can check for null
-    setState(() {
-      _initializeControllerFuture = future;
-    });
-    
-    future.catchError((error) {
-      debugPrint('Camera initialization error: $error');
     });
   }
 
-  // --- FLIP CAMERA LOGIC ---
   Future<void> _onTapSwitchCamera() async {
-    if (_cameras.length < 2) return; 
-
-    if (_isScanning) {
-      setState(() {
-        _isScanning = false; 
-      });
-    }
+    if (_cameras.length < 2) return;
+    if (_isScanning) await _stopScanning();
 
     final newIndex = (_selectedCameraIdx + 1) % _cameras.length;
-    
     await _controller.dispose();
-
     setState(() {
       _selectedCameraIdx = newIndex;
-      _initializeControllerFuture = null; // Reset to show loading spinner
+      _initializeControllerFuture = null;
     });
-    
     _initializeCamera(_cameras[_selectedCameraIdx]);
   }
 
-  // --- SCANNING LOOP ---
   void _toggleScanning() async {
-    setState(() {
-      _isScanning = !_isScanning;
-    });
-
+    if (!_modelLoaded) return;
     if (_isScanning) {
-      _startDetectionLoop();
+      await _stopScanning();
+    } else {
+      await _startScanning();
     }
   }
 
-  void _startDetectionLoop() async {
-    while (_isScanning && mounted) {
-      try {
-        if (_initializeControllerFuture == null || !_controller.value.isInitialized) return;
+  Future<void> _startScanning() async {
+    if (!_controller.value.isInitialized) return;
+    setState(() {
+      _isScanning = true;
+      _detections = [];
+    });
+    await _startStreaming();
+  }
 
-        final image = await _controller.takePicture();
-        final results = await _detector.runInference(image.path);
+  Future<void> _startStreaming() async {
+    try {
+      await _controller.startImageStream((CameraImage image) {
+        _processCameraFrame(image);
+      });
+    } catch (e) {
+      print("Stream Error: $e");
+    }
+  }
 
-        if (mounted) {
-          setState(() {
-            if (results.isNotEmpty) {
-              _recognizedText = "${results[0]['label']} (${results[0]['score']})";
-            } else {
-              _recognizedText = "No Sign Detected";
-            }
-          });
-        }
-        await Future.delayed(const Duration(milliseconds: 100));
+  void _processCameraFrame(CameraImage image) async {
+    if (_detector.isBusy) return;
 
-      } catch (e) {
-        debugPrint("Detection Error: $e");
-        break; 
-      }
+    // NO THROTTLING - Runs as fast as possible, exactly like your working version
+    _frameCounter++;
+
+    final results = await _detector.yoloOnFrame(image);
+
+    if (mounted && _isScanning) {
+      setState(() {
+        _detections = results;
+      });
+    }
+  }
+
+  Future<void> _stopScanning() async {
+    if (_controller.value.isStreamingImages) {
+      await _controller.stopImageStream();
+    }
+    if (mounted) {
+      setState(() {
+        _isScanning = false;
+        _detections = [];
+      });
     }
   }
 
   @override
   void dispose() {
-    _isScanning = false;
+    WidgetsBinding.instance.removeObserver(this);
+    _stopScanning();
+    _fpsTimer?.cancel();
+    _detector.dispose();
     _controller.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final double width = MediaQuery.of(context).size.width;
+    // Removed width variable, using responsive widgets instead
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Sign Recognition', style: TextStyle(color: Colors.black, fontFamily: 'Arimo')),
+        title: const Text('Sign Recognition', style: TextStyle(color: Colors.black)),
         centerTitle: true,
         backgroundColor: Colors.white,
-        elevation: 1,
+        elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black),
           onPressed: () {
-            _isScanning = false;
-            if (context.canPop()) context.pop();
-            else context.go('/home');
+            _stopScanning();
+            context.pop();
           },
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings, color: Colors.black),
+            onPressed: () => setState(() => _showSettings = !_showSettings),
+          ),
+        ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+      // SafeArea ensures we don't draw behind Android system buttons
+      body: SafeArea(
         child: Column(
           children: [
-             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                gradient: const LinearGradient(colors: [Color(0xFFAC46FF), Color(0xFF8B2EFF)]),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(isSignToText ? 'Text → Sign' : 'Sign → Text', style: const TextStyle(fontSize: 18, color: Colors.white)),
-                ],
-              ),
-            ),
-            
-            const SizedBox(height: 20),
-
-            // Result Display
-            Container(
-              padding: const EdgeInsets.all(12),
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: Colors.purple.shade50,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.purple.shade200)
-              ),
-              child: Column(
-                children: [
-                  const Text("Detected Sign:", style: TextStyle(color: Colors.grey)),
-                  Text(
-                    _recognizedText,
-                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.purple),
-                  ),
-                ],
-              ),
-            ),
-            
-            const SizedBox(height: 20),
-
-            // --- CAMERA PREVIEW SECTION ---
-            Container(
-              width: width,
-              height: 400,
-              decoration: BoxDecoration(
-                color: const Color(0xFFF3F4F6),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFE5E7EB)),
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    // CHECK: Is Camera Ready?
-                    _initializeControllerFuture == null 
-                    ? const Center(child: CircularProgressIndicator())
-                    : FutureBuilder<void>(
-                      future: _initializeControllerFuture,
-                      builder: (context, snapshot) {
-                        if (snapshot.connectionState == ConnectionState.done) {
-                          // FIX: Use FittedBox to cover the area without stretching
-                          return SizedBox.expand(
-                            child: FittedBox(
-                              fit: BoxFit.cover,
-                              child: SizedBox(
-                                width: _controller.value.previewSize!.height,
-                                height: _controller.value.previewSize!.width,
-                                child: CameraPreview(_controller),
-                              ),
-                            ),
-                          );
-                        } else {
-                          return const Center(child: CircularProgressIndicator());
-                        }
-                      },
-                    ),
-                    
-                    // Overlay Box
-                    Center(
-                      child: Container(
-                        width: 220, height: 220,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(24),
-                          border: Border.all(width: 3, color: _isScanning ? Colors.green : Colors.white.withOpacity(0.7)),
-                        ),
-                      ),
-                    ),
-
-                    // Flip Camera Button
-                    Positioned(
-                      bottom: 16,
-                      right: 16,
-                      child: FloatingActionButton.small(
-                        heroTag: "flip_btn",
-                        backgroundColor: Colors.white.withOpacity(0.8),
-                        onPressed: _onTapSwitchCamera,
-                        child: const Icon(Icons.flip_camera_ios, color: Colors.black),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 32),
-
-            // Start/Stop Button
-            GestureDetector(
-              onTap: _toggleScanning,
+            // 1. Status Chip
+            Padding(
+              padding: const EdgeInsets.all(10.0),
               child: Container(
-                width: double.infinity,
-                height: 56,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  gradient: LinearGradient(
-                    colors: _isScanning 
-                        ? [Colors.red, Colors.redAccent] 
-                        : [const Color(0xFFF6329A), const Color(0xFF00B8DA)],
-                  ),
+                  color: _modelLoaded ? Colors.green.shade50 : Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: _modelLoaded ? Colors.green : Colors.red),
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(_isScanning ? Icons.stop : Icons.camera_alt_outlined, color: Colors.white),
-                    const SizedBox(width: 8),
-                    Text(
-                      _isScanning ? 'Stop Recognition' : 'Start Recognition',
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 16),
-                    ),
-                  ],
+                child: Text(
+                  _modelLoaded ? "AI Active (YOLOv8)" : "Loading Model...",
+                  style: TextStyle(
+                      color: _modelLoaded ? Colors.green.shade800 : Colors.red.shade800,
+                      fontWeight: FontWeight.bold),
                 ),
               ),
             ),
+
+            // 2. Camera View
+            // CHANGED: Using Expanded instead of fixed height 500
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Container(
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: Colors.black,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(color: Colors.black26, blurRadius: 10, offset: Offset(0, 5))
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: Stack(
+                      fit: StackFit.expand, // Ensures camera fills the container
+                      children: [
+                        _initializeControllerFuture == null
+                            ? const Center(child: CircularProgressIndicator())
+                            : CameraPreview(_controller),
+
+                        // Bounding Boxes Overlay
+                        if (_isScanning && _detections.isNotEmpty)
+                          CustomPaint(
+                            painter: BoundingBoxPainter(
+                              detections: _detections,
+                              previewSize: _controller.value.previewSize!,
+                              // We just pass the current context size implicitly via the paint method
+                            ),
+                          ),
+
+                        // Flip Button
+                        Positioned(
+                          bottom: 15,
+                          right: 15,
+                          child: FloatingActionButton.small(
+                            backgroundColor: Colors.white24,
+                            onPressed: _onTapSwitchCamera,
+                            child: const Icon(Icons.flip_camera_ios, color: Colors.white),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            // 3. Start/Stop Button
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: GestureDetector(
+                onTap: _toggleScanning,
+                child: Container(
+                  height: 60,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(15),
+                    gradient: LinearGradient(
+                      colors: _isScanning
+                          ? [Colors.red.shade400, Colors.red.shade700]
+                          : [const Color(0xFF00B8DA), const Color(0xFFF6329A)],
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                          color: _isScanning
+                              ? Colors.red.withOpacity(0.4)
+                              : Colors.pink.withOpacity(0.4),
+                          blurRadius: 10,
+                          offset: const Offset(0, 5))
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(_isScanning ? Icons.stop : Icons.play_arrow,
+                          color: Colors.white, size: 30),
+                      const SizedBox(width: 10),
+                      Text(
+                        _isScanning ? "STOP SCANNING" : "START SCANNING",
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+            // Debug Info
+            if (_showSettings) ...[
+              Text(
+                "FPS: ${_fps.toStringAsFixed(1)} | Detections: ${_detections.length}",
+                style: TextStyle(color: Colors.grey.shade600),
+              ),
+              const SizedBox(height: 10),
+            ]
           ],
         ),
       ),
     );
+  }
+}
+
+// Reverted to your exact working Painter logic
+class BoundingBoxPainter extends CustomPainter {
+  final List<Map<String, dynamic>> detections;
+  final Size previewSize;
+
+  BoundingBoxPainter({
+    required this.detections,
+    required this.previewSize,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // Exact scaling math from your working version
+    final double scaleX = size.width / previewSize.height;
+    final double scaleY = size.height / previewSize.width;
+
+    final Paint paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3.0
+      ..color = Colors.green;
+
+    final TextStyle textStyle = TextStyle(
+      color: Colors.white,
+      fontSize: 16,
+      fontWeight: FontWeight.bold,
+      backgroundColor: Colors.green,
+    );
+
+    for (var detection in detections) {
+      final box = detection['box'];
+      
+      final double x1 = box[0] * scaleX;
+      final double y1 = box[1] * scaleY;
+      final double x2 = box[2] * scaleX;
+      final double y2 = box[3] * scaleY;
+
+      final rect = Rect.fromLTRB(x1, y1, x2, y2);
+      canvas.drawRect(rect, paint);
+
+      final String label = "${detection['tag']} ${(detection['box'][4] * 100).toStringAsFixed(0)}%";
+      final TextSpan span = TextSpan(text: label, style: textStyle);
+      final TextPainter tp = TextPainter(
+        text: span,
+        textAlign: TextAlign.left,
+        textDirection: TextDirection.ltr,
+      );
+      tp.layout();
+      tp.paint(canvas, Offset(x1, y1 - 20));
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) {
+    return true;
   }
 }
