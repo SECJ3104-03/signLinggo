@@ -100,7 +100,7 @@ class _SmartChatScreenState extends State<SmartChatScreen>
     try {
       _cameras = await availableCameras();
       _selectedCameraIdx = _cameras.indexWhere(
-        (c) => c.lensDirection == CameraLensDirection.front,
+        (c) => c.lensDirection == CameraLensDirection.back,
       );
       if (_selectedCameraIdx == -1) _selectedCameraIdx = 0;
       // Don't initialize camera yet - only when Sign mode is activated
@@ -114,7 +114,7 @@ class _SmartChatScreenState extends State<SmartChatScreen>
     
     _cameraController = CameraController(
       _cameras[_selectedCameraIdx],
-      ResolutionPreset.medium,
+      ResolutionPreset.high,
       enableAudio: false,
       imageFormatGroup: Platform.isAndroid
           ? ImageFormatGroup.yuv420
@@ -789,7 +789,7 @@ class _SmartChatScreenState extends State<SmartChatScreen>
 
   Widget _buildSignInput() {
     return Container(
-      height: 400,
+      height: 350,
       decoration: BoxDecoration(
         color: Colors.black,
         border: Border(
@@ -926,8 +926,7 @@ class _SmartChatScreenState extends State<SmartChatScreen>
                   detections: _detections,
                   previewSize: _cameraController!.value.previewSize!,
                   screenSize: size,
-                  isFrontCamera: _cameras[_selectedCameraIdx].lensDirection ==
-                      CameraLensDirection.front,
+                  isFrontCamera: false,
                 ),
               ),
           ],
