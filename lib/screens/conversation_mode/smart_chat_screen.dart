@@ -10,12 +10,9 @@ import 'package:just_audio/just_audio.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 import '../../services/object_detector.dart';
-// --- ADDED IMPORTS FOR POST SHARING ---
 import '../Community_Module/post_detail_screen.dart';
 import '../Community_Module/post_data.dart';
 
-/// Smart Chat Screen - Unified chat interface with Text, Sign, and Voice input modes
-/// This screen displays chat history at all times while allowing dynamic input switching
 class SmartChatScreen extends StatefulWidget {
   final String chatName;
   final String avatar;
@@ -37,7 +34,7 @@ class SmartChatScreen extends StatefulWidget {
 class _SmartChatScreenState extends State<SmartChatScreen>
     with WidgetsBindingObserver {
   // ===== Input Mode State =====
-  String _inputMode = 'Text'; // 'Text', 'Sign', 'Voice'
+  String _inputMode = 'Text'; 
 
   // ===== Text Mode =====
   final TextEditingController _textController = TextEditingController();
@@ -52,7 +49,7 @@ class _SmartChatScreenState extends State<SmartChatScreen>
   
   // Stability Buffer for Sign Detection
   final Map<String, int> _detectionBuffer = {};
-  static const int _stabilityThreshold = 5; // Frames needed for stability
+  static const int _stabilityThreshold = 5; 
   String _lastStableWord = '';
   
   // Performance tracking
@@ -103,7 +100,6 @@ class _SmartChatScreenState extends State<SmartChatScreen>
         (c) => c.lensDirection == CameraLensDirection.back,
       );
       if (_selectedCameraIdx == -1) _selectedCameraIdx = 0;
-      // Don't initialize camera yet - only when Sign mode is activated
     } catch (e) {
       debugPrint("Camera Error: $e");
     }
@@ -132,7 +128,7 @@ class _SmartChatScreenState extends State<SmartChatScreen>
       await _speech!.initialize();
   }
 
-  // ===== Sign Mode: YOLO Detection with Stability Buffer =====
+  // ===== Sign Mode: YOLO Detection =====
   Future<void> _startScanning() async {
     if (_cameraController == null || !_cameraController!.value.isInitialized) {
       return;
@@ -158,7 +154,6 @@ class _SmartChatScreenState extends State<SmartChatScreen>
   void _processCameraFrame(CameraImage image) async {
     if (_detector.isBusy) return;
 
-    // Throttle: Only run every 500ms (approx 2 times per second)
     final now = DateTime.now();
     if (_lastRunTime != null &&
         now.difference(_lastRunTime!).inMilliseconds < 500) {
@@ -166,7 +161,6 @@ class _SmartChatScreenState extends State<SmartChatScreen>
     }
     _lastRunTime = now;
 
-    // Run Detection
     final results = await _detector.yoloOnFrame(image);
 
     if (mounted && _isScanning) {
@@ -174,18 +168,13 @@ class _SmartChatScreenState extends State<SmartChatScreen>
         _detections = results;
       });
 
-      // Process detections for stability buffer
       if (results.isNotEmpty) {
-        final detection = results.first; // Take highest confidence detection
+        final detection = results.first;
         final String word = detection['tag'];
         
-        // Update buffer
         _detectionBuffer[word] = (_detectionBuffer[word] ?? 0) + 1;
-        
-        // Clean old detections
         _detectionBuffer.removeWhere((key, value) => key != word);
         
-        // Check if word is stable
         if (_detectionBuffer[word]! >= _stabilityThreshold && word != _lastStableWord) {
           _lastStableWord = word;
           _insertWordToTextField(word);
@@ -217,9 +206,8 @@ class _SmartChatScreenState extends State<SmartChatScreen>
     }
   }
 
-  // ===== Voice Mode: Speech to Text =====
+  // ===== Voice Mode =====
   void _startListening() async {
-    // Uncomment when speech_to_text is added
     if (_speech == null || !_speech!.isAvailable) return;
     
     setState(() {
@@ -235,15 +223,9 @@ class _SmartChatScreenState extends State<SmartChatScreen>
         });
        },
     );
-    
-    // Placeholder for now
-    setState(() {
-      _isListening = true;
-    });
   }
 
   void _stopListening() async {
-    // Uncomment when speech_to_text is added
     if (_speech != null) {
       await _speech!.stop();
     }
@@ -278,7 +260,7 @@ class _SmartChatScreenState extends State<SmartChatScreen>
 
     _textController.clear();
     setState(() {
-      _lastStableWord = ''; // Reset for next sign detection
+      _lastStableWord = ''; 
     });
   }
 
@@ -476,7 +458,7 @@ class _SmartChatScreenState extends State<SmartChatScreen>
     );
   }
 
-  // ===== SHARED POST BUBBLE (ADDED) =====
+  // ===== SHARED POST BUBBLE =====
   Widget _buildSharedPostBubble(Map<String, dynamic> msg, bool isUser) {
     final String postTitle = msg['post_title'] ?? '';
     final String postContent = msg['post_content'] ?? '';
@@ -487,7 +469,6 @@ class _SmartChatScreenState extends State<SmartChatScreen>
     final String authorInitials = msg['post_initials'] ?? '?';
     final String postId = msg['post_id'] ?? '';
     
-    // Attempt to parse the original timestamp
     final String tsString = msg['post_timestamp'] ?? '';
     final DateTime postDate = tsString.isNotEmpty 
         ? DateTime.tryParse(tsString) ?? DateTime.now() 
@@ -497,10 +478,9 @@ class _SmartChatScreenState extends State<SmartChatScreen>
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
       child: GestureDetector(
         onTap: () {
-          // Reconstruct PostData to open the detail screen
           final post = PostData(
             id: postId,
-            authorId: '', // Not critical for viewing
+            authorId: '',
             author: postAuthor,
             initials: authorInitials,
             authorProfileImage: authorImage.isNotEmpty ? authorImage : null,
@@ -550,7 +530,6 @@ class _SmartChatScreenState extends State<SmartChatScreen>
                 ),
               ),
               
-              // The Mini Post Card
               Container(
                 margin: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
@@ -561,7 +540,6 @@ class _SmartChatScreenState extends State<SmartChatScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Header (Author)
                     Padding(
                       padding: const EdgeInsets.all(8.0),
                       child: Row(
@@ -584,7 +562,6 @@ class _SmartChatScreenState extends State<SmartChatScreen>
                       ),
                     ),
       
-                    // Media Preview
                     if (postImage.isNotEmpty)
                       AspectRatio(
                         aspectRatio: 16/9,
@@ -601,7 +578,6 @@ class _SmartChatScreenState extends State<SmartChatScreen>
                          child: const Center(child: Icon(Icons.play_circle_fill, color: Colors.white, size: 40)),
                        ),
       
-                    // Text Content
                     Padding(
                       padding: const EdgeInsets.all(10.0),
                       child: Column(
@@ -646,7 +622,6 @@ class _SmartChatScreenState extends State<SmartChatScreen>
       case 'voice':
         messageBubble = _buildVoiceBubble(content, isUser);
         break;
-      // --- ADDED CASE FOR SHARED POSTS ---
       case 'shared_post':
         messageBubble = _buildSharedPostBubble(msg, isUser);
         break;
@@ -657,7 +632,6 @@ class _SmartChatScreenState extends State<SmartChatScreen>
     return messageBubble;
   }
 
-  // ===== UI: Input Mode Selector =====
   Widget _buildModeSelector() {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
@@ -683,7 +657,6 @@ class _SmartChatScreenState extends State<SmartChatScreen>
     return GestureDetector(
       onTap: () {
         setState(() {
-          // Stop previous mode activities
           if (_inputMode == 'Sign') {
             _stopScanning();
           } else if (_inputMode == 'Voice') {
@@ -692,7 +665,6 @@ class _SmartChatScreenState extends State<SmartChatScreen>
 
           _inputMode = mode;
 
-          // Start new mode activities
           if (mode == 'Sign' && _cameraController == null) {
             _initializeCamera();
           }
@@ -730,7 +702,7 @@ class _SmartChatScreenState extends State<SmartChatScreen>
     );
   }
 
-  // ===== UI: Dynamic Input Area =====
+  // ===== UI: Dynamic Input Area with SAFEAREA FIX =====
   Widget _buildInputArea() {
     switch (_inputMode) {
       case 'Text':
@@ -745,44 +717,48 @@ class _SmartChatScreenState extends State<SmartChatScreen>
   }
 
   Widget _buildTextInput() {
+    // --- FIX: Added SafeArea to Text Input ---
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: Colors.white,
-        border: Border(
-          top: BorderSide(color: Colors.grey.shade200),
-        ),
+        border: Border(top: BorderSide(color: Colors.grey.shade200)),
       ),
-      child: Row(
-        children: [
-          Expanded(
-            child: TextField(
-              controller: _textController,
-              decoration: InputDecoration(
-                hintText: 'Type a message...',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(25),
-                  borderSide: BorderSide.none,
-                ),
-                filled: true,
-                fillColor: Colors.grey[100],
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 10,
+      child: SafeArea(
+        top: false, // Only safe area at bottom
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _textController,
+                  decoration: InputDecoration(
+                    hintText: 'Type a message...',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(25),
+                      borderSide: BorderSide.none,
+                    ),
+                    filled: true,
+                    fillColor: Colors.grey[100],
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
+                  ),
+                  maxLines: null,
                 ),
               ),
-              maxLines: null,
-            ),
+              const SizedBox(width: 8),
+              CircleAvatar(
+                backgroundColor: const Color(0xFF5B259F),
+                child: IconButton(
+                  icon: const Icon(Icons.send, color: Colors.white),
+                  onPressed: _sendMessage,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 8),
-          CircleAvatar(
-            backgroundColor: const Color(0xFF5B259F),
-            child: IconButton(
-              icon: const Icon(Icons.send, color: Colors.white),
-              onPressed: _sendMessage,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -799,8 +775,7 @@ class _SmartChatScreenState extends State<SmartChatScreen>
       child: Stack(
         children: [
           // Camera Preview
-          if (_cameraController != null &&
-              _cameraController!.value.isInitialized)
+          if (_cameraController != null && _cameraController!.value.isInitialized)
             Positioned.fill(
               child: _buildCameraPreview(),
             )
@@ -809,10 +784,8 @@ class _SmartChatScreenState extends State<SmartChatScreen>
               child: CircularProgressIndicator(color: Colors.white),
             ),
 
-          // Status Indicator
           Positioned(
-            top: 12,
-            left: 12,
+            top: 12, left: 12,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
@@ -821,20 +794,14 @@ class _SmartChatScreenState extends State<SmartChatScreen>
               ),
               child: Text(
                 _modelLoaded ? 'AI Active' : 'Loading...',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
               ),
             ),
           ),
 
-          // Detection Info
           if (_detections.isNotEmpty)
             Positioned(
-              top: 12,
-              right: 12,
+              top: 12, right: 12,
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
@@ -843,53 +810,52 @@ class _SmartChatScreenState extends State<SmartChatScreen>
                 ),
                 child: Text(
                   'Detected: ${_detections.first['tag']}',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
                 ),
               ),
             ),
 
-          // Text Input Field (shows detected words)
+          // --- FIX: Added SafeArea to Sign Input Text Field ---
           Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
+            bottom: 0, left: 0, right: 0,
             child: Container(
               color: Colors.white,
-              padding: const EdgeInsets.all(12),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _textController,
-                      decoration: InputDecoration(
-                        hintText: 'Detected signs will appear here...',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(25),
-                          borderSide: BorderSide.none,
-                        ),
-                        filled: true,
-                        fillColor: Colors.grey[100],
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 10,
+              child: SafeArea(
+                top: false,
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _textController,
+                          decoration: InputDecoration(
+                            hintText: 'Detected signs will appear here...',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(25),
+                              borderSide: BorderSide.none,
+                            ),
+                            filled: true,
+                            fillColor: Colors.grey[100],
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 10,
+                            ),
+                          ),
+                          maxLines: null,
                         ),
                       ),
-                      maxLines: null,
-                    ),
+                      const SizedBox(width: 8),
+                      CircleAvatar(
+                        backgroundColor: const Color(0xFF5B259F),
+                        child: IconButton(
+                          icon: const Icon(Icons.send, color: Colors.white),
+                          onPressed: _sendMessage,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 8),
-                  CircleAvatar(
-                    backgroundColor: const Color(0xFF5B259F),
-                    child: IconButton(
-                      icon: const Icon(Icons.send, color: Colors.white),
-                      onPressed: _sendMessage,
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
           ),
@@ -906,7 +872,6 @@ class _SmartChatScreenState extends State<SmartChatScreen>
     return LayoutBuilder(
       builder: (context, constraints) {
         final size = Size(constraints.maxWidth, constraints.maxHeight);
-        
         return Stack(
           fit: StackFit.expand,
           children: [
@@ -918,15 +883,13 @@ class _SmartChatScreenState extends State<SmartChatScreen>
                 child: CameraPreview(_cameraController!),
               ),
             ),
-            
-            // Bounding Boxes
             if (_isScanning && _detections.isNotEmpty)
               CustomPaint(
                 painter: BoundingBoxPainter(
                   detections: _detections,
                   previewSize: _cameraController!.value.previewSize!,
                   screenSize: size,
-                  isFrontCamera: false,
+                  isFrontCamera: _cameras[_selectedCameraIdx].lensDirection == CameraLensDirection.front,
                 ),
               ),
           ],
@@ -936,95 +899,82 @@ class _SmartChatScreenState extends State<SmartChatScreen>
   }
 
   Widget _buildVoiceInput() {
+    // --- FIX: Added SafeArea to Voice Input ---
     return Container(
-      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
-        border: Border(
-          top: BorderSide(color: Colors.grey.shade200),
-        ),
+        border: Border(top: BorderSide(color: Colors.grey.shade200)),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Voice visualization
-          if (_isListening)
-            Container(
-              height: 60,
-              margin: const EdgeInsets.only(bottom: 20),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(
-                  5,
-                  (index) => Container(
-                    width: 4,
-                    margin: const EdgeInsets.symmetric(horizontal: 2),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF5B259F),
-                      borderRadius: BorderRadius.circular(2),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (_isListening)
+                Container(
+                  height: 60,
+                  margin: const EdgeInsets.only(bottom: 20),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(
+                      5,
+                      (index) => Container(
+                        width: 4,
+                        margin: const EdgeInsets.symmetric(horizontal: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF5B259F),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ),
 
-          // Hold to Speak Button
-          GestureDetector(
-            onLongPressStart: (_) => _startListening(),
-            onLongPressEnd: (_) {
-              _stopListening();
-              if (_textController.text.isNotEmpty) {
-                _sendMessage();
-              }
-            },
-            child: Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: _isListening
-                    ? Colors.red
-                    : const Color(0xFF5B259F),
-                boxShadow: [
-                  BoxShadow(
-                    color: (_isListening ? Colors.red : const Color(0xFF5B259F))
-                        .withOpacity(0.3),
-                    blurRadius: 20,
-                    spreadRadius: 5,
+              GestureDetector(
+                onLongPressStart: (_) => _startListening(),
+                onLongPressEnd: (_) {
+                  _stopListening();
+                  if (_textController.text.isNotEmpty) {
+                    _sendMessage();
+                  }
+                },
+                child: Container(
+                  width: 80, height: 80,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: _isListening ? Colors.red : const Color(0xFF5B259F),
+                    boxShadow: [
+                      BoxShadow(
+                        color: (_isListening ? Colors.red : const Color(0xFF5B259F)).withOpacity(0.3),
+                        blurRadius: 20, spreadRadius: 5,
+                      ),
+                    ],
                   ),
-                ],
-              ),
-              child: Icon(
-                _isListening ? Icons.mic : Icons.mic_none,
-                color: Colors.white,
-                size: 40,
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            _isListening ? 'Listening...' : 'Hold to Speak',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey[700],
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          
-          // Note: Speech to text requires speech_to_text package
-          if (!_isListening)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Text(
-                'Note: Add speech_to_text package to enable',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey[500],
-                  fontStyle: FontStyle.italic,
+                  child: Icon(
+                    _isListening ? Icons.mic : Icons.mic_none,
+                    color: Colors.white, size: 40,
+                  ),
                 ),
               ),
-            ),
-        ],
+              const SizedBox(height: 12),
+              Text(
+                _isListening ? 'Listening...' : 'Hold to Speak',
+                style: TextStyle(fontSize: 16, color: Colors.grey[700], fontWeight: FontWeight.w500),
+              ),
+              
+              if (!_isListening)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    'Note: Add speech_to_text package to enable',
+                    style: TextStyle(fontSize: 12, color: Colors.grey[500], fontStyle: FontStyle.italic),
+                  ),
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -1036,14 +986,12 @@ class _SmartChatScreenState extends State<SmartChatScreen>
     _stopScanning();
     _detector.dispose();
     _cameraController?.dispose();
-    
     for (var controller in _videoControllers.values) {
       controller.dispose();
     }
     for (var player in _audioPlayers.values) {
       player.dispose();
     }
-    
     super.dispose();
   }
 
@@ -1061,16 +1009,12 @@ class _SmartChatScreenState extends State<SmartChatScreen>
           children: [
             CircleAvatar(
               backgroundColor: Colors.grey.shade300,
-              backgroundImage: (widget.avatar.isNotEmpty &&
-                      Uri.tryParse(widget.avatar)?.hasAbsolutePath == true)
+              backgroundImage: (widget.avatar.isNotEmpty && Uri.tryParse(widget.avatar)?.hasAbsolutePath == true)
                   ? NetworkImage(widget.avatar)
                   : null,
-              child: (widget.avatar.isEmpty ||
-                      Uri.tryParse(widget.avatar)?.hasAbsolutePath != true)
+              child: (widget.avatar.isEmpty || Uri.tryParse(widget.avatar)?.hasAbsolutePath != true)
                   ? Text(
-                      widget.chatName.isNotEmpty
-                          ? widget.chatName[0].toUpperCase()
-                          : '?',
+                      widget.chatName.isNotEmpty ? widget.chatName[0].toUpperCase() : '?',
                       style: const TextStyle(color: Colors.white),
                     )
                   : null,
@@ -1079,11 +1023,7 @@ class _SmartChatScreenState extends State<SmartChatScreen>
             Expanded(
               child: Text(
                 widget.chatName,
-                style: const TextStyle(
-                  color: Colors.black,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                ),
+                style: const TextStyle(color: Colors.black, fontSize: 18, fontWeight: FontWeight.w600),
                 overflow: TextOverflow.ellipsis,
               ),
             ),
@@ -1093,7 +1033,6 @@ class _SmartChatScreenState extends State<SmartChatScreen>
       backgroundColor: Colors.white,
       body: Column(
         children: [
-          // Chat History (Always Visible)
           Expanded(
             child: StreamBuilder<List<Map<String, dynamic>>>(
               stream: _messageStream(),
@@ -1108,27 +1047,11 @@ class _SmartChatScreenState extends State<SmartChatScreen>
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(
-                          Icons.chat_bubble_outline,
-                          size: 64,
-                          color: Colors.grey[300],
-                        ),
+                        Icon(Icons.chat_bubble_outline, size: 64, color: Colors.grey[300]),
                         const SizedBox(height: 16),
-                        Text(
-                          'No messages yet',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.grey[500],
-                          ),
-                        ),
+                        Text('No messages yet', style: TextStyle(fontSize: 16, color: Colors.grey[500])),
                         const SizedBox(height: 8),
-                        Text(
-                          'Start chatting using Text, Sign, or Voice!',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey[400],
-                          ),
-                        ),
+                        Text('Start chatting using Text, Sign, or Voice!', style: TextStyle(fontSize: 14, color: Colors.grey[400])),
                       ],
                     ),
                   );
@@ -1138,17 +1061,15 @@ class _SmartChatScreenState extends State<SmartChatScreen>
                   reverse: true,
                   padding: const EdgeInsets.only(bottom: 8, top: 8),
                   itemCount: messages.length,
-                  itemBuilder: (context, index) =>
-                      _buildUserMessage(messages[index]),
+                  itemBuilder: (context, index) => _buildUserMessage(messages[index]),
                 );
               },
             ),
           ),
 
-          // Mode Selector
           _buildModeSelector(),
 
-          // Dynamic Input Area
+          // --- FIX: Optional Safety wrapper for the input area call itself ---
           _buildInputArea(),
         ],
       ),
@@ -1156,7 +1077,6 @@ class _SmartChatScreenState extends State<SmartChatScreen>
   }
 }
 
-// ===== Bounding Box Painter (Copied from SignRecognitionScreen) =====
 class BoundingBoxPainter extends CustomPainter {
   final List<Map<String, dynamic>> detections;
   final Size previewSize;
@@ -1172,15 +1092,9 @@ class BoundingBoxPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    // We calculate scales based on the FittedBox logic (BoxFit.cover)
-    // The camera image (previewSize) is likely rotated 90deg on phones, so we swap width/height logic
     double scaleX = size.width / previewSize.height;
     double scaleY = size.height / previewSize.width;
-    
-    // Use the larger scale to ensure BoxFit.cover behavior matches the preview
     final double scale = math.max(scaleX, scaleY);
-
-    // Calculate the offset to center the drawing area
     double offsetX = (size.width - (previewSize.height * scale)) / 2;
     double offsetY = (size.height - (previewSize.width * scale)) / 2;
 
@@ -1189,26 +1103,16 @@ class BoundingBoxPainter extends CustomPainter {
       ..strokeWidth = 3.0
       ..color = Colors.green;
 
-    final TextStyle textStyle = TextStyle(
-      color: Colors.white,
-      fontSize: 16,
-      fontWeight: FontWeight.bold,
-      backgroundColor: Colors.green,
-    );
+    final TextStyle textStyle = TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold, backgroundColor: Colors.green);
 
     for (var detection in detections) {
       final box = detection['box'];
-      
-      // Standard output from many models: [x1, y1, x2, y2, confidence]
-      // Coordinates are usually based on the PreviewSize
       double x1 = box[0] * scale + offsetX;
       double y1 = box[1] * scale + offsetY;
       double x2 = box[2] * scale + offsetX;
       double y2 = box[3] * scale + offsetY;
 
-      // Mirror logic for Front Camera
       if (isFrontCamera) {
-        // Flip the X coordinates relative to the screen width
         double tempX1 = size.width - x2;
         double tempX2 = size.width - x1;
         x1 = tempX1;
@@ -1220,11 +1124,7 @@ class BoundingBoxPainter extends CustomPainter {
 
       final String label = "${detection['tag']} ${(detection['box'][4] * 100).toStringAsFixed(0)}%";
       final TextSpan span = TextSpan(text: label, style: textStyle);
-      final TextPainter tp = TextPainter(
-        text: span,
-        textAlign: TextAlign.left,
-        textDirection: TextDirection.ltr,
-      );
+      final TextPainter tp = TextPainter(text: span, textAlign: TextAlign.left, textDirection: TextDirection.ltr);
       tp.layout();
       tp.paint(canvas, Offset(x1, y1 - 20));
     }
