@@ -445,7 +445,6 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
   void _showDailyQuizDialog(BuildContext context) {
     final progressManager = context.read<ProgressManager>();
-    final quizQuestion = QuizRepository.getRandomQuestion();
     
     if (progressManager.dailyQuizDone) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -457,133 +456,11 @@ class _ProgressScreenState extends State<ProgressScreen> {
       return;
     }
 
-    int? selectedIndex;
-
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) {
-          return AlertDialog(
-            title: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Daily Quiz',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.blue.shade800,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Chip(
-                  label: Text(quizQuestion.category),
-                  backgroundColor: Colors.blue.shade50,
-                ),
-              ],
-            ),
-            content: SizedBox(
-              width: double.maxFinite,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    quizQuestion.question,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w500,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 24),
-                  
-                  ...quizQuestion.options.asMap().entries.map((entry) {
-                    final index = entry.key;
-                    final option = entry.value;
-                    
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        side: BorderSide(
-                          color: selectedIndex == index 
-                            ? Colors.blue 
-                            : Colors.grey.shade300,
-                          width: selectedIndex == index ? 2 : 1,
-                        ),
-                      ),
-                      child: ListTile(
-                        title: Text(option),
-                        leading: Radio<int>(
-                          value: index,
-                          groupValue: selectedIndex,
-                          onChanged: (value) {
-                            setState(() {
-                              selectedIndex = value;
-                            });
-                          },
-                        ),
-                        onTap: () {
-                          setState(() {
-                            selectedIndex = index;
-                          });
-                        },
-                      ),
-                    );
-                  }).toList(),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel'),
-              ),
-              ElevatedButton(
-                onPressed: selectedIndex == null
-                    ? null
-                    : () {
-                        Navigator.pop(context);
-                        _completeQuiz(
-                          context, 
-                          selectedIndex == quizQuestion.correctAnswerIndex
-                        );
-                      },
-                child: const Text('Submit Answer'),
-              ),
-            ],
-          );
-        },
-      ),
-    );
+    // Navigate to the full DailyQuizScreen instead of showing dialog
+    context.go('/daily-quiz');
   }
 
-  void _completeQuiz(BuildContext context, bool isCorrect) {
-    final progressManager = context.read<ProgressManager>();
-    
-    try {
-      progressManager.completeDailyQuiz(isCorrect: isCorrect);
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            isCorrect
-              ? '✅ Correct! +10 points and streak continued!'
-              : '❌ Incorrect. Try again tomorrow to continue streak!',
-          ),
-          backgroundColor: isCorrect ? Colors.green : Colors.orange,
-          duration: const Duration(seconds: 3),
-        ),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.toString()),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
+  // REMOVED: The old _completeQuiz method and the dialog logic
 }
 
 // ──────────────────────────────
@@ -714,7 +591,7 @@ class _StatCard extends StatelessWidget {
             ],
           ],
         ),
-      ),
+      )
     );
   }
 }
