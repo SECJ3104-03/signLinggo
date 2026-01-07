@@ -97,7 +97,7 @@ class _SmartChatScreenState extends State<SmartChatScreen>
     try {
       _cameras = await availableCameras();
       _selectedCameraIdx = _cameras.indexWhere(
-        (c) => c.lensDirection == CameraLensDirection.front,
+        (c) => c.lensDirection == CameraLensDirection.back,
       );
       if (_selectedCameraIdx == -1) _selectedCameraIdx = 0;
     } catch (e) {
@@ -110,7 +110,7 @@ class _SmartChatScreenState extends State<SmartChatScreen>
     
     _cameraController = CameraController(
       _cameras[_selectedCameraIdx],
-      ResolutionPreset.medium,
+      ResolutionPreset.high,
       enableAudio: false,
       imageFormatGroup: Platform.isAndroid
           ? ImageFormatGroup.yuv420
@@ -765,7 +765,7 @@ class _SmartChatScreenState extends State<SmartChatScreen>
 
   Widget _buildSignInput() {
     return Container(
-      height: 400,
+      height: 350,
       decoration: BoxDecoration(
         color: Colors.black,
         border: Border(

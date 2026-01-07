@@ -32,7 +32,23 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
   bool _isScanning = false;
   List<Map<String, dynamic>> _detections = [];
 
-  // Performance tracking (Logging only, no throttling)
+  // --- NEW: Category State ---
+  String _selectedCategory = 'Alphabets'; // Default selection
+
+  // 1. Exact matches for your numbers (from your labels.txt)
+  final List<String> _numberLabels = [
+    '1', '2', '3', '4', '5', '6', '7', '8', '9'
+  ];
+
+  // 2. Exact matches for your words (from your labels.txt)
+  final List<String> _wordLabels = [
+    'Bread', 'Brother', 'Bus', 'Drink', 'Eat', 'Elder sister',
+    'Father', 'Help', 'Hotel', 'How much', 'Hungry', 'Mother',
+    'No', 'Sorry', 'Thirsty', 'Toilet', 'Water', 'Yes'
+  ];
+  // ---------------------------
+
+  // Performance tracking
   int _frameCounter = 0;
   double _fps = 0.0;
   Timer? _fpsTimer;
@@ -51,11 +67,9 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     isSignToText = widget.isSignToText;
 
-    // 1. Setup Camera & Model
     _initializeModel();
     _setupCameras();
 
-    // 2. Start FPS Timer (Updates every 1 second just for display)
     _fpsTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (mounted && _isScanning) {
         setState(() {
@@ -70,7 +84,8 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused) {
       _stopScanning();
-    } else if (state == AppLifecycleState.resumed && _controller.value.isInitialized) {
+    } else if (state == AppLifecycleState.resumed &&
+        _controller.value.isInitialized) {
       if (_isScanning) _startStreaming();
     }
   }
@@ -87,7 +102,8 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
   Future<void> _setupCameras() async {
     try {
       _cameras = await availableCameras();
-      _selectedCameraIdx = _cameras.indexWhere((c) => c.lensDirection == CameraLensDirection.back);
+      _selectedCameraIdx =
+          _cameras.indexWhere((c) => c.lensDirection == CameraLensDirection.back);
       if (_selectedCameraIdx == -1) _selectedCameraIdx = 0;
       _initializeCamera(_cameras[_selectedCameraIdx]);
     } catch (e) {
@@ -98,9 +114,11 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
   void _initializeCamera(CameraDescription cameraDescription) {
     _controller = CameraController(
       cameraDescription,
-      ResolutionPreset.high, // Kept at HIGH as per your working code
+      ResolutionPreset.high,
       enableAudio: false,
-      imageFormatGroup: Platform.isAndroid ? ImageFormatGroup.yuv420 : ImageFormatGroup.bgra8888,
+      imageFormatGroup: Platform.isAndroid
+          ? ImageFormatGroup.yuv420
+          : ImageFormatGroup.bgra8888,
     );
 
     _initializeControllerFuture = _controller.initialize().then((_) {
@@ -149,20 +167,57 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
     }
   }
 
-  void _processCameraFrame(CameraImage image) async {
+  // --- MODIFIED: Filtering Logic ---
+void _processCameraFrame(CameraImage image) async {
     if (_detector.isBusy) return;
 
-    // NO THROTTLING - Runs as fast as possible, exactly like your working version
     _frameCounter++;
-
     final results = await _detector.yoloOnFrame(image);
+
+    // --- DEBUG LOGGING --- 
+    // This prints exactly what the model sees to your bottom console
+    for (var result in results) {
+      print("AI DETECTED: '${result['tag']}'"); 
+    }
+    // ---------------------
+
+    List<Map<String, dynamic>> filteredResults = [];
+
+    if (_selectedCategory == 'Alphabets') {
+      filteredResults = results.where((result) {
+        String tag = result['tag'].toString().trim(); // Remove spaces
+        
+        // Check if it's a Number
+        bool isNumber = _numberLabels.any((label) => label.toLowerCase() == tag.toLowerCase());
+        // Check if it's a Word
+        bool isWord = _wordLabels.any((label) => label.toLowerCase() == tag.toLowerCase());
+
+        // Show ONLY if it is NOT a number AND NOT a word
+        return !isNumber && !isWord;
+      }).toList();
+
+    } else if (_selectedCategory == 'Numbers') {
+      filteredResults = results.where((result) {
+        String tag = result['tag'].toString().trim();
+        // Smart Check: Ignore case and spaces
+        return _numberLabels.any((label) => label.toLowerCase() == tag.toLowerCase());
+      }).toList();
+
+    } else if (_selectedCategory == 'Words') {
+      filteredResults = results.where((result) {
+        String tag = result['tag'].toString().trim();
+        // Smart Check: Ignore case and spaces
+        return _wordLabels.any((label) => label.toLowerCase() == tag.toLowerCase());
+      }).toList();
+    }
 
     if (mounted && _isScanning) {
       setState(() {
-        _detections = results;
+        _detections = filteredResults;
       });
     }
   }
+  // -------------------------------
 
   Future<void> _stopScanning() async {
     if (_controller.value.isStreamingImages) {
@@ -188,8 +243,6 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
 
   @override
   Widget build(BuildContext context) {
-    // Removed width variable, using responsive widgets instead
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Sign Recognition', style: TextStyle(color: Colors.black)),
@@ -210,13 +263,45 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
           ),
         ],
       ),
-      // SafeArea ensures we don't draw behind Android system buttons
       body: SafeArea(
         child: Column(
           children: [
+            // --- NEW: Category Selector ---
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              child: Row(
+                children: ['Alphabets', 'Numbers', 'Words'].map((category) {
+                  final isSelected = _selectedCategory == category;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8.0),
+                    child: ChoiceChip(
+                      label: Text(category),
+                      selected: isSelected,
+                      onSelected: (bool selected) {
+                        if (selected) {
+                          setState(() {
+                            _selectedCategory = category;
+                          });
+                        }
+                      },
+                      // Colors match your Start/Stop gradient blue
+                      selectedColor: const Color(0xFF00B8DA),
+                      backgroundColor: Colors.grey.shade200,
+                      labelStyle: TextStyle(
+                        color: isSelected ? Colors.white : Colors.black,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+            // -----------------------------
+
             // 1. Status Chip
             Padding(
-              padding: const EdgeInsets.all(10.0),
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 5.0),
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 decoration: BoxDecoration(
@@ -225,7 +310,7 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
                   border: Border.all(color: _modelLoaded ? Colors.green : Colors.red),
                 ),
                 child: Text(
-                  _modelLoaded ? "AI Active (YOLOv8)" : "Loading Model...",
+                  _modelLoaded ? "Ready: $_selectedCategory" : "Loading Model...",
                   style: TextStyle(
                       color: _modelLoaded ? Colors.green.shade800 : Colors.red.shade800,
                       fontWeight: FontWeight.bold),
@@ -233,8 +318,9 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
               ),
             ),
 
+            const SizedBox(height: 10),
+
             // 2. Camera View
-            // CHANGED: Using Expanded instead of fixed height 500
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -250,23 +336,20 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(20),
                     child: Stack(
-                      fit: StackFit.expand, // Ensures camera fills the container
+                      fit: StackFit.expand,
                       children: [
                         _initializeControllerFuture == null
                             ? const Center(child: CircularProgressIndicator())
                             : CameraPreview(_controller),
 
-                        // Bounding Boxes Overlay
                         if (_isScanning && _detections.isNotEmpty)
                           CustomPaint(
                             painter: BoundingBoxPainter(
                               detections: _detections,
                               previewSize: _controller.value.previewSize!,
-                              // We just pass the current context size implicitly via the paint method
                             ),
                           ),
 
-                        // Flip Button
                         Positioned(
                           bottom: 15,
                           right: 15,
@@ -327,7 +410,6 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
               ),
             ),
 
-            // Debug Info
             if (_showSettings) ...[
               Text(
                 "FPS: ${_fps.toStringAsFixed(1)} | Detections: ${_detections.length}",
@@ -342,7 +424,6 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
   }
 }
 
-// Reverted to your exact working Painter logic
 class BoundingBoxPainter extends CustomPainter {
   final List<Map<String, dynamic>> detections;
   final Size previewSize;
@@ -354,7 +435,6 @@ class BoundingBoxPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    // Exact scaling math from your working version
     final double scaleX = size.width / previewSize.height;
     final double scaleY = size.height / previewSize.width;
 
@@ -372,7 +452,7 @@ class BoundingBoxPainter extends CustomPainter {
 
     for (var detection in detections) {
       final box = detection['box'];
-      
+
       final double x1 = box[0] * scaleX;
       final double y1 = box[1] * scaleY;
       final double x2 = box[2] * scaleX;
@@ -381,7 +461,8 @@ class BoundingBoxPainter extends CustomPainter {
       final rect = Rect.fromLTRB(x1, y1, x2, y2);
       canvas.drawRect(rect, paint);
 
-      final String label = "${detection['tag']} ${(detection['box'][4] * 100).toStringAsFixed(0)}%";
+      final String label =
+          "${detection['tag']} ${(detection['box'][4] * 100).toStringAsFixed(0)}%";
       final TextSpan span = TextSpan(text: label, style: textStyle);
       final TextPainter tp = TextPainter(
         text: span,
