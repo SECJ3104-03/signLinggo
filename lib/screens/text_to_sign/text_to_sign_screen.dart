@@ -203,6 +203,67 @@ class _TextTranslationScreenState extends State<TextTranslationScreen> with Widg
     });
   }
 
+  List<String> _getAssetPaths(String input) {
+    if (input.trim().isEmpty) return [];
+
+    String word = input.trim().toLowerCase();
+
+    if (RegExp(r'^\d+$').hasMatch(word)) {
+      if (word == "10") return ['assets/assets/sign_images/numbers/10.png'];
+      return word.split('').map((digit) => 'assets/assets/sign_images/numbers/$digit.png').toList();
+    }
+
+    if (word.length == 1 && RegExp(r'[a-zA-Z]').hasMatch(word)) {
+      return ['assets/assets/sign_images/alphabets/${word.toUpperCase()}.png'];
+    }
+
+    bool isKnownWord = _wordLabels.any((w) => w.toLowerCase() == word.toLowerCase());
+    if (isKnownWord) {
+      String fileName = _wordLabels.firstWhere((w) => w.toLowerCase() == word.toLowerCase());
+      return ['assets/assets/sign_images/words/$fileName.png'];
+    }
+
+    return [];
+  }
+
+  Widget _buildDisplayImage() {
+    final List<String> paths = _getAssetPaths(_textController.text);
+
+    if (paths.isEmpty) {
+      return _buildPlaceholder();
+    }
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: paths.map((path) {
+        return Expanded(
+          child: Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Image.asset(
+              path,
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) => _buildPlaceholder(),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildPlaceholder() {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(Icons.sign_language, size: 80, color: Colors.grey[300]),
+        const SizedBox(height: 10),
+        const Text(
+          "No sign found for this input",
+          style: TextStyle(color: Colors.grey, fontSize: 14),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -375,16 +436,17 @@ class _TextTranslationScreenState extends State<TextTranslationScreen> with Widg
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text("TRANSLATION:", style: TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
-                  Text(_translatedText, style: const TextStyle(fontSize: 16, color: Color(0xFF101727))),
-                  // Placeholder for Avatar
                   const SizedBox(height: 20),
                   Center(
                     child: Container(
-                      height: 150,
-                      width: 150,
-                      color: Colors.grey[300],
-                      child: const Center(child: Text("[Avatar Placeholder]")),
+                      height: 220,
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: _buildDisplayImage()
                     ),
                   )
                 ],

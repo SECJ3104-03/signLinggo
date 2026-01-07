@@ -88,5 +88,8 @@ flutter:
     - assets/assets/offline_materials/ 
     - assets/models/
     - assets/models/ahmed_best_int8.tflite
-    - assets/models/labels.txt 
+    - assets/models/labels.txt
+    - assets/assets/sign_images/alphabets/
+    - assets/assets/sign_images/numbers/
+    - assets/assets/sign_images/
 
