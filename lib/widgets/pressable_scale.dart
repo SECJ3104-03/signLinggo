@@ -26,10 +26,10 @@ class _PressableScaleState extends State<PressableScale> {
         setState(() => _scale = 1.0);
         widget.onTap();
       },
-      onTapCancel: () => setState(() => _scale = 1.0),
+      onTapCancel: () => setState(() => _scale = 0.97),
       child: AnimatedScale(
         scale: _scale,
-        duration: const Duration(milliseconds: 120),
+        duration: const Duration(milliseconds: 140),
         curve: Curves.easeOut,
         child: widget.child,
       ),

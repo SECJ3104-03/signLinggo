@@ -2,6 +2,10 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:signlinggo/widgets/pressable_scale.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
@@ -111,7 +115,6 @@ class HomePage extends StatelessWidget {
                     ),
                   ),
 
-                  // 🔽 Reduced spacing before Offline button
                   const SizedBox(height: 16),
 
                   // ================= OFFLINE MODE =================
@@ -119,7 +122,7 @@ class HomePage extends StatelessWidget {
                     top: false,
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                      child: GestureDetector(
+                      child: PressableScale(
                         onTap: () => context.push('/offline'),
                         child: Container(
                           height: 68,
@@ -184,7 +187,7 @@ class HomePage extends StatelessWidget {
             ),
           ),
 
-          // ================= PINNED HEADER (SOLID) =================
+          // ================= PINNED HEADER =================
           Positioned(
             top: 0,
             left: 0,
@@ -198,7 +201,7 @@ class HomePage extends StatelessWidget {
                 bottom: 12,
               ),
               decoration: const BoxDecoration(
-                color: Colors.white, // ✅ SOLID HEADER
+                color: Colors.white,
                 boxShadow: [
                   BoxShadow(
                     color: Color(0x19000000),
@@ -218,23 +221,11 @@ class HomePage extends StatelessWidget {
                       color: Color(0xFF101727),
                     ),
                   ),
-                  GestureDetector(
+
+                  // ================= PROFILE IMAGE =================
+                  PressableScale(
                     onTap: () => context.push('/profile'),
-                    child: Container(
-                      width: 44,
-                      height: 44,
-                      decoration: const BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: LinearGradient(
-                          colors: [
-                            Color(0xFF615EFF),
-                            Color(0xFFAC46FF),
-                            Color(0xFFF6329A),
-                          ],
-                        ),
-                      ),
-                      child: const Icon(Icons.person, color: Colors.white),
-                    ),
+                    child: _HomeProfileAvatar(),
                   ),
                 ],
               ),
@@ -253,8 +244,8 @@ class HomePage extends StatelessWidget {
     required List<Color> gradientColors,
     VoidCallback? onTap,
   }) {
-    return GestureDetector(
-      onTap: onTap,
+    return PressableScale(
+      onTap: onTap ?? () {},
       child: Container(
         width: 160,
         height: 250,
@@ -296,6 +287,75 @@ class HomePage extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ================= PROFILE AVATAR WIDGET =================
+class _HomeProfileAvatar extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user == null) {
+      return _defaultAvatar();
+    }
+
+    return FutureBuilder<DocumentSnapshot>(
+      future: FirebaseFirestore.instance
+          .collection("users")
+          .doc(user.uid)
+          .get(),
+      builder: (context, snapshot) {
+        String? url;
+
+        if (snapshot.hasData && snapshot.data!.exists) {
+          final data = snapshot.data!.data() as Map<String, dynamic>;
+          url = data['profileUrl']?.toString();
+        }
+
+        url ??= user.photoURL;
+
+        if (url == null || url.isEmpty) {
+          return _defaultAvatar();
+        }
+
+        return Container(
+          width: 44,
+          height: 44,
+          decoration: const BoxDecoration(
+            shape: BoxShape.circle,
+          ),
+          child: ClipOval(
+            child: CachedNetworkImage(
+              imageUrl: url,
+              fit: BoxFit.cover,
+              placeholder: (context, url) => const Center(
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+              errorWidget: (context, url, error) => _defaultAvatar(),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _defaultAvatar() {
+    return Container(
+      width: 44,
+      height: 44,
+      decoration: const BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: LinearGradient(
+          colors: [
+            Color(0xFF615EFF),
+            Color(0xFFAC46FF),
+            Color(0xFFF6329A),
+          ],
+        ),
+      ),
+      child: const Icon(Icons.person, color: Colors.white),
     );
   }
 }
