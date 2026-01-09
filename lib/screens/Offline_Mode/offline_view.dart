@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+/* import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart'; 
 import 'package:scroll_to_index/scroll_to_index.dart';
 import 'dart:io';
@@ -763,6 +763,573 @@ class _DownloadableFileItemState extends State<_DownloadableFileItem> with Autom
           ),
           const SizedBox(width: 12.0),
           _buildDownloadIcon(),
+        ],
+      ),
+    );
+  }
+} */
+import 'dart:io';
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:scroll_to_index/scroll_to_index.dart';
+import 'package:path_provider/path_provider.dart';
+
+// Import your data and manager
+import '../../data/offline_data.dart';
+import '../../services/offline_manager.dart';
+import '../../models/offline_module.dart';
+
+// --- STEP 1: SEARCH DELEGATE ---
+class _DownloadSearchDelegate extends SearchDelegate<OfflineModule?> {
+  final List<OfflineModule> searchItems;
+  _DownloadSearchDelegate({required this.searchItems});
+
+  @override
+  List<Widget>? buildActions(BuildContext context) {
+    return [
+      IconButton(
+        icon: const Icon(Icons.clear),
+        onPressed: () {
+          if (query.isEmpty) {
+            close(context, null);
+          } else {
+            query = '';
+          }
+        },
+      ),
+    ];
+  }
+
+  @override
+  Widget? buildLeading(BuildContext context) {
+    return IconButton(
+      icon: const Icon(Icons.arrow_back),
+      onPressed: () => close(context, null),
+    );
+  }
+
+  @override
+  Widget buildResults(BuildContext context) => buildSuggestions(context);
+
+  @override
+  Widget buildSuggestions(BuildContext context) {
+    final suggestions = searchItems.where((item) {
+      final titleLower = item.title.toLowerCase();
+      final descriptionLower = item.description.toLowerCase();
+      final queryLower = query.toLowerCase();
+      return titleLower.contains(queryLower) || descriptionLower.contains(queryLower);
+    }).toList();
+
+    return ListView.builder(
+      itemCount: suggestions.length,
+      itemBuilder: (context, index) {
+        final item = suggestions[index];
+        final colors = _getModuleColors(item.id);
+        
+        return ListTile(
+          leading: Icon(item.icon, color: colors['icon']),
+          title: Text(item.title),
+          subtitle: Text(item.description, maxLines: 1, overflow: TextOverflow.ellipsis),
+          onTap: () => close(context, item),
+        );
+      },
+    );
+  }
+}
+
+// --- HELPER: RESTORE COLORS ---
+Map<String, Color> _getModuleColors(String id) {
+  switch (id) {
+    case '1': // Dictionary
+      return {'icon': const Color(0xFF007AFF), 'bg': const Color(0xFFEBF5FF)};
+    case '2': // Numeric
+      return {'icon': const Color(0xFF34C759), 'bg': const Color(0xFFD5FFD4)};
+    case '3': // Alphabet
+      return {'icon': const Color.fromARGB(255, 191, 138, 5), 'bg': const Color.fromARGB(255, 248, 247, 188)};
+    case '4': // Greetings
+      return {'icon': const Color(0xFFE5890A), 'bg': const Color(0xFFFFF2DE)};
+    case '5': // Food
+      return {'icon': const Color(0xFFD62F0B), 'bg': const Color(0xFFFFD6D1)};
+    case '6': // Family
+      return {'icon': const Color(0xFFD60B95), 'bg': const Color(0xFFFFDFF2)};
+    case '7': // Travel
+      return {'icon': const Color(0xFF5E0BD6), 'bg': const Color(0xFFF5F1FF)};
+    default:
+      return {'icon': Colors.blue, 'bg': Colors.blue.shade50};
+  }
+}
+
+// --- STEP 2: MAIN SCREEN ---
+class OfflineMode extends StatefulWidget {
+  const OfflineMode({super.key});
+
+  @override
+  State<OfflineMode> createState() => _OfflineModeState();
+}
+
+class _OfflineModeState extends State<OfflineMode> with SingleTickerProviderStateMixin {
+  late AutoScrollController _scrollController;
+  late TabController _tabController;
+  
+  // Logic Manager
+  final OfflineManager _manager = OfflineManager();
+
+  // State Trackers
+  Map<String, bool> downloadedStatus = {};
+  Map<String, double> downloadProgress = {};
+  Map<String, bool> isDownloading = {};
+  
+  // For Search Highlighting
+  String? _highlightedId;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController = AutoScrollController();
+    _tabController = TabController(length: 2, vsync: this);
+    _checkAllStatuses();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  // --- LOGIC: Check Status ---
+  Future<void> _checkAllStatuses() async {
+    for (var module in allOfflineModules) {
+      bool exists = await _manager.isModuleDownloaded(module.folderName);
+      if (mounted) {
+        setState(() {
+          downloadedStatus[module.folderName] = exists;
+        });
+      }
+    }
+  }
+
+  // --- LOGIC: Download ---
+  Future<void> _handleDownload(OfflineModule module) async {
+    setState(() {
+      isDownloading[module.folderName] = true;
+      downloadProgress[module.folderName] = 0.0;
+    });
+
+    bool success = await _manager.downloadAndUnzipModule(
+      module.zipFileName,
+      module.folderName,
+      onProgress: (val) {
+        if (mounted) {
+          setState(() => downloadProgress[module.folderName] = val);
+        }
+      },
+    );
+
+    if (mounted) {
+      setState(() {
+        isDownloading[module.folderName] = false;
+        if (success) {
+          downloadedStatus[module.folderName] = true;
+        } else {
+           ScaffoldMessenger.of(context).showSnackBar(
+             SnackBar(content: Text('Failed to download ${module.title}')),
+           );
+        }
+      });
+    }
+  }
+
+  // --- LOGIC: Delete ---
+  Future<void> _confirmAndDelete(OfflineModule module) async {
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text("Delete Download"),
+          content: Text("Are you sure you want to delete '${module.title}' from your offline library?"),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text("Cancel", style: TextStyle(color: Colors.grey)),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text("Delete", style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirm == true) {
+      await _manager.deleteModule(module.folderName);
+      await _checkAllStatuses();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("${module.title} deleted")),
+        );
+      }
+    }
+  }
+
+  // --- LOGIC: Open Folder (Navigate to Viewer) ---
+  Future<void> _openModule(OfflineModule module) async {
+    final appDir = await getApplicationDocumentsDirectory();
+    final fullPath = '${appDir.path}/offline_content/${module.folderName}';
+
+    if (mounted) {
+      context.pushNamed('offline-files', extra: {
+        'path': fullPath,
+        'title': module.title,
+      });
+    }
+  }
+
+  // --- LOGIC: Show Details Dialog (Video List) ---
+  Future<void> _showContentsDialog(OfflineModule module) async {
+    await showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text(module.title),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text("Included in this pack:", style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 10),
+                if (module.includedVideos.isEmpty)
+                  const Text("No details available.")
+                else
+                  ...module.includedVideos.map((videoName) {
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4.0),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.check_circle_outline, color: Colors.green, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(child: Text(videoName)),
+                        ],
+                      ),
+                    );
+                  }),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              child: const Text("Close"), 
+              onPressed: () => Navigator.of(context).pop()
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // --- LOGIC: Scroll & Highlight ---
+  Future<void> _scrollToItemAndHighlight(OfflineModule selectedItem) async {
+    final int index = allOfflineModules.indexWhere((m) => m.id == selectedItem.id);
+    if (index != -1) {
+      final int listViewIndex = index + 1;
+      _tabController.animateTo(0);
+      setState(() => _highlightedId = selectedItem.id);
+
+      await _scrollController.scrollToIndex(
+        listViewIndex,
+        preferPosition: AutoScrollPosition.middle,
+        duration: const Duration(milliseconds: 500),
+      );
+
+      Future.delayed(const Duration(seconds: 2), () {
+        if (mounted) setState(() => _highlightedId = null);
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment(0.00, 0.00),
+          end: Alignment(1.00, 1.00),
+          colors: [Color(0xFFF2E7FE), Color(0xFFFCE6F3), Color(0xFFFFECD4)],
+        ),
+      ),
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Color(0xFF101727)),
+            onPressed: () => context.go('/home'),
+          ),
+          title: const Text(
+            'Offline Downloads',
+            style: TextStyle(color: Color(0xFF101727), fontSize: 20, fontFamily: 'Arimo'),
+          ),
+          centerTitle: true,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.search, color: Color(0xFF101727), size: 28),
+              onPressed: () async {
+                final selectedItem = await showSearch<OfflineModule?>(
+                  context: context,
+                  delegate: _DownloadSearchDelegate(searchItems: allOfflineModules),
+                );
+                if (selectedItem != null) {
+                  _scrollToItemAndHighlight(selectedItem);
+                }
+              },
+            ),
+            const SizedBox(width: 8),
+          ],
+          bottom: TabBar(
+            controller: _tabController,
+            labelColor: const Color(0xFF101727), 
+            unselectedLabelColor: Colors.grey[700], 
+            indicatorColor: const Color(0xFF007AFF), 
+            tabs: const [Tab(text: 'AVAILABLE'), Tab(text: 'DOWNLOADED')],
+          ),
+        ),
+        body: TabBarView(
+          controller: _tabController,
+          children: [_buildAvailableTab(), _buildDownloadedTab()],
+        ),
+      ),
+    );
+  }
+
+  // --- TAB 1: AVAILABLE ---
+  Widget _buildAvailableTab() {
+    return ListView.builder(
+      controller: _scrollController,
+      padding: const EdgeInsets.all(20.0),
+      itemCount: allOfflineModules.length + 1,
+      itemBuilder: (context, index) {
+        if (index == 0) {
+          return AutoScrollTag(
+            key: const ValueKey("header"),
+            controller: _scrollController,
+            index: index,
+            child: const Padding(
+              padding: EdgeInsets.only(bottom: 20.0),
+              child: Text(
+                'Downloadable Files',
+                style: TextStyle(
+                  color: Color(0xFF101727), fontSize: 25, fontFamily: 'Figtree', fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          );
+        }
+        
+        final module = allOfflineModules[index - 1];
+        final colors = _getModuleColors(module.id);
+        final bool isHighlighted = (module.id == _highlightedId);
+        
+        final bool isDownloaded = downloadedStatus[module.folderName] ?? false;
+        final bool downloading = isDownloading[module.folderName] ?? false;
+        final double progress = downloadProgress[module.folderName] ?? 0.0;
+
+        return AutoScrollTag(
+          key: ValueKey(module.id),
+          controller: _scrollController,
+          index: index,
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 20.0),
+            child: _buildModuleCard(
+              module: module,
+              colors: colors,
+              isHighlighted: isHighlighted,
+              isDownloaded: isDownloaded,
+              isDownloading: downloading,
+              progress: progress,
+              // --- HERE IS THE FIX YOU REQUESTED ---
+              // Clicking the CARD shows the contents dialog
+              onTap: () => _showContentsDialog(module),
+              // Clicking the BUTTON starts the download (or checks status)
+              onDownloadPressed: () {
+                if (!isDownloaded && !downloading) {
+                  _handleDownload(module);
+                } else if (isDownloaded) {
+                  _showContentsDialog(module); // Old behavior: checkmark also showed info
+                }
+              },
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // --- TAB 2: DOWNLOADED ---
+  Widget _buildDownloadedTab() {
+    final downloadedModules = allOfflineModules.where((m) => downloadedStatus[m.folderName] == true).toList();
+
+    if (downloadedModules.isEmpty) {
+      return Center(
+        child: Text('No downloaded files yet.', style: TextStyle(color: Colors.grey[700], fontSize: 16)),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(20.0),
+      itemCount: downloadedModules.length,
+      itemBuilder: (context, index) {
+        final module = downloadedModules[index];
+        final colors = _getModuleColors(module.id);
+
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 20.0),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(30.18),
+            onLongPress: () => _confirmAndDelete(module),
+            onTap: () => _openModule(module), // In Downloaded Tab, click opens viewer
+            child: Container(
+              padding: const EdgeInsets.all(20.0),
+              decoration: ShapeDecoration(
+                color: Colors.white.withOpacity(0.85),
+                shape: RoundedRectangleBorder(
+                  side: const BorderSide(width: 1, color: Color(0x99FFFEFE)),
+                  borderRadius: BorderRadius.circular(30.18),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 50.29, height: 50.29,
+                    decoration: ShapeDecoration(
+                      color: colors['bg'],
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(17.60)),
+                    ),
+                    child: Center(child: Icon(module.icon, color: colors['icon'], size: 28)),
+                  ),
+                  const SizedBox(width: 15.09),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          module.title,
+                          style: const TextStyle(
+                            color: Colors.black, fontSize: 20, fontFamily: 'Figtree', fontWeight: FontWeight.w600,
+                          ),
+                          maxLines: 2, overflow: TextOverflow.ellipsis,
+                        ),
+                        const Text(
+                          'Ready for offline use',
+                          style: TextStyle(
+                            color: Color(0xFF34C759), fontSize: 16, fontFamily: 'Figtree', fontWeight: FontWeight.w400,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.arrow_forward_ios, color: Colors.grey),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // --- REUSABLE CARD COMPONENT ---
+  Widget _buildModuleCard({
+    required OfflineModule module,
+    required Map<String, Color> colors,
+    required bool isHighlighted,
+    required bool isDownloaded,
+    required bool isDownloading,
+    required double progress,
+    required VoidCallback onTap,
+    required VoidCallback onDownloadPressed,
+  }) {
+    final Color highlightColor = const Color(0xFF007AFF);
+    final Color highlightBackgroundColor = const Color.fromARGB(255, 235, 245, 255);
+
+    return Container(
+      padding: const EdgeInsets.all(20.0),
+      decoration: ShapeDecoration(
+        color: isHighlighted ? highlightBackgroundColor : Colors.white.withOpacity(0.85),
+        shape: RoundedRectangleBorder(
+          side: isHighlighted 
+              ? BorderSide(width: 2.0, color: highlightColor) 
+              : const BorderSide(width: 1, color: Color(0x99FFFEFE)),
+          borderRadius: BorderRadius.circular(30.18),
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: GestureDetector(
+              onTap: onTap, // This triggers the Dialog now
+              child: Container(
+                color: Colors.transparent,
+                child: Row(
+                  children: [
+                    Container(
+                      width: 50.29, height: 50.29,
+                      decoration: ShapeDecoration(
+                        color: colors['bg'],
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(17.60)),
+                      ),
+                      child: Center(child: Icon(module.icon, color: colors['icon'], size: 28)),
+                    ),
+                    const SizedBox(width: 15.09),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            module.title,
+                            style: const TextStyle(color: Colors.black, fontSize: 20, fontFamily: 'Figtree', fontWeight: FontWeight.w600),
+                            maxLines: 2, overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 5),
+                          Text(
+                            module.description,
+                            style: const TextStyle(color: Color(0xFFA5A5A5), fontSize: 17, fontFamily: 'Figtree', fontWeight: FontWeight.w400),
+                            maxLines: 2, overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12.0),
+          // RIGHT SIDE ICON BUTTON
+          if (isDownloaded)
+             IconButton(
+              icon: const Icon(Icons.check_circle, color: Color(0xFF34C759), size: 30),
+              onPressed: onDownloadPressed, // Shows dialog
+            )
+          else if (isDownloading)
+            Container(
+              width: 48, height: 48, padding: const EdgeInsets.all(9.0),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  CircularProgressIndicator(strokeWidth: 2.5, color: const Color(0xFF007AFF), value: progress > 0 ? progress : null),
+                  Text('${(progress * 100).toInt()}%', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFF007AFF)))
+                ],
+              ),
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.download_outlined, color: Color(0xFF007AFF), size: 30),
+              onPressed: onDownloadPressed, // Starts Download
+            ),
         ],
       ),
     );
