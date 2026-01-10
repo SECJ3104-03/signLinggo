@@ -135,55 +135,67 @@ class _PostCardState extends State<PostCard> {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
+      isScrollControlled: true, // Optional: helps if content is long
       builder: (context) => Container(
         decoration: const BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.only(topLeft: Radius.circular(20), topRight: Radius.circular(20)),
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(20), 
+            topRight: Radius.circular(20)
+          ),
         ),
-        child: Wrap(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Center(
-                child: Container(
-                  width: 40, height: 4, 
-                  decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
+        // --- FIX: Wrap content in SafeArea to avoid overlap with nav bar ---
+        child: SafeArea(
+          child: Wrap(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Center(
+                  child: Container(
+                    width: 40, height: 4, 
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300], 
+                      borderRadius: BorderRadius.circular(2)
+                    ),
+                  ),
                 ),
               ),
-            ),
-            ListTile(
-              leading: const Icon(Icons.send_rounded, color: Color(0xFFAC46FF)),
-              title: const Text('Send in SignLinggo'),
-              onTap: () {
-                Navigator.pop(context); // Close option sheet
-                
-                final user = FirebaseAuth.instance.currentUser;
-                if (user != null) {
-                  // Show the Chat Picker Sheet
-                  showModalBottomSheet(
-                    context: context,
-                    isScrollControlled: true,
-                    backgroundColor: Colors.transparent,
-                    builder: (context) => SharePostSheet(
-                      post: widget.post, 
-                      currentUserId: user.uid
-                    ),
-                  );
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please login first")));
-                }
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.share_outlined, color: Colors.black87),
-              title: const Text('Share via...'),
-              onTap: () {
-                Navigator.pop(context);
-                _shareSystem(); // Trigger original share
-              },
-            ),
-            const SizedBox(height: 20),
-          ],
+              ListTile(
+                leading: const Icon(Icons.send_rounded, color: Color(0xFFAC46FF)),
+                title: const Text('Send in SignLinggo'),
+                onTap: () {
+                  Navigator.pop(context); 
+                  
+                  final user = FirebaseAuth.instance.currentUser;
+                  if (user != null) {
+                    showModalBottomSheet(
+                      context: context,
+                      isScrollControlled: true,
+                      backgroundColor: Colors.transparent,
+                      builder: (context) => SharePostSheet(
+                        post: widget.post, 
+                        currentUserId: user.uid
+                      ),
+                    );
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text("Please login first"))
+                    );
+                  }
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.share_outlined, color: Colors.black87),
+                title: const Text('Share via...'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _shareSystem(); 
+                },
+              ),
+              // Add a little bottom padding for extra breathing room if needed
+              const SizedBox(height: 10),
+            ],
+          ),
         ),
       ),
     );
