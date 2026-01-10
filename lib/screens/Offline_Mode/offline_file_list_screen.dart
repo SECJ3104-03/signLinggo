@@ -71,7 +71,7 @@ class _OfflineFileListScreenState extends State<OfflineFileListScreen> {
     }
   }
 
-  // --- EXTERNAL SHARE FUNCTION ---
+  // --- EXTERNAL SHARE FUNCTION (FIXED FOR WHATSAPP) ---
   Future<void> _shareFileExternally(File file) async {
     Completer<void> shareCompleter = Completer<void>();
     Timer? timeoutTimer;
@@ -100,7 +100,7 @@ class _OfflineFileListScreenState extends State<OfflineFileListScreen> {
       String originalName = p.basename(file.path);
       String extension = p.extension(originalName).toLowerCase();
       
-      // Ensure proper extension
+      // Force .mp4 extension if missing
       if (extension.isEmpty) {
         extension = '.mp4';
         originalName = '$originalName$extension';
@@ -111,7 +111,7 @@ class _OfflineFileListScreenState extends State<OfflineFileListScreen> {
           .replaceAll(RegExp(r'[^\w\s.-]'), '')
           .trim();
       
-      if (cleanName.isEmpty) cleanName = 'signlinggo';
+      if (cleanName.isEmpty) cleanName = 'signlinggo_video';
       
       // Use timestamp to make filename unique
       final timestamp = DateTime.now().millisecondsSinceEpoch;
@@ -127,27 +127,25 @@ class _OfflineFileListScreenState extends State<OfflineFileListScreen> {
       
       await file.copy(tempFile.path);
       
-      // MIME type
-      String mimeType = 'video/mp4';
+      // Determine MIME type strictly
+      String mimeType = 'video/mp4'; 
       if (extension == '.jpg' || extension == '.jpeg') {
         mimeType = 'image/jpeg';
       } else if (extension == '.png') {
         mimeType = 'image/png';
       }
 
-      final String beautifulName = _beautifyName(file.path);
+      // We do NOT send the text caption anymore to avoid WhatsApp errors
       final box = context.findRenderObject() as RenderBox?;
 
-      // Start the share process
       final shareFuture = Share.shareXFiles(
         [
           XFile(
             tempFile.path,
-            mimeType: mimeType,
-            name: finalFileName,
+            mimeType: mimeType, 
           )
         ],
-        text: beautifulName,
+        // text: beautifulName, // <--- REMOVED: Sending text + video breaks WhatsApp
         sharePositionOrigin: box!.localToGlobal(Offset.zero) & box.size,
       );
       
@@ -322,17 +320,9 @@ class _OfflineFileListScreenState extends State<OfflineFileListScreen> {
   String _beautifyName(String path) {
     try {
       String name = p.basenameWithoutExtension(path);
-      
-      // Remove numbers at start (like "01_hello.mp4" -> "hello")
       name = name.replaceAll(RegExp(r'^\d+[\s\-_\.]*'), '');
-      
-      // Replace separators with spaces
       name = name.replaceAll('_', ' ').replaceAll('-', ' ');
-      
-      // Clean up multiple spaces
       name = name.replaceAll(RegExp(r'\s+'), ' ').trim();
-      
-      // Capitalize first letter
       if (name.isEmpty) return 'Sign Language Video';
       return name[0].toUpperCase() + name.substring(1);
     } catch (e) {
