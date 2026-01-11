@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:camera/camera.dart';
 import 'package:flutter_vision/flutter_vision.dart';
 
@@ -7,36 +5,46 @@ class ObjectDetector {
   late FlutterVision _vision;
   bool _isBusy = false;
   bool _isLoaded = false;
+  String? _currentModelPath;
 
   ObjectDetector() {
     _vision = FlutterVision();
   }
 
-  // Getters
   bool get isLoaded => _isLoaded;
   bool get isBusy => _isBusy;
 
   Future<void> loadModel({
     String? modelPath,
     String? labelsPath,
-    int? numThreads,
-    bool? useGpu,
+    bool isQuantized = false, // <--- NEW PARAMETER (Default to false for Float32)
   }) async {
+    final path = modelPath ?? 'assets/models/ahmed_best_int8.tflite';
+    
+    // 1. If the SAME model is already loaded, do nothing
+    if (_isLoaded && _currentModelPath == path) return;
+
+    // 2. If a DIFFERENT model is loaded, close it first
+    if (_isLoaded) {
+      await dispose();
+    }
+
     try {
       await _vision.loadYoloModel(
-        modelPath: modelPath ?? 'assets/models/ahmed_best_int8.tflite',
+        modelPath: path,
         labels: labelsPath ?? 'assets/models/labels.txt',
         modelVersion: "yolov8",
-        numThreads: numThreads ?? 1,
-        useGpu: useGpu ?? false,
-        quantization: false, // Set to true if using int8 quantized model and it requires this flag
+        quantization: isQuantized, // <--- USES THE PARAMETER NOW
+        numThreads: 4,
+        useGpu: true,
       );
+
       _isLoaded = true;
-      print("Model loaded successfully: ${modelPath ?? 'default'}");
+      _currentModelPath = path;
+      print("✅ Loaded Model: $path | Quantized: $isQuantized");
     } catch (e) {
-      print("Error loading model: $e");
+      print("❌ Error loading model: $e");
       _isLoaded = false;
-      rethrow; // Allow caller to handle the error
     }
   }
 
@@ -49,14 +57,13 @@ class ObjectDetector {
         bytesList: cameraImage.planes.map((plane) => plane.bytes).toList(),
         imageHeight: cameraImage.height,
         imageWidth: cameraImage.width,
-        iouThreshold: 0.4, // Adjusted threshold
-        confThreshold: 0.4, // Adjusted threshold
-        classThreshold: 0.4, // Adjusted threshold
+        iouThreshold: 0.25, // Reset to standard (0.25) now that you have Float32
+        confThreshold: 0.25,
+        classThreshold: 0.25,
       );
       _isBusy = false;
       return result;
     } catch (e) {
-      print("Error running inference: $e");
       _isBusy = false;
       return [];
     }
@@ -66,6 +73,8 @@ class ObjectDetector {
     try {
       await _vision.closeYoloModel();
       _isLoaded = false;
+      _currentModelPath = null;
+      print("Model closed");
     } catch (e) {
       print("Error disposing model: $e");
     }

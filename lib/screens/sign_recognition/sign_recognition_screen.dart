@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math; // Needed for Aspect Ratio
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -32,6 +33,10 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
   
   bool _isScanning = false;
   bool _modelLoaded = false;
+  
+  // NEW: Flag to prevent race conditions during model switch
+  bool _isSwitching = false; 
+
   List<Map<String, dynamic>> _detections = [];
   SignMode _currentMode = SignMode.alphabets;
   
@@ -45,6 +50,9 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // Lock orientation to portrait to avoid layout issues
+    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+    
     _detector = ObjectDetector();
     _initializeCamera();
     _loadModel();
@@ -60,9 +68,8 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (!_controller.value.isInitialized) {
-      return;
-    }
+    if (!_controller.value.isInitialized) return;
+    
     if (state == AppLifecycleState.inactive) {
       _controller.dispose();
     } else if (state == AppLifecycleState.resumed) {
@@ -73,7 +80,7 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
   Future<void> _initializeCamera() async {
     _controller = CameraController(
       widget.camera,
-      ResolutionPreset.medium,
+      ResolutionPreset.high, // 'medium' is sometimes too blurry for YOLO
       enableAudio: false,
       imageFormatGroup: Platform.isAndroid
           ? ImageFormatGroup.yuv420
@@ -83,7 +90,6 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
     _initializeControllerFuture = _controller.initialize().then((_) {
       if (!mounted) return;
       setState(() {});
-      // Start image stream for detection
       _controller.startImageStream((image) async {
         if (_isScanning && _modelLoaded && !_detector.isBusy) {
           _processFrame(image);
@@ -92,47 +98,68 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
     });
   }
 
+  // --- SAFE MODEL LOADING LOGIC ---
   Future<void> _loadModel() async {
-    setState(() {
-      _modelLoaded = false;
-    });
+      if (mounted) setState(() => _modelLoaded = false);
 
-    String modelPath = "";
-    String labelsPath = "";
+      String modelPath = "";
+      String labelsPath = "";
+      bool isQuantized = false;
 
-    switch (_currentMode) {
-      case SignMode.alphabets:
-        modelPath = "assets/models/ahmed_best_int8.tflite";
-        labelsPath = "assets/models/labels.txt";
-        break;
-      case SignMode.numbers:
-        modelPath = "assets/models/numbers_best_int8.tflite";
-        labelsPath = "assets/models/numbers_labels.txt";
-        break;
-      case SignMode.words:
-        modelPath = "assets/models/words_best_int8.tflite";
-        labelsPath = "assets/models/words_labels.txt";
-        break;
-    }
+      print("🔄 ATTEMPTING SWITCH TO: $_currentMode");
 
-    try {
-      await _detector.loadModel(modelPath: modelPath, labelsPath: labelsPath);
-      setState(() {
-        _modelLoaded = true;
-      });
-    } catch (e) {
-      print("Error loading model for $_currentMode: $e");
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Failed to load model: $e")),
+      switch (_currentMode) {
+        case SignMode.alphabets:
+          // This one was already correct
+          modelPath = "assets/models/ahmed_best_int8.tflite";
+          labelsPath = "assets/models/labels.txt";
+          isQuantized = true;
+          break;
+
+        case SignMode.numbers:
+          // UPDATED: Added '_best' to match pubspec.yaml
+          modelPath = "assets/models/numbers_best_float32.tflite"; 
+          labelsPath = "assets/models/numbers_labels.txt";
+          isQuantized = false;
+          break;
+
+        case SignMode.words:
+          // UPDATED: Added '_best' to match pubspec.yaml
+          modelPath = "assets/models/words_best_float32.tflite";
+          labelsPath = "assets/models/words_labels.txt";
+          isQuantized = false;
+          break;
+      }
+
+      print("📂 Loading File: $modelPath");
+      print("🏷️ Loading Labels: $labelsPath");
+      print("🧮 Is Quantized: $isQuantized");
+
+      try {
+        await _detector.loadModel(
+          modelPath: modelPath, 
+          labelsPath: labelsPath, 
+          isQuantized: isQuantized
         );
+        
+        if (mounted) {
+          setState(() {
+            _modelLoaded = true;
+            _detections = [];
+          });
+        }
+        print("✅ SUCCESS: Switched to $_currentMode");
+        
+      } catch (e) {
+        print("❌ FAILURE: Could not load $_currentMode. Error: $e");
       }
     }
-  }
-
+  // --- SAFE FRAME PROCESSING ---
   void _processFrame(CameraImage image) async {
-    int startTime = DateTime.now().millisecondsSinceEpoch;
-    
+    // SECURITY GUARD: If switching models, ignore this frame immediately
+    // This prevents the "Zombie Brain" crash (sending image to destroyed model)
+    if (_isSwitching || !_modelLoaded) return; 
+
     final results = await _detector.yoloOnFrame(image);
     
     if (!mounted) return;
@@ -160,47 +187,74 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
     });
   }
 
-  void _onTapSwitchCamera() {
-    // Implement camera switching logic if needed
-    // This usually requires re-initializing the controller with a different camera description
-    print("Switch camera not implemented yet");
-  }
+  // --- CRASH-PROOF SWITCHING LOGIC ---
+  Future<void> _changeMode(SignMode mode) async {
+    if (_currentMode == mode || _isSwitching) return;
 
-  void _changeMode(SignMode mode) {
-    if (_currentMode != mode) {
-      setState(() {
-        _currentMode = mode;
-        _isScanning = false;
-        _detections = [];
+    setState(() {
+      _isSwitching = true; // 1. Raise flag to block camera frames
+      _currentMode = mode;
+      _isScanning = false; // Pause scanning UI
+      _detections = [];
+    });
+
+    // 2. FORCE STOP the camera stream if it's running
+    // This ensures no frames hit the C++ layer while we swap .tflite files
+    if (_controller.value.isStreamingImages) {
+      await _controller.stopImageStream();
+    }
+
+    // 3. NOW it is safe to swap the model
+    await _loadModel();
+
+    // 4. Restart the Camera Stream safely
+    if (!_controller.value.isStreamingImages) {
+      await _controller.startImageStream((image) async {
+        if (_isScanning && _modelLoaded && !_detector.isBusy) {
+           _processFrame(image);
+        }
       });
-      _loadModel();
+    }
+
+    if (mounted) {
+      setState(() {
+        _isSwitching = false; // 5. Lower flag, ready for business
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    // 1. Calculate Scaling to fix Camera Stretch
+    var tmp = MediaQuery.of(context).size;
+    final screenH = math.max(tmp.height, tmp.width);
+    final screenW = math.min(tmp.height, tmp.width);
+    
+    tmp = _controller.value.previewSize ?? const Size(1280, 720);
+    final previewH = math.max(tmp.height, tmp.width);
+    final previewW = math.min(tmp.height, tmp.width);
+    
+    final screenRatio = screenH / screenW;
+    final previewRatio = previewH / previewW;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text("Sign Recognition"),
+        centerTitle: true,
         actions: [
           IconButton(
             icon: const Icon(Icons.settings),
-            onPressed: () {
-              setState(() {
-                _showSettings = !_showSettings;
-              });
-            },
+            onPressed: () => setState(() => _showSettings = !_showSettings),
           ),
         ],
       ),
       body: Column(
         children: [
-          // 1. Mode Selection & Status
+          // --- Mode Selection & Status ---
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 5.0),
             child: Column(
               children: [
-                // Mode Selector
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
@@ -212,8 +266,16 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
                         child: ChoiceChip(
                           label: Text(mode.name.toUpperCase()),
                           selected: isSelected,
+                          selectedColor: const Color(0xFF00B8DA),
+                          labelStyle: TextStyle(
+                            color: isSelected ? Colors.white : Colors.black,
+                            fontWeight: FontWeight.bold
+                          ),
                           onSelected: (selected) {
-                            if (selected) _changeMode(mode);
+                            if (selected) {
+                              // Use the new SAFE switch function
+                              _changeMode(mode); 
+                            }
                           },
                         ),
                       );
@@ -221,7 +283,6 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
                   ),
                 ),
                 const SizedBox(height: 8),
-                // Status Indicator
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(
@@ -230,7 +291,9 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
                     border: Border.all(color: _modelLoaded ? Colors.green : Colors.red),
                   ),
                   child: Text(
-                    _modelLoaded ? "Ready: ${_currentMode.name.toUpperCase()}" : "Loading Model...",
+                    _isSwitching 
+                        ? "Switching Model..." 
+                        : (_modelLoaded ? "Ready: ${_currentMode.name.toUpperCase()}" : "Loading Model..."),
                     style: TextStyle(
                         color: _modelLoaded ? Colors.green.shade800 : Colors.red.shade800,
                         fontWeight: FontWeight.bold),
@@ -242,7 +305,7 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
 
           const SizedBox(height: 10),
 
-          // 2. Camera View
+          // --- Camera View (With Stretch Fix) ---
           Expanded(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -260,28 +323,29 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
-                      _initializeControllerFuture == null
-                          ? const Center(child: CircularProgressIndicator())
-                          : CameraPreview(_controller),
+                      if (_initializeControllerFuture == null)
+                        const Center(child: CircularProgressIndicator())
+                      else
+                        // The Fix: OverflowBox keeps aspect ratio correct
+                        ClipRRect(
+                          child: OverflowBox(
+                            maxHeight: screenRatio > previewRatio
+                                ? screenH
+                                : screenW / previewW * previewH,
+                            maxWidth: screenRatio > previewRatio
+                                ? screenH / previewH * previewW
+                                : screenW,
+                            child: CameraPreview(_controller),
+                          ),
+                        ),
 
-                      if (_isScanning && _detections.isNotEmpty)
+                      if (_isScanning && _detections.isNotEmpty && !_isSwitching)
                         CustomPaint(
                           painter: BoundingBoxPainter(
                             detections: _detections,
                             previewSize: _controller.value.previewSize!,
                           ),
                         ),
-
-                      Positioned(
-                        bottom: 15,
-                        right: 15,
-                        child: FloatingActionButton.small(
-                          heroTag: "switch_camera",
-                          backgroundColor: Colors.white24,
-                          onPressed: _onTapSwitchCamera,
-                          child: const Icon(Icons.flip_camera_ios, color: Colors.white),
-                        ),
-                      ),
                     ],
                   ),
                 ),
@@ -291,7 +355,7 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
 
           const SizedBox(height: 20),
 
-          // 3. Start/Stop Button
+          // --- Start/Stop Button ---
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
             child: GestureDetector(
@@ -346,6 +410,7 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
   }
 }
 
+// Ensure this Painter class is at the bottom of the file
 class BoundingBoxPainter extends CustomPainter {
   final List<Map<String, dynamic>> detections;
   final Size previewSize;
@@ -357,10 +422,7 @@ class BoundingBoxPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    // Calculate scaling factors
-    // Camera preview is usually rotated 90 degrees on phones, so we might need to swap width/height
-    // or adjust based on aspect ratio. For now, assuming standard scaling.
-    final double scaleX = size.width / previewSize.height; // Swapped for portrait mode usually
+    final double scaleX = size.width / previewSize.height;
     final double scaleY = size.height / previewSize.width;
 
     final Paint paint = Paint()
@@ -368,7 +430,7 @@ class BoundingBoxPainter extends CustomPainter {
       ..strokeWidth = 3.0
       ..color = Colors.green;
 
-    final TextStyle textStyle = TextStyle(
+    final TextStyle textStyle = const TextStyle(
       color: Colors.white,
       fontSize: 16,
       fontWeight: FontWeight.bold,
@@ -377,9 +439,6 @@ class BoundingBoxPainter extends CustomPainter {
 
     for (var detection in detections) {
       final box = detection['box'];
-      
-      // Bounding box coordinates from YOLO are usually [x1, y1, x2, y2]
-      // We need to scale them to the screen size
       final double x1 = box[0] * scaleX;
       final double y1 = box[1] * scaleY;
       final double x2 = box[2] * scaleX;
@@ -388,8 +447,7 @@ class BoundingBoxPainter extends CustomPainter {
       final rect = Rect.fromLTRB(x1, y1, x2, y2);
       canvas.drawRect(rect, paint);
 
-      final String label =
-          "${detection['tag']} ${(detection['box'][4] * 100).toStringAsFixed(0)}%";
+      final String label = "${detection['tag']} ${(detection['box'][4] * 100).toStringAsFixed(0)}%";
       final TextSpan span = TextSpan(text: label, style: textStyle);
       final TextPainter tp = TextPainter(
         text: span,
@@ -397,7 +455,7 @@ class BoundingBoxPainter extends CustomPainter {
         textDirection: TextDirection.ltr,
       );
       tp.layout();
-      tp.paint(canvas, Offset(x1, y1 - 20));
+      tp.paint(canvas, Offset(x1, y1 - 22));
     }
   }
 

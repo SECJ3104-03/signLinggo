@@ -90,8 +90,10 @@ flutter:
     - assets/models/ahmed_best_int8.tflite
     - assets/models/labels.txt
     - assets/models/numbers_best_int8.tflite
+    - assets/models/numbers_best_float32.tflite
     - assets/models/numbers_labels.txt
     - assets/models/words_best_int8.tflite
+    - assets/models/words_best_float32.tflite
     - assets/models/words_labels.txt
     - assets/assets/sign_images/alphabets/
     - assets/assets/sign_images/numbers/
