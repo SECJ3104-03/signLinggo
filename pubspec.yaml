@@ -91,5 +91,6 @@ flutter:
     - assets/models/labels.txt
     - assets/assets/sign_images/alphabets/
     - assets/assets/sign_images/numbers/
+    - assets/assets/sign_images/words/
     - assets/assets/sign_images/
 
