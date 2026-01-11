@@ -1,38 +1,42 @@
 import 'dart:ui';
 
 import 'package:camera/camera.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_vision/flutter_vision.dart';
 
 class ObjectDetector {
   late FlutterVision _vision;
   bool _isBusy = false;
-  List<Map<String, dynamic>> _yoloResults = [];
   bool _isLoaded = false;
-
-  // Getters
-  bool get isLoaded => _isLoaded;
-  bool get isBusy => _isBusy;
-  List<Map<String, dynamic>> get results => _yoloResults;
 
   ObjectDetector() {
     _vision = FlutterVision();
   }
 
-  Future<void> loadModel() async {
+  // Getters
+  bool get isLoaded => _isLoaded;
+  bool get isBusy => _isBusy;
+
+  Future<void> loadModel({
+    String? modelPath,
+    String? labelsPath,
+    int? numThreads,
+    bool? useGpu,
+  }) async {
     try {
       await _vision.loadYoloModel(
-        modelPath: 'assets/models/ahmed_best_int8.tflite',
-        labels: 'assets/models/labels.txt',
+        modelPath: modelPath ?? 'assets/models/ahmed_best_int8.tflite',
+        labels: labelsPath ?? 'assets/models/labels.txt',
         modelVersion: "yolov8",
-        quantization: true, // Critical for Int8 models
-        numThreads: 4,
-        useGpu: true,
+        numThreads: numThreads ?? 1,
+        useGpu: useGpu ?? false,
+        quantization: false, // Set to true if using int8 quantized model and it requires this flag
       );
       _isLoaded = true;
-      print("✅ YOLOv8 Model Loaded Successfully");
+      print("Model loaded successfully: ${modelPath ?? 'default'}");
     } catch (e) {
-      print("❌ Error loading model: $e");
+      print("Error loading model: $e");
+      _isLoaded = false;
+      rethrow; // Allow caller to handle the error
     }
   }
 
@@ -45,11 +49,10 @@ class ObjectDetector {
         bytesList: cameraImage.planes.map((plane) => plane.bytes).toList(),
         imageHeight: cameraImage.height,
         imageWidth: cameraImage.width,
-        iouThreshold: 0.25,
-        confThreshold: 0.25,
-        classThreshold: 0.25,
+        iouThreshold: 0.4, // Adjusted threshold
+        confThreshold: 0.4, // Adjusted threshold
+        classThreshold: 0.4, // Adjusted threshold
       );
-      _yoloResults = result;
       _isBusy = false;
       return result;
     } catch (e) {
@@ -59,7 +62,12 @@ class ObjectDetector {
     }
   }
 
-  void dispose() async {
-    await _vision.closeYoloModel();
+  Future<void> dispose() async {
+    try {
+      await _vision.closeYoloModel();
+      _isLoaded = false;
+    } catch (e) {
+      print("Error disposing model: $e");
+    }
   }
 }
