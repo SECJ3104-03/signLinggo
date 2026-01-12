@@ -34,8 +34,8 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
   bool _isScanning = false;
   bool _modelLoaded = false;
   
-  // NEW: Flag to prevent race conditions during model switch
-  bool _isSwitching = false; 
+  // Flag to prevent race conditions during model switch
+  bool _isSwitching = false;
 
   List<Map<String, dynamic>> _detections = [];
   SignMode _currentMode = SignMode.alphabets;
@@ -50,7 +50,7 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    // Lock orientation to portrait to avoid layout issues
+    // Lock orientation to portrait
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     
     _detector = ObjectDetector();
@@ -80,16 +80,22 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
   Future<void> _initializeCamera() async {
     _controller = CameraController(
       widget.camera,
-      ResolutionPreset.high, // 'medium' is sometimes too blurry for YOLO
+      ResolutionPreset.high, // High resolution for clarity
       enableAudio: false,
       imageFormatGroup: Platform.isAndroid
           ? ImageFormatGroup.yuv420
           : ImageFormatGroup.bgra8888,
     );
 
-    _initializeControllerFuture = _controller.initialize().then((_) {
+    _initializeControllerFuture = _controller.initialize().then((_) async {
       if (!mounted) return;
+      
+      // --- FIX FOR BLURRY CAMERA ---
+      // This line forces the camera to auto-focus continuously
+      await _controller.setFocusMode(FocusMode.auto);
+      
       setState(() {});
+      
       _controller.startImageStream((image) async {
         if (_isScanning && _modelLoaded && !_detector.isBusy) {
           _processFrame(image);
@@ -110,21 +116,19 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
 
       switch (_currentMode) {
         case SignMode.alphabets:
-          // This one was already correct
-          modelPath = "assets/models/ahmed_best_int8.tflite";
+          // --- UPDATED FOR NEW SPEED HACK MODEL ---
+          modelPath = "assets/models/ahmed_best_int8.tflite"; // Make sure file name matches!
           labelsPath = "assets/models/labels.txt";
-          isQuantized = true;
+          isQuantized = true; // MUST be true for the new model
           break;
 
         case SignMode.numbers:
-          // UPDATED: Added '_best' to match pubspec.yaml
-          modelPath = "assets/models/numbers_best_float32.tflite"; 
+          modelPath = "assets/models/numbers2_best_int8.tflite";
           labelsPath = "assets/models/numbers_labels.txt";
-          isQuantized = false;
+          isQuantized = true;
           break;
 
         case SignMode.words:
-          // UPDATED: Added '_best' to match pubspec.yaml
           modelPath = "assets/models/words_best_float32.tflite";
           labelsPath = "assets/models/words_labels.txt";
           isQuantized = false;
@@ -137,8 +141,8 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
 
       try {
         await _detector.loadModel(
-          modelPath: modelPath, 
-          labelsPath: labelsPath, 
+          modelPath: modelPath,
+          labelsPath: labelsPath,
           isQuantized: isQuantized
         );
         
@@ -154,11 +158,11 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
         print("❌ FAILURE: Could not load $_currentMode. Error: $e");
       }
     }
+
   // --- SAFE FRAME PROCESSING ---
   void _processFrame(CameraImage image) async {
     // SECURITY GUARD: If switching models, ignore this frame immediately
-    // This prevents the "Zombie Brain" crash (sending image to destroyed model)
-    if (_isSwitching || !_modelLoaded) return; 
+    if (_isSwitching || !_modelLoaded) return;
 
     final results = await _detector.yoloOnFrame(image);
     
@@ -192,22 +196,21 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
     if (_currentMode == mode || _isSwitching) return;
 
     setState(() {
-      _isSwitching = true; // 1. Raise flag to block camera frames
+      _isSwitching = true; // Raise flag to block camera frames
       _currentMode = mode;
       _isScanning = false; // Pause scanning UI
       _detections = [];
     });
 
-    // 2. FORCE STOP the camera stream if it's running
-    // This ensures no frames hit the C++ layer while we swap .tflite files
+    // FORCE STOP the camera stream if it's running
     if (_controller.value.isStreamingImages) {
       await _controller.stopImageStream();
     }
 
-    // 3. NOW it is safe to swap the model
+    // NOW it is safe to swap the model
     await _loadModel();
 
-    // 4. Restart the Camera Stream safely
+    // Restart the Camera Stream safely
     if (!_controller.value.isStreamingImages) {
       await _controller.startImageStream((image) async {
         if (_isScanning && _modelLoaded && !_detector.isBusy) {
@@ -218,14 +221,14 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
 
     if (mounted) {
       setState(() {
-        _isSwitching = false; // 5. Lower flag, ready for business
+        _isSwitching = false; // Lower flag, ready for business
       });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // 1. Calculate Scaling to fix Camera Stretch
+    // Calculate Scaling to fix Camera Stretch
     var tmp = MediaQuery.of(context).size;
     final screenH = math.max(tmp.height, tmp.width);
     final screenW = math.min(tmp.height, tmp.width);
@@ -273,8 +276,7 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
                           ),
                           onSelected: (selected) {
                             if (selected) {
-                              // Use the new SAFE switch function
-                              _changeMode(mode); 
+                              _changeMode(mode);
                             }
                           },
                         ),
@@ -291,8 +293,8 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
                     border: Border.all(color: _modelLoaded ? Colors.green : Colors.red),
                   ),
                   child: Text(
-                    _isSwitching 
-                        ? "Switching Model..." 
+                    _isSwitching
+                        ? "Switching Model..."
                         : (_modelLoaded ? "Ready: ${_currentMode.name.toUpperCase()}" : "Loading Model..."),
                     style: TextStyle(
                         color: _modelLoaded ? Colors.green.shade800 : Colors.red.shade800,
@@ -326,7 +328,6 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
                       if (_initializeControllerFuture == null)
                         const Center(child: CircularProgressIndicator())
                       else
-                        // The Fix: OverflowBox keeps aspect ratio correct
                         ClipRRect(
                           child: OverflowBox(
                             maxHeight: screenRatio > previewRatio
@@ -446,8 +447,12 @@ class BoundingBoxPainter extends CustomPainter {
 
       final rect = Rect.fromLTRB(x1, y1, x2, y2);
       canvas.drawRect(rect, paint);
+      
+      // Safety check for label
+      String tag = detection['tag'] ?? "Unknown";
+      String conf = ((detection['box'][4] ?? 0.0) * 100).toStringAsFixed(0);
 
-      final String label = "${detection['tag']} ${(detection['box'][4] * 100).toStringAsFixed(0)}%";
+      final String label = "$tag $conf%";
       final TextSpan span = TextSpan(text: label, style: textStyle);
       final TextPainter tp = TextPainter(
         text: span,
