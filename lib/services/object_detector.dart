@@ -57,9 +57,9 @@ class ObjectDetector {
         bytesList: cameraImage.planes.map((plane) => plane.bytes).toList(),
         imageHeight: cameraImage.height,
         imageWidth: cameraImage.width,
-        iouThreshold: 0.25, // Reset to standard (0.25) now that you have Float32
-        confThreshold: 0.25,
-        classThreshold: 0.25,
+        iouThreshold: 0.1, // Reset to standard (0.25) now that you have Float32
+        confThreshold: 0.1,
+        classThreshold: 0.1,
       );
       _isBusy = false;
       return result;
