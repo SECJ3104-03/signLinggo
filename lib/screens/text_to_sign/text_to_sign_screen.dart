@@ -41,9 +41,9 @@ class _TextTranslationScreenState extends State<TextTranslationScreen> with Widg
   
   // Mapping for Text-to-Sign (Image Display)
   final List<String> _wordLabels = [
-    'Bread', 'Brother', 'Bus', 'Drink', 'Eat', 'Elder sister',
-    'Father', 'Help', 'Hotel', 'How much', 'Hungry', 'Mother',
-    'No', 'Sorry', 'Thirsty', 'Toilet', 'Water', 'Yes'
+    'bread', 'brother', 'bus', 'drink', 'eat', 'elder sister',
+    'father', 'help', 'hotel', 'how much', 'hungry', 'mother',
+    'no', 'sorry', 'thirsty', 'toilet', 'water', 'yes', 'hello'
   ];
 
   @override
@@ -257,23 +257,25 @@ class _TextTranslationScreenState extends State<TextTranslationScreen> with Widg
   }
 
   List<String> _getAssetPaths(String input) {
-    if (input.trim().isEmpty) return [];
-
     String word = input.trim().toLowerCase();
+    if (word.isEmpty) return [];
 
     if (RegExp(r'^\d+$').hasMatch(word)) {
       if (word == "10") return ['assets/assets/sign_images/numbers/10.png'];
       return word.split('').map((digit) => 'assets/assets/sign_images/numbers/$digit.png').toList();
     }
 
-    if (word.length == 1 && RegExp(r'[a-zA-Z]').hasMatch(word)) {
-      return ['assets/assets/sign_images/alphabets/${word.toUpperCase()}.png'];
+    String? matchedLabel = _wordLabels.cast<String?>().firstWhere(
+      (label) => label!.toLowerCase() == word,
+      orElse: () => null,
+    );
+
+    if (matchedLabel != null) {
+      return ['assets/assets/sign_images/words/$matchedLabel.png'];
     }
 
-    bool isKnownWord = _wordLabels.any((w) => w.toLowerCase() == word.toLowerCase());
-    if (isKnownWord) {
-      String fileName = _wordLabels.firstWhere((w) => w.toLowerCase() == word.toLowerCase());
-      return ['assets/assets/sign_images/words/$fileName.png'];
+    if (word.length == 1 && RegExp(r'[a-zA-Z]').hasMatch(word)) {
+      return ['assets/assets/sign_images/alphabets/${word.toUpperCase()}.png'];
     }
 
     return [];
