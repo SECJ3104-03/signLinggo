@@ -101,17 +101,23 @@ class _SmartChatScreenState extends State<SmartChatScreen>
     if (_cameras.isEmpty) return;
     
     final status = await Permission.camera.request();
-    if (!status.isGranted) return;
+    final audioStatus = await Permission.microphone.request();
+    if (!status.isGranted || !audioStatus.isGranted) return;
 
     _cameraController = CameraController(
       _cameras[_selectedCameraIdx],
-      ResolutionPreset.medium, // Medium for better compatibility
+      ResolutionPreset.medium,
       enableAudio: true,
+      imageFormatGroup: ImageFormatGroup.jpeg,
     );
 
-    _initializeControllerFuture = _cameraController!.initialize();
-    await _initializeControllerFuture;
-    if (mounted) setState(() {});
+    try {
+      _initializeControllerFuture = _cameraController!.initialize();
+      await _initializeControllerFuture;
+      if (mounted) setState(() {});
+    } catch (e) {
+      debugPrint("Camera Init Error: $e");
+    }
   }
 
   Future<void> _initializeSpeech() async {
@@ -123,15 +129,14 @@ class _SmartChatScreenState extends State<SmartChatScreen>
   Future<String?> _uploadFileToSupabase(File file, String folder) async {
     try {
       final fileName = '${DateTime.now().millisecondsSinceEpoch}_${p.basename(file.path)}';
-      final path = '$folder/$fileName';
+      final path = 'user_uploads/$fileName';
+
+      final storage = Supabase.instance.client.storage.from('videoMessage');
       
-      await Supabase.instance.client.storage
-          .from('chat_uploads')
-          .upload(path, file);
+      await storage.upload(path, file, 
+        fileOptions: const FileOptions(cacheControl: '3600', upsert: false));
           
-      final String publicUrl = Supabase.instance.client.storage
-          .from('chat_uploads')
-          .getPublicUrl(path);
+      final String publicUrl = storage.getPublicUrl(path);
           
       return publicUrl;
     } catch (e) {
@@ -182,10 +187,19 @@ class _SmartChatScreenState extends State<SmartChatScreen>
       builder: (context) => VideoPreviewDialog(
         videoFile: videoFile,
         onSend: (file) async {
-          Navigator.pop(context);
-          final url = await _uploadFileToSupabase(File(file.path), 'videoMessage/videos');
+          final url = await _uploadFileToSupabase(File(file.path), 'user_uploads');
+          
           if (url != null) {
-            _sendMediaMessage(url, 'video');
+            // 2. Create Message in Firebase with the Supabase URL
+            await _sendMediaMessage(url, 'video');
+            if (mounted) Navigator.pop(context);
+          } else {
+            if (mounted) {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text("Failed to upload video.")),
+              );
+            }
           }
         },
         onDiscard: () {
@@ -370,39 +384,50 @@ class _SmartChatScreenState extends State<SmartChatScreen>
     final width = MediaQuery.of(context).size.width * 0.55;
 
     return Align(
-      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+    alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
         width: width,
-        padding: const EdgeInsets.all(12),
+        height: width,
         margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
         decoration: BoxDecoration(
           color: isUser ? const Color(0xFFF2E7FE) : Colors.grey[200],
           borderRadius: BorderRadius.circular(16),
         ),
-        child: AspectRatio(
-          aspectRatio: controller.value.aspectRatio,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              VideoPlayer(controller),
-              IconButton(
-                icon: Icon(
-                  controller.value.isPlaying
-                      ? Icons.pause_circle
-                      : Icons.play_circle,
-                  size: 48,
-                  color: Colors.white70,
-                ),
-                onPressed: () {
-                  setState(() {
-                    controller.value.isPlaying
-                        ? controller.pause()
-                        : controller.play();
-                  });
-                },
-              ),
-            ],
-          ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: controller.value.isInitialized
+              ? Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    SizedBox.expand(
+                      child: FittedBox(
+                        fit: BoxFit.cover,
+                        child: SizedBox(
+                          width: controller.value.size.width,
+                          height: controller.value.size.height,
+                          child: VideoPlayer(controller),
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: Icon(
+                        controller.value.isPlaying
+                            ? Icons.pause_circle
+                            : Icons.play_circle,
+                        size: 48,
+                        color: Colors.white70,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          controller.value.isPlaying
+                              ? controller.pause()
+                              : controller.play();
+                        });
+                      },
+                    ),
+                  ],
+                )
+              : const Center(child: CircularProgressIndicator()),
         ),
       ),
     );
@@ -789,20 +814,19 @@ class _SmartChatScreenState extends State<SmartChatScreen>
 
   Widget _buildVideoInput() {
     return Container(
-      height: 350,
-      decoration: BoxDecoration(
+      height: 380,
+      decoration: const BoxDecoration(
         color: Colors.black,
-        border: Border(
-          top: BorderSide(color: Colors.grey.shade200, width: 2),
-        ),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      child: Stack(
-        children: [
-          // Camera Preview
-          if (_cameraController != null && _cameraController!.value.isInitialized)
-            Positioned.fill(
+      child: ClipRRect(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        child: Stack(
+          children: [
+            if (_cameraController != null && _cameraController!.value.isInitialized)
+              SizedBox.expand( // Fill the entire container
               child: FittedBox(
-                fit: BoxFit.cover,
+                fit: BoxFit.cover, // This crops the sides to fill the square/rect
                 child: SizedBox(
                   width: _cameraController!.value.previewSize!.height,
                   height: _cameraController!.value.previewSize!.width,
@@ -810,75 +834,69 @@ class _SmartChatScreenState extends State<SmartChatScreen>
                 ),
               ),
             )
-          else
-            const Center(
-              child: CircularProgressIndicator(color: Colors.white),
-            ),
+            else
+              const Center(child: CircularProgressIndicator(color: Colors.white)),
 
-          // Recording Overlay
-          if (_isRecordingVideo)
-            Positioned(
-              top: 20,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.8),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.fiber_manual_record, color: Colors.white, size: 16),
-                      const SizedBox(width: 8),
-                      Text(
-                        _formatDuration(_recordingDuration),
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                      ),
-                    ],
+            if (_isRecordingVideo)
+              Positioned(
+                top: 20,
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.5),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.red.withOpacity(0.5), width: 1),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.circle, color: Colors.white, size: 12),
+                        const SizedBox(width: 8),
+                        Text(
+                          _formatDuration(_recordingDuration),
+                          style: const TextStyle(
+                            color: Colors.white, 
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 1.2
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
-
-          // Record Button
-          Positioned(
-            bottom: 30,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: GestureDetector(
-                onTap: () {
-                  if (_isRecordingVideo) {
-                    _stopVideoRecording();
-                  } else {
-                    _startVideoRecording();
-                  }
-                },
-                child: Container(
-                  width: 70,
-                  height: 70,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 4),
-                  ),
-                  child: Center(
+      
+            Positioned(
+              bottom: 30,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: GestureDetector(
+                  onTap: () => _isRecordingVideo ? _stopVideoRecording() : _startVideoRecording(),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 300),
+                    width: 80,
+                    height: 80,
+                    padding: EdgeInsets.all(_isRecordingVideo ? 20 : 5),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 4),
+                    ),
                     child: Container(
-                      width: _isRecordingVideo ? 30 : 50,
-                      height: _isRecordingVideo ? 30 : 50,
                       decoration: BoxDecoration(
                         color: Colors.red,
-                        borderRadius: BorderRadius.circular(_isRecordingVideo ? 4 : 25),
+                        borderRadius: BorderRadius.circular(_isRecordingVideo ? 8 : 40),
                       ),
                     ),
                   ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -1093,10 +1111,17 @@ class _VideoPreviewDialogState extends State<VideoPreviewDialog> {
           ClipRRect(
             borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
             child: AspectRatio(
-              aspectRatio: _initialized ? _controller.value.aspectRatio : 16 / 9,
-              child: _initialized
-                  ? VideoPlayer(_controller)
-                  : const Center(child: CircularProgressIndicator()),
+              aspectRatio: 1.0,
+              child: _initialized 
+                ? FittedBox(
+                  fit: BoxFit.cover, 
+                  child: SizedBox(
+                    width: _controller.value.size.width,
+                    height: _controller.value.size.height,
+                    child: VideoPlayer(_controller),
+                  ),
+                )
+                : const Center(child: CircularProgressIndicator()),
             ),
           ),
           Padding(
