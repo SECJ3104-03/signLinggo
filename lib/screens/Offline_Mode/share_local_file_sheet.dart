@@ -30,7 +30,6 @@ class _ShareLocalFileSheetState extends State<ShareLocalFileSheet> {
 
     try {
       // 1. UPLOAD VIDEO TO SUPABASE
-      // We use the same bucket 'videoMessage' as your other features
       final String fileName = '${const Uuid().v4()}.mp4';
       final String storagePath = 'offline_shares/$fileName'; 
 
@@ -47,7 +46,7 @@ class _ShareLocalFileSheetState extends State<ShareLocalFileSheet> {
       
       await _sendMessage(
         conversationId: conversationId,
-        type: 'video', // This ensures it shows up as a video bubble in chat
+        type: 'video', 
         content: publicUrl,
         previewText: 'Sent a video',
       );
@@ -98,18 +97,12 @@ class _ShareLocalFileSheetState extends State<ShareLocalFileSheet> {
       'deletedFor': [],
     });
 
-    // Update conversation preview for both users
     final conversationDoc = _firestore.collection('conversation').doc(conversationId);
     
-    // Ensure userIDs array is correct (safety check)
     await conversationDoc.set({
       'userIDs': FieldValue.arrayUnion([widget.currentUserId]),
     }, SetOptions(merge: true));
 
-    // Update the last message preview
-    // Note: We update it for the current user. Ideally, you update it for both if you know the other ID,
-    // but the Conversation Screen logic usually fixes the list on load. 
-    // This basic update is sufficient for the sender's view.
      await conversationDoc.set({
          'lastMessageFor': { widget.currentUserId: previewText },
          'lastMessageAtFor': { widget.currentUserId: FieldValue.serverTimestamp() },
@@ -154,12 +147,13 @@ class _ShareLocalFileSheetState extends State<ShareLocalFileSheet> {
                     if (docs.isEmpty) return const Center(child: Text("No chats found"));
 
                     return ListView.builder(
+                      // --- FIX: Add padding at the bottom so the last item is visible above nav bar ---
+                      padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom + 20),
                       itemCount: docs.length,
                       itemBuilder: (context, index) {
                         final data = docs[index].data() as Map<String, dynamic>;
                         final users = data['userIDs'] as List<dynamic>? ?? [];
                         
-                        // Find the "other" user ID
                         final otherId = users.firstWhere(
                           (u) => u != widget.currentUserId, 
                           orElse: () => ''
@@ -167,7 +161,6 @@ class _ShareLocalFileSheetState extends State<ShareLocalFileSheet> {
                         
                         if (otherId == '') return const SizedBox.shrink();
 
-                        // Fetch the other user's name/avatar
                         return FutureBuilder<DocumentSnapshot>(
                           future: _firestore.collection('users').doc(otherId).get(),
                           builder: (context, userSnap) {

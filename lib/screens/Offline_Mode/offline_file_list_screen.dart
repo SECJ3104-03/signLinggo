@@ -1,10 +1,12 @@
 // lib/screens/Offline_Mode/offline_file_list_screen.dart
 
 import 'dart:io';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 import 'package:share_plus/share_plus.dart';
 import 'package:firebase_auth/firebase_auth.dart'; 
+import 'package:path_provider/path_provider.dart';
 import '../Community_Module/full_screen_video_screen.dart';
 import 'share_local_file_sheet.dart'; 
 
@@ -69,32 +71,150 @@ class _OfflineFileListScreenState extends State<OfflineFileListScreen> {
     }
   }
 
-  // --- FIX: EXTERNAL SHARE WITH MIME TYPE ---
+  // --- EXTERNAL SHARE FUNCTION (FIXED FOR WHATSAPP) ---
   Future<void> _shareFileExternally(File file) async {
+    Completer<void> shareCompleter = Completer<void>();
+    Timer? timeoutTimer;
+    
     try {
-      final String fileName = _beautifyName(file.path);
+      if (!await file.exists()) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("File not found")),
+          );
+        }
+        return;
+      }
+
+      final fileSize = await file.length();
+      if (fileSize == 0) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("File is empty or corrupted")),
+          );
+        }
+        return;
+      }
       
-      // Determine MIME type (WhatsApp is picky about this!)
+      // Get file info
+      String originalName = p.basename(file.path);
+      String extension = p.extension(originalName).toLowerCase();
+      
+      // Force .mp4 extension if missing
+      if (extension.isEmpty) {
+        extension = '.mp4';
+        originalName = '$originalName$extension';
+      }
+      
+      // Clean filename
+      String cleanName = p.basenameWithoutExtension(originalName)
+          .replaceAll(RegExp(r'[^\w\s.-]'), '')
+          .trim();
+      
+      if (cleanName.isEmpty) cleanName = 'signlinggo_video';
+      
+      // Use timestamp to make filename unique
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final String finalFileName = '${cleanName}_$timestamp$extension';
+
+      // Copy to temp directory
+      final tempDir = await getTemporaryDirectory();
+      final File tempFile = File('${tempDir.path}/$finalFileName');
+      
+      if (await tempFile.exists()) {
+        await tempFile.delete();
+      }
+      
+      await file.copy(tempFile.path);
+      
+      // Determine MIME type strictly
       String mimeType = 'video/mp4'; 
-      if (file.path.endsWith('.jpg') || file.path.endsWith('.jpeg')) {
+      if (extension == '.jpg' || extension == '.jpeg') {
         mimeType = 'image/jpeg';
-      } else if (file.path.endsWith('.png')) {
+      } else if (extension == '.png') {
         mimeType = 'image/png';
       }
 
-      await Share.shareXFiles(
+      // We do NOT send the text caption anymore to avoid WhatsApp errors
+      final box = context.findRenderObject() as RenderBox?;
+
+      final shareFuture = Share.shareXFiles(
         [
           XFile(
-            file.path, 
-            mimeType: mimeType, // <--- CRITICAL FIX: Tell the app this is a video
+            tempFile.path,
+            mimeType: mimeType, 
           )
         ],
-        text: 'Learn "$fileName" in Sign Language with SignLinggo!',
+        // text: beautifulName, // <--- REMOVED: Sending text + video breaks WhatsApp
+        sharePositionOrigin: box!.localToGlobal(Offset.zero) & box.size,
       );
+      
+      // Set up timeout
+      timeoutTimer = Timer(const Duration(seconds: 20), () {
+        if (!shareCompleter.isCompleted) {
+          shareCompleter.complete();
+          
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text("Share is taking too long. Try sharing to a different app."),
+                duration: Duration(seconds: 4),
+              ),
+            );
+          }
+        }
+      });
+      
+      // Start share
+      shareFuture.then((_) {
+        timeoutTimer?.cancel();
+        if (!shareCompleter.isCompleted) {
+          shareCompleter.complete();
+        }
+      }).catchError((error) {
+        timeoutTimer?.cancel();
+        if (!shareCompleter.isCompleted) {
+          shareCompleter.completeError(error);
+        }
+      });
+      
+      // Wait for completion
+      await shareCompleter.future;
+      
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error sharing: $e")),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Failed to share: $e"),
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    } finally {
+      timeoutTimer?.cancel();
+      
+      // Cleanup temp files after delay
+      Future.delayed(const Duration(seconds: 60), () async {
+        try {
+          final tempDir = await getTemporaryDirectory();
+          final tempFiles = await tempDir.list().where((entity) {
+            final name = p.basename(entity.path);
+            return name.contains('signlinggo') || name.contains('test_');
+          }).toList();
+          
+          for (var file in tempFiles) {
+            try {
+              if (await file.exists()) {
+                await file.delete();
+              }
+            } catch (e) {
+              // Ignore cleanup errors
+            }
+          }
+        } catch (e) {
+          // Ignore cleanup errors
+        }
+      });
     }
   }
 
@@ -108,48 +228,50 @@ class _OfflineFileListScreenState extends State<OfflineFileListScreen> {
           color: Colors.white,
           borderRadius: BorderRadius.only(topLeft: Radius.circular(20), topRight: Radius.circular(20)),
         ),
-        child: Wrap(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Center(
-                child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2))),
+        child: SafeArea(
+          child: Wrap(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Center(
+                  child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2))),
+                ),
               ),
-            ),
-            ListTile(
-              leading: const Icon(Icons.send_rounded, color: Color(0xFFAC46FF)),
-              title: const Text('Send in SignLinggo'),
-              subtitle: const Text('Send as video message'),
-              onTap: () {
-                Navigator.pop(context); 
-                
-                final user = FirebaseAuth.instance.currentUser;
-                if (user != null) {
-                  showModalBottomSheet(
-                    context: context,
-                    isScrollControlled: true, 
-                    backgroundColor: Colors.transparent,
-                    builder: (context) => ShareLocalFileSheet(
-                      file: file,
-                      currentUserId: user.uid,
-                    ),
-                  );
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please login first")));
-                }
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.share_outlined, color: Colors.black87),
-              title: const Text('Share externally...'),
-              subtitle: const Text('WhatsApp, Telegram, etc.'),
-              onTap: () {
-                Navigator.pop(context);
-                _shareFileExternally(file); // Calls the fixed function
-              },
-            ),
-            const SizedBox(height: 20),
-          ],
+              ListTile(
+                leading: const Icon(Icons.send_rounded, color: Color(0xFFAC46FF)),
+                title: const Text('Send in SignLinggo'),
+                subtitle: const Text('Send as video message'),
+                onTap: () {
+                  Navigator.pop(context); 
+                  
+                  final user = FirebaseAuth.instance.currentUser;
+                  if (user != null) {
+                    showModalBottomSheet(
+                      context: context,
+                      isScrollControlled: true, 
+                      backgroundColor: Colors.transparent,
+                      builder: (context) => ShareLocalFileSheet(
+                        file: file,
+                        currentUserId: user.uid,
+                      ),
+                    );
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please login first")));
+                  }
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.share_outlined, color: Colors.black87),
+                title: const Text('Share externally...'),
+                subtitle: const Text('WhatsApp, Telegram, etc.'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _shareFileExternally(file); 
+                },
+              ),
+              const SizedBox(height: 10), 
+            ],
+          ),
         ),
       ),
     );
@@ -196,11 +318,16 @@ class _OfflineFileListScreenState extends State<OfflineFileListScreen> {
   }
 
   String _beautifyName(String path) {
-    String name = p.basenameWithoutExtension(path);
-    name = name.replaceAll('_', ' ').replaceAll('-', ' ');
-    name = name.replaceAll(RegExp(r'^\d+\s*'), ''); 
-    if (name.isEmpty) return '';
-    return name[0].toUpperCase() + name.substring(1);
+    try {
+      String name = p.basenameWithoutExtension(path);
+      name = name.replaceAll(RegExp(r'^\d+[\s\-_\.]*'), '');
+      name = name.replaceAll('_', ' ').replaceAll('-', ' ');
+      name = name.replaceAll(RegExp(r'\s+'), ' ').trim();
+      if (name.isEmpty) return 'Sign Language Video';
+      return name[0].toUpperCase() + name.substring(1);
+    } catch (e) {
+      return 'Sign Language Video';
+    }
   }
 
   @override
