@@ -262,7 +262,7 @@ class _LearnModePageState extends State<LearnModePage> {
                                           topRight: Radius.circular(16),
                                         ),
                                         image: const DecorationImage(
-                                          image: AssetImage('assets/placeholder.png'),
+                                          image: AssetImage('assets/assets/placeholder.png'),
                                           fit: BoxFit.cover,
                                         ),
                                       ),
