@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:math' as math; // Added for max
+import 'dart:math' as math; 
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -188,9 +188,8 @@ class _TextTranslationScreenState extends State<TextTranslationScreen> with Widg
 
     _cameraController = CameraController(
       camera,
-      ResolutionPreset.high,
+      ResolutionPreset.medium, // Medium for better compatibility
       enableAudio: false,
-      imageFormatGroup: Platform.isAndroid ? ImageFormatGroup.yuv420 : ImageFormatGroup.bgra8888,
     );
 
     await _cameraController!.initialize();
@@ -507,17 +506,11 @@ class _TextTranslationScreenState extends State<TextTranslationScreen> with Widg
     );
   }
 
-  // --- VIEW B: CAMERA MODE (With Fixed Aspect Ratio) ---
+  // --- VIEW B: CAMERA MODE (Fixed: No Stretching, Correct Box Alignment) ---
   Widget _buildSignToTextMode() {
     if (_cameraController == null || !_cameraController!.value.isInitialized) {
       return const Center(child: CircularProgressIndicator());
     }
-
-    // CALCULATE SCALE (Same as your SignRecognitionScreen)
-    final size = MediaQuery.of(context).size;
-    final previewSize = _cameraController!.value.previewSize ?? const Size(1280, 720);
-    var scale = size.aspectRatio * previewSize.aspectRatio;
-    if (scale < 1) scale = 1 / scale;
 
     return Column(
       children: [
@@ -547,7 +540,7 @@ class _TextTranslationScreenState extends State<TextTranslationScreen> with Widg
           ),
         ),
 
-        // Camera Preview (Trimmed & Scaled)
+        // Camera Preview (Trimmed & Aspect Ratio Preserved)
         Expanded(
           child: Container(
             margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -557,33 +550,38 @@ class _TextTranslationScreenState extends State<TextTranslationScreen> with Widg
                 color: Colors.black,
                 child: Stack(
                   fit: StackFit.expand,
-                  alignment: Alignment.center,
                   children: [
-                     // 1. Scaled Camera
-                     Transform.scale(
-                        scale: scale,
-                        child: Center(
+                      // 1. Camera Preview (FittedBox covers space without stretch)
+                      FittedBox(
+                        fit: BoxFit.cover,
+                        child: SizedBox(
+                          width: _cameraController!.value.previewSize!.height, // Swap for portrait
+                          height: _cameraController!.value.previewSize!.width,
                           child: CameraPreview(_cameraController!),
                         ),
-                     ),
-                     
-                     // 2. Scaled Bounding Boxes
-                     if (_detections.isNotEmpty && !_isSwitching)
-                       Transform.scale(
-                         scale: scale,
-                         child: CustomPaint(
-                           painter: BoundingBoxPainter(
-                             detections: _detections,
-                             previewSize: _cameraController!.value.previewSize!,
-                           ),
-                         ),
-                       ),
+                      ),
+                      
+                      // 2. Bounding Boxes (Matched exactly to the FittedBox)
+                      if (_detections.isNotEmpty && !_isSwitching)
+                        FittedBox(
+                          fit: BoxFit.cover,
+                          child: SizedBox(
+                            width: _cameraController!.value.previewSize!.height,
+                            height: _cameraController!.value.previewSize!.width,
+                            child: CustomPaint(
+                              painter: BoundingBoxPainter(
+                                detections: _detections,
+                                previewSize: _cameraController!.value.previewSize!,
+                              ),
+                            ),
+                          ),
+                        ),
 
-                     if (_isSwitching)
-                       Container(
-                         color: Colors.black54,
-                         child: const Center(child: Text("Switching Model...", style: TextStyle(color: Colors.white))),
-                       )
+                      if (_isSwitching)
+                        Container(
+                          color: Colors.black54,
+                          child: const Center(child: Text("Switching Model...", style: TextStyle(color: Colors.white))),
+                        )
                   ],
                 ),
               ),
@@ -626,8 +624,11 @@ class BoundingBoxPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    // Because we swapped width/height in the SizedBox for Portrait mode,
+    // we use previewSize.height for width calculation and previewSize.width for height.
     final double scaleX = size.width / previewSize.height;
     final double scaleY = size.height / previewSize.width;
+
     final Paint paint = Paint()..style = PaintingStyle.stroke..strokeWidth = 3.0..color = Colors.green;
 
     for (var detection in detections) {

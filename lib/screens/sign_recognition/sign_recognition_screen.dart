@@ -33,7 +33,7 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
   
   bool _isScanning = false;
   bool _modelLoaded = false;
-  bool _isSwitching = false; // Flag to prevent race conditions during model switch
+  bool _isSwitching = false; 
 
   List<Map<String, dynamic>> _detections = [];
   SignMode _currentMode = SignMode.alphabets;
@@ -77,7 +77,7 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
   Future<void> _initializeCamera() async {
     _controller = CameraController(
       widget.camera,
-      ResolutionPreset.high,
+      ResolutionPreset.high, // High creates a clear image
       enableAudio: false,
       imageFormatGroup: Platform.isAndroid
           ? ImageFormatGroup.yuv420
@@ -86,7 +86,7 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
 
     _initializeControllerFuture = _controller.initialize().then((_) async {
       if (!mounted) return;
-      await _controller.setFocusMode(FocusMode.auto); // Fix for blurry camera
+      await _controller.setFocusMode(FocusMode.auto);
       setState(() {});
       
       _controller.startImageStream((image) async {
@@ -104,7 +104,6 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
       String labelsPath = "";
       bool isQuantized = false;
 
-      // Select Model based on Mode
       switch (_currentMode) {
         case SignMode.alphabets:
           modelPath = "assets/models/ahmed_best_int8.tflite"; 
@@ -202,15 +201,7 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
 
   @override
   Widget build(BuildContext context) {
-    // 1. Get Screen Size and Camera Size
     final size = MediaQuery.of(context).size;
-    final previewSize = _controller.value.previewSize ?? const Size(1280, 720);
-
-    // 2. Calculate Scaling Factor for "Aspect Fill"
-    // This ensures the camera covers the width of the screen without distortion.
-    // If the math results in a scale < 1, we invert it to ensure we always zoom IN (cover), not out.
-    var scale = size.aspectRatio * previewSize.aspectRatio;
-    if (scale < 1) scale = 1 / scale;
 
     return Scaffold(
       appBar: AppBar(
@@ -278,45 +269,48 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
 
             const SizedBox(height: 10),
 
-            // --- TRIMMED CAMERA VIEW (Fixed Height) ---
-            SizedBox(
-              height: size.height * 0.55, // 55% of Screen Height
+            // --- CAMERA VIEW (No Stretching) ---
+            Container(
+              height: size.height * 0.55, // Fixed 55% height
               width: double.infinity,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(20),
-                  child: Container(
-                    color: Colors.black,
-                    child: Stack(
-                      fit: StackFit.expand,
-                      alignment: Alignment.center, 
-                      children: [
-                        if (_initializeControllerFuture == null)
-                          const Center(child: CircularProgressIndicator())
-                        else
-                          // Scale the camera to fill the width (Trim top/bottom)
-                          Transform.scale(
-                            scale: scale, 
-                            child: Center(
-                              child: CameraPreview(_controller),
-                            ),
-                          ),
-
-                        if (_isScanning && _detections.isNotEmpty && !_isSwitching)
-                           // Apply EXACT SAME scale to bounding boxes so they match
-                           Transform.scale(
-                            scale: scale,
-                            child: CustomPaint(
-                              painter: BoundingBoxPainter(
-                                detections: _detections,
-                                previewSize: _controller.value.previewSize!,
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  color: Colors.black,
+                  child: (_initializeControllerFuture == null || !_controller.value.isInitialized)
+                      ? const Center(child: CircularProgressIndicator())
+                      : Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            // 1. The Camera Preview (Fitted to cover, no distortion)
+                            FittedBox(
+                              fit: BoxFit.cover,
+                              child: SizedBox(
+                                width: _controller.value.previewSize!.height, // Swap for portrait
+                                height: _controller.value.previewSize!.width,
+                                child: CameraPreview(_controller),
                               ),
                             ),
-                          ),
-                      ],
-                    ),
-                  ),
+                            
+                            // 2. The Bounding Boxes (Overlaid exactly on top)
+                            if (_isScanning && _detections.isNotEmpty && !_isSwitching)
+                              FittedBox(
+                                fit: BoxFit.cover,
+                                child: SizedBox(
+                                  width: _controller.value.previewSize!.height,
+                                  height: _controller.value.previewSize!.width,
+                                  child: CustomPaint(
+                                    painter: BoundingBoxPainter(
+                                      detections: _detections,
+                                      // Pass the original camera resolution
+                                      previewSize: _controller.value.previewSize!,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
                 ),
               ),
             ),
@@ -379,7 +373,7 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
   }
 }
 
-// --- PAINTER CLASS (No changes needed here, logic is handled by Transform.scale above) ---
+// --- PAINTER CLASS ---
 class BoundingBoxPainter extends CustomPainter {
   final List<Map<String, dynamic>> detections;
   final Size previewSize;
@@ -391,6 +385,10 @@ class BoundingBoxPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    // We are now painting on a canvas that is exactly the size of the camera image.
+    // previewSize.height is the "width" in portrait mode.
+    // previewSize.width is the "height" in portrait mode.
+    
     final double scaleX = size.width / previewSize.height;
     final double scaleY = size.height / previewSize.width;
 
@@ -408,6 +406,8 @@ class BoundingBoxPainter extends CustomPainter {
 
     for (var detection in detections) {
       final box = detection['box'];
+      
+      // Map coordinates
       final double x1 = box[0] * scaleX;
       final double y1 = box[1] * scaleY;
       final double x2 = box[2] * scaleX;

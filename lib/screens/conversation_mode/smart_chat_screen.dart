@@ -7,7 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:video_player/video_player.dart';
 import 'package:just_audio/just_audio.dart';
-import 'package:record/record.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:path_provider/path_provider.dart';
@@ -42,20 +42,19 @@ class _SmartChatScreenState extends State<SmartChatScreen>
   // ===== Text Mode =====
   final TextEditingController _textController = TextEditingController();
 
-  // ===== Camera (Video Mode) =====
+  // ===== Video Mode =====
   CameraController? _cameraController;
   Future<void>? _initializeControllerFuture;
   List<CameraDescription> _cameras = [];
   int _selectedCameraIdx = 0;
   bool _isRecordingVideo = false;
-
-  // ===== Audio (Voice Mode) =====
-  final AudioRecorder _audioRecorder = AudioRecorder();
-  bool _isRecordingAudio = false;
-  
-  // ===== Recording Timer =====
   Timer? _recordingTimer;
   int _recordingDuration = 0;
+
+  // ===== Voice Mode =====
+  stt.SpeechToText? _speech;
+  bool _isListening = false;
+  String _voiceText = '';
 
   // ===== Chat History =====
   final Map<String, VideoPlayerController> _videoControllers = {};
@@ -68,12 +67,21 @@ class _SmartChatScreenState extends State<SmartChatScreen>
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     
     _setupCameras();
+    _initializeSpeech();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused) {
-      _stopVideoRecording(cancel: true);
+      if (_isRecordingVideo) {
+        _stopVideoRecording(cancel: true);
+      }
+      _cameraController?.dispose();
+      _cameraController = null;
+    } else if (state == AppLifecycleState.resumed) {
+      if (_inputMode == 'Video') {
+        _initializeCamera();
+      }
     }
   }
 
@@ -97,13 +105,18 @@ class _SmartChatScreenState extends State<SmartChatScreen>
 
     _cameraController = CameraController(
       _cameras[_selectedCameraIdx],
-      ResolutionPreset.high,
+      ResolutionPreset.medium, // Medium for better compatibility
       enableAudio: true,
     );
 
     _initializeControllerFuture = _cameraController!.initialize();
     await _initializeControllerFuture;
     if (mounted) setState(() {});
+  }
+
+  Future<void> _initializeSpeech() async {
+    _speech = stt.SpeechToText();
+    await _speech!.initialize();
   }
 
   // ===== Supabase Storage Integration =====
@@ -155,51 +168,70 @@ class _SmartChatScreenState extends State<SmartChatScreen>
       });
 
       if (!cancel) {
-        final url = await _uploadFileToSupabase(File(videoFile.path), 'videos');
-        if (url != null) {
-          _sendMediaMessage(url, 'video');
-        }
+        _showVideoPreview(videoFile);
       }
     } catch (e) {
       debugPrint("Stop Video Error: $e");
     }
   }
 
-  // ===== Audio Recording =====
-  Future<void> _startAudioRecording() async {
-    try {
-      if (await _audioRecorder.hasPermission()) {
-        final directory = await getTemporaryDirectory();
-        final path = p.join(directory.path, 'audio_${DateTime.now().millisecondsSinceEpoch}.m4a');
-        
-        await _audioRecorder.start(const RecordConfig(), path: path);
-        setState(() {
-          _isRecordingAudio = true;
-          _recordingDuration = 0;
-        });
-        _startTimer();
-      }
-    } catch (e) {
-      debugPrint("Start Audio Error: $e");
-    }
+  void _showVideoPreview(XFile videoFile) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => VideoPreviewDialog(
+        videoFile: videoFile,
+        onSend: (file) async {
+          Navigator.pop(context);
+          final url = await _uploadFileToSupabase(File(file.path), 'videoMessage/videos');
+          if (url != null) {
+            _sendMediaMessage(url, 'video');
+          }
+        },
+        onDiscard: () {
+          Navigator.pop(context);
+          File(videoFile.path).delete().catchError((e) => debugPrint("Delete error: $e"));
+        },
+      ),
+    );
   }
 
-  Future<void> _stopAudioRecording() async {
-    try {
-      final path = await _audioRecorder.stop();
-      _stopTimer();
-      setState(() {
-        _isRecordingAudio = false;
-      });
+  // ===== Voice Mode =====
+  void _startListening() async {
+    if (_speech == null || !_speech!.isAvailable) return;
+    
+    final status = await Permission.microphone.request();
+    if (!status.isGranted) return;
 
-      if (path != null) {
-        final url = await _uploadFileToSupabase(File(path), 'audio');
-        if (url != null) {
-          _sendMediaMessage(url, 'voice');
-        }
-      }
-    } catch (e) {
-      debugPrint("Stop Audio Error: $e");
+    setState(() {
+      _isListening = true;
+      _voiceText = '';
+    });
+
+    await _speech!.listen(
+      onResult: (result) {
+        setState(() {
+          _voiceText = result.recognizedWords;
+          _textController.text = _voiceText;
+          _textController.selection = TextSelection.fromPosition(
+            TextPosition(offset: _textController.text.length),
+          );
+        });
+      },
+      listenMode: stt.ListenMode.dictation,
+      partialResults: true,
+    );
+  }
+
+  void _stopListening() async {
+    if (_speech != null) {
+      await _speech!.stop();
+    }
+    setState(() {
+      _isListening = false;
+    });
+    if (_textController.text.isNotEmpty) {
+      _sendMessage();
     }
   }
 
@@ -446,7 +478,6 @@ class _SmartChatScreenState extends State<SmartChatScreen>
     );
   }
 
-  // ===== SHARED POST BUBBLE =====
   Widget _buildSharedPostBubble(Map<String, dynamic> msg, bool isUser) {
     final String postTitle = msg['post_title'] ?? '';
     final String postContent = msg['post_content'] ?? '';
@@ -643,20 +674,26 @@ class _SmartChatScreenState extends State<SmartChatScreen>
   Widget _buildModeButton(String mode, String emoji) {
     final isSelected = _inputMode == mode;
     return GestureDetector(
-      onTap: () {
+      onTap: () async {
+        if (_inputMode == mode) return;
+
+        // Cleanup previous mode
+        if (_inputMode == 'Video') {
+          await _stopVideoRecording(cancel: true);
+          await _cameraController?.dispose();
+          _cameraController = null;
+        } else if (_inputMode == 'Voice') {
+          _stopListening();
+        }
+
         setState(() {
-          if (_inputMode == 'Video') {
-            _stopVideoRecording(cancel: true);
-          } else if (_inputMode == 'Voice') {
-            _stopAudioRecording();
-          }
-
           _inputMode = mode;
-
-          if (mode == 'Video' && _cameraController == null) {
-            _initializeCamera();
-          }
         });
+
+        // Initialize new mode
+        if (mode == 'Video') {
+          _initializeCamera();
+        }
       },
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
@@ -859,36 +896,50 @@ class _SmartChatScreenState extends State<SmartChatScreen>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (_isRecordingAudio)
-                Text(
-                  _formatDuration(_recordingDuration),
-                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.red),
+              if (_isListening)
+                Container(
+                  height: 60,
+                  margin: const EdgeInsets.only(bottom: 20),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(
+                      5,
+                      (index) => Container(
+                        width: 4,
+                        margin: const EdgeInsets.symmetric(horizontal: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF5B259F),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
-              const SizedBox(height: 20),
+
               GestureDetector(
-                onLongPressStart: (_) => _startAudioRecording(),
-                onLongPressEnd: (_) => _stopAudioRecording(),
+                onLongPressStart: (_) => _startListening(),
+                onLongPressEnd: (_) => _stopListening(),
                 child: Container(
                   width: 80, height: 80,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: _isRecordingAudio ? Colors.red : const Color(0xFF5B259F),
+                    color: _isListening ? Colors.red : const Color(0xFF5B259F),
                     boxShadow: [
                       BoxShadow(
-                        color: (_isRecordingAudio ? Colors.red : const Color(0xFF5B259F)).withOpacity(0.3),
+                        color: (_isListening ? Colors.red : const Color(0xFF5B259F)).withOpacity(0.3),
                         blurRadius: 20, spreadRadius: 5,
                       ),
                     ],
                   ),
                   child: Icon(
-                    _isRecordingAudio ? Icons.mic : Icons.mic_none,
+                    _isListening ? Icons.mic : Icons.mic_none,
                     color: Colors.white, size: 40,
                   ),
                 ),
               ),
               const SizedBox(height: 12),
               Text(
-                _isRecordingAudio ? 'Recording...' : 'Hold to Record',
+                _isListening ? 'Listening...' : 'Hold to Speak',
                 style: TextStyle(fontSize: 16, color: Colors.grey[700], fontWeight: FontWeight.w500),
               ),
             ],
@@ -903,7 +954,6 @@ class _SmartChatScreenState extends State<SmartChatScreen>
     WidgetsBinding.instance.removeObserver(this);
     _textController.dispose();
     _cameraController?.dispose();
-    _audioRecorder.dispose();
     _recordingTimer?.cancel();
     for (var controller in _videoControllers.values) {
       controller.dispose();
@@ -988,6 +1038,89 @@ class _SmartChatScreenState extends State<SmartChatScreen>
 
           _buildModeSelector(),
           _buildInputArea(),
+        ],
+      ),
+    );
+  }
+}
+
+class VideoPreviewDialog extends StatefulWidget {
+  final XFile videoFile;
+  final Function(XFile) onSend;
+  final VoidCallback onDiscard;
+
+  const VideoPreviewDialog({
+    super.key,
+    required this.videoFile,
+    required this.onSend,
+    required this.onDiscard,
+  });
+
+  @override
+  State<VideoPreviewDialog> createState() => _VideoPreviewDialogState();
+}
+
+class _VideoPreviewDialogState extends State<VideoPreviewDialog> {
+  late VideoPlayerController _controller;
+  bool _initialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = VideoPlayerController.file(File(widget.videoFile.path))
+      ..initialize().then((_) {
+        setState(() {
+          _initialized = true;
+        });
+        _controller.play();
+        _controller.setLooping(true);
+      });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ClipRRect(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            child: AspectRatio(
+              aspectRatio: _initialized ? _controller.value.aspectRatio : 16 / 9,
+              child: _initialized
+                  ? VideoPlayer(_controller)
+                  : const Center(child: CircularProgressIndicator()),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                TextButton.icon(
+                  onPressed: widget.onDiscard,
+                  icon: const Icon(Icons.delete, color: Colors.red),
+                  label: const Text('Discard', style: TextStyle(color: Colors.red)),
+                ),
+                ElevatedButton.icon(
+                  onPressed: () => widget.onSend(widget.videoFile),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF5B259F),
+                    foregroundColor: Colors.white,
+                  ),
+                  icon: const Icon(Icons.send),
+                  label: const Text('Send'),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
