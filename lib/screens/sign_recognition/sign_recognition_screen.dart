@@ -1,12 +1,12 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:math' as math; // Needed for Aspect Ratio
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:camera/camera.dart';
 import 'package:flutter/services.dart';
 
+// Ensure this path matches your project structure
 import '../../services/object_detector.dart';
 
 enum SignMode { alphabets, numbers, words }
@@ -33,9 +33,7 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
   
   bool _isScanning = false;
   bool _modelLoaded = false;
-  
-  // Flag to prevent race conditions during model switch
-  bool _isSwitching = false;
+  bool _isSwitching = false; // Flag to prevent race conditions during model switch
 
   List<Map<String, dynamic>> _detections = [];
   SignMode _currentMode = SignMode.alphabets;
@@ -50,7 +48,6 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    // Lock orientation to portrait
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     
     _detector = ObjectDetector();
@@ -80,7 +77,7 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
   Future<void> _initializeCamera() async {
     _controller = CameraController(
       widget.camera,
-      ResolutionPreset.high, // High resolution for clarity
+      ResolutionPreset.high,
       enableAudio: false,
       imageFormatGroup: Platform.isAndroid
           ? ImageFormatGroup.yuv420
@@ -89,11 +86,7 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
 
     _initializeControllerFuture = _controller.initialize().then((_) async {
       if (!mounted) return;
-      
-      // --- FIX FOR BLURRY CAMERA ---
-      // This line forces the camera to auto-focus continuously
-      await _controller.setFocusMode(FocusMode.auto);
-      
+      await _controller.setFocusMode(FocusMode.auto); // Fix for blurry camera
       setState(() {});
       
       _controller.startImageStream((image) async {
@@ -104,7 +97,6 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
     });
   }
 
-  // --- SAFE MODEL LOADING LOGIC ---
   Future<void> _loadModel() async {
       if (mounted) setState(() => _modelLoaded = false);
 
@@ -112,32 +104,24 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
       String labelsPath = "";
       bool isQuantized = false;
 
-      print("🔄 ATTEMPTING SWITCH TO: $_currentMode");
-
+      // Select Model based on Mode
       switch (_currentMode) {
         case SignMode.alphabets:
-          // --- UPDATED FOR NEW SPEED HACK MODEL ---
-          modelPath = "assets/models/ahmed_best_int8.tflite"; // Make sure file name matches!
+          modelPath = "assets/models/ahmed_best_int8.tflite"; 
           labelsPath = "assets/models/labels.txt";
-          isQuantized = true; // MUST be true for the new model
+          isQuantized = true; 
           break;
-
         case SignMode.numbers:
           modelPath = "assets/models/numbers2_best_int8.tflite";
           labelsPath = "assets/models/numbers_labels.txt";
           isQuantized = true;
           break;
-
         case SignMode.words:
           modelPath = "assets/models/words_best_float32.tflite";
           labelsPath = "assets/models/words_labels.txt";
           isQuantized = false;
           break;
       }
-
-      print("📂 Loading File: $modelPath");
-      print("🏷️ Loading Labels: $labelsPath");
-      print("🧮 Is Quantized: $isQuantized");
 
       try {
         await _detector.loadModel(
@@ -152,16 +136,12 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
             _detections = [];
           });
         }
-        print("✅ SUCCESS: Switched to $_currentMode");
-        
       } catch (e) {
-        print("❌ FAILURE: Could not load $_currentMode. Error: $e");
+        print("Failure loading model: $e");
       }
     }
 
-  // --- SAFE FRAME PROCESSING ---
   void _processFrame(CameraImage image) async {
-    // SECURITY GUARD: If switching models, ignore this frame immediately
     if (_isSwitching || !_modelLoaded) return;
 
     final results = await _detector.yoloOnFrame(image);
@@ -191,26 +171,22 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
     });
   }
 
-  // --- CRASH-PROOF SWITCHING LOGIC ---
   Future<void> _changeMode(SignMode mode) async {
     if (_currentMode == mode || _isSwitching) return;
 
     setState(() {
-      _isSwitching = true; // Raise flag to block camera frames
+      _isSwitching = true;
       _currentMode = mode;
-      _isScanning = false; // Pause scanning UI
+      _isScanning = false;
       _detections = [];
     });
 
-    // FORCE STOP the camera stream if it's running
     if (_controller.value.isStreamingImages) {
       await _controller.stopImageStream();
     }
 
-    // NOW it is safe to swap the model
     await _loadModel();
 
-    // Restart the Camera Stream safely
     if (!_controller.value.isStreamingImages) {
       await _controller.startImageStream((image) async {
         if (_isScanning && _modelLoaded && !_detector.isBusy) {
@@ -220,25 +196,21 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
     }
 
     if (mounted) {
-      setState(() {
-        _isSwitching = false; // Lower flag, ready for business
-      });
+      setState(() => _isSwitching = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // Calculate Scaling to fix Camera Stretch
-    var tmp = MediaQuery.of(context).size;
-    final screenH = math.max(tmp.height, tmp.width);
-    final screenW = math.min(tmp.height, tmp.width);
-    
-    tmp = _controller.value.previewSize ?? const Size(1280, 720);
-    final previewH = math.max(tmp.height, tmp.width);
-    final previewW = math.min(tmp.height, tmp.width);
-    
-    final screenRatio = screenH / screenW;
-    final previewRatio = previewH / previewW;
+    // 1. Get Screen Size and Camera Size
+    final size = MediaQuery.of(context).size;
+    final previewSize = _controller.value.previewSize ?? const Size(1280, 720);
+
+    // 2. Calculate Scaling Factor for "Aspect Fill"
+    // This ensures the camera covers the width of the screen without distortion.
+    // If the math results in a scale < 1, we invert it to ensure we always zoom IN (cover), not out.
+    var scale = size.aspectRatio * previewSize.aspectRatio;
+    if (scale < 1) scale = 1 / scale;
 
     return Scaffold(
       appBar: AppBar(
@@ -251,167 +223,163 @@ class _SignRecognitionScreenState extends State<SignRecognitionScreen>
           ),
         ],
       ),
-      body: Column(
-        children: [
-          // --- Mode Selection & Status ---
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 5.0),
-            child: Column(
-              children: [
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: SignMode.values.map((mode) {
-                      bool isSelected = _currentMode == mode;
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                        child: ChoiceChip(
-                          label: Text(mode.name.toUpperCase()),
-                          selected: isSelected,
-                          selectedColor: const Color(0xFF00B8DA),
-                          labelStyle: TextStyle(
-                            color: isSelected ? Colors.white : Colors.black,
-                            fontWeight: FontWeight.bold
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            // --- Mode Selection ---
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 5.0),
+              child: Column(
+                children: [
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: SignMode.values.map((mode) {
+                        bool isSelected = _currentMode == mode;
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                          child: ChoiceChip(
+                            label: Text(mode.name.toUpperCase()),
+                            selected: isSelected,
+                            selectedColor: const Color(0xFF00B8DA),
+                            labelStyle: TextStyle(
+                              color: isSelected ? Colors.white : Colors.black,
+                              fontWeight: FontWeight.bold
+                            ),
+                            onSelected: (selected) {
+                              if (selected) _changeMode(mode);
+                            },
                           ),
-                          onSelected: (selected) {
-                            if (selected) {
-                              _changeMode(mode);
-                            }
-                          },
-                        ),
-                      );
-                    }).toList(),
+                        );
+                      }).toList(),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: _modelLoaded ? Colors.green.shade50 : Colors.red.shade50,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: _modelLoaded ? Colors.green : Colors.red),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: _modelLoaded ? Colors.green.shade50 : Colors.red.shade50,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: _modelLoaded ? Colors.green : Colors.red),
+                    ),
+                    child: Text(
+                      _isSwitching
+                          ? "Switching Model..."
+                          : (_modelLoaded ? "Ready: ${_currentMode.name.toUpperCase()}" : "Loading Model..."),
+                      style: TextStyle(
+                          color: _modelLoaded ? Colors.green.shade800 : Colors.red.shade800,
+                          fontWeight: FontWeight.bold),
+                    ),
                   ),
-                  child: Text(
-                    _isSwitching
-                        ? "Switching Model..."
-                        : (_modelLoaded ? "Ready: ${_currentMode.name.toUpperCase()}" : "Loading Model..."),
-                    style: TextStyle(
-                        color: _modelLoaded ? Colors.green.shade800 : Colors.red.shade800,
-                        fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
 
-          const SizedBox(height: 10),
+            const SizedBox(height: 10),
 
-          // --- Camera View (With Stretch Fix) ---
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Container(
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: Colors.black,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: const [
-                    BoxShadow(color: Colors.black26, blurRadius: 10, offset: Offset(0, 5))
-                  ],
-                ),
+            // --- TRIMMED CAMERA VIEW (Fixed Height) ---
+            SizedBox(
+              height: size.height * 0.55, // 55% of Screen Height
+              width: double.infinity,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(20),
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      if (_initializeControllerFuture == null)
-                        const Center(child: CircularProgressIndicator())
-                      else
-                        ClipRRect(
-                          child: OverflowBox(
-                            maxHeight: screenRatio > previewRatio
-                                ? screenH
-                                : screenW / previewW * previewH,
-                            maxWidth: screenRatio > previewRatio
-                                ? screenH / previewH * previewW
-                                : screenW,
-                            child: CameraPreview(_controller),
+                  child: Container(
+                    color: Colors.black,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      alignment: Alignment.center, 
+                      children: [
+                        if (_initializeControllerFuture == null)
+                          const Center(child: CircularProgressIndicator())
+                        else
+                          // Scale the camera to fill the width (Trim top/bottom)
+                          Transform.scale(
+                            scale: scale, 
+                            child: Center(
+                              child: CameraPreview(_controller),
+                            ),
                           ),
-                        ),
 
-                      if (_isScanning && _detections.isNotEmpty && !_isSwitching)
-                        CustomPaint(
-                          painter: BoundingBoxPainter(
-                            detections: _detections,
-                            previewSize: _controller.value.previewSize!,
+                        if (_isScanning && _detections.isNotEmpty && !_isSwitching)
+                           // Apply EXACT SAME scale to bounding boxes so they match
+                           Transform.scale(
+                            scale: scale,
+                            child: CustomPaint(
+                              painter: BoundingBoxPainter(
+                                detections: _detections,
+                                previewSize: _controller.value.previewSize!,
+                              ),
+                            ),
                           ),
-                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 30),
+
+            // --- Start/Stop Button ---
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: GestureDetector(
+                onTap: _toggleScanning,
+                child: Container(
+                  height: 60,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(15),
+                    gradient: LinearGradient(
+                      colors: _isScanning
+                          ? [Colors.red.shade400, Colors.red.shade700]
+                          : [const Color(0xFF00B8DA), const Color(0xFFF6329A)],
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                          color: _isScanning
+                              ? Colors.red.withOpacity(0.4)
+                              : Colors.pink.withOpacity(0.4),
+                          blurRadius: 10,
+                          offset: const Offset(0, 5))
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(_isScanning ? Icons.stop : Icons.play_arrow,
+                          color: Colors.white, size: 30),
+                      const SizedBox(width: 10),
+                      Text(
+                        _isScanning ? "STOP SCANNING" : "START SCANNING",
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold),
+                      ),
                     ],
                   ),
                 ),
               ),
             ),
-          ),
 
-          const SizedBox(height: 20),
-
-          // --- Start/Stop Button ---
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            child: GestureDetector(
-              onTap: _toggleScanning,
-              child: Container(
-                height: 60,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(15),
-                  gradient: LinearGradient(
-                    colors: _isScanning
-                        ? [Colors.red.shade400, Colors.red.shade700]
-                        : [const Color(0xFF00B8DA), const Color(0xFFF6329A)],
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                        color: _isScanning
-                            ? Colors.red.withOpacity(0.4)
-                            : Colors.pink.withOpacity(0.4),
-                        blurRadius: 10,
-                        offset: const Offset(0, 5))
-                  ],
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(_isScanning ? Icons.stop : Icons.play_arrow,
-                        color: Colors.white, size: 30),
-                    const SizedBox(width: 10),
-                    Text(
-                      _isScanning ? "STOP SCANNING" : "START SCANNING",
-                      style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold),
-                    ),
-                  ],
-                ),
+            if (_showSettings) ...[
+              Text(
+                "FPS: ${_fps.toStringAsFixed(1)} | Detections: ${_detections.length}",
+                style: TextStyle(color: Colors.grey.shade600),
               ),
-            ),
-          ),
-
-          if (_showSettings) ...[
-            Text(
-              "FPS: ${_fps.toStringAsFixed(1)} | Detections: ${_detections.length}",
-              style: TextStyle(color: Colors.grey.shade600),
-            ),
-            const SizedBox(height: 10),
-          ]
-        ],
+              const SizedBox(height: 10),
+            ]
+          ],
+        ),
       ),
     );
   }
 }
 
-// Ensure this Painter class is at the bottom of the file
+// --- PAINTER CLASS (No changes needed here, logic is handled by Transform.scale above) ---
 class BoundingBoxPainter extends CustomPainter {
   final List<Map<String, dynamic>> detections;
   final Size previewSize;
@@ -448,7 +416,6 @@ class BoundingBoxPainter extends CustomPainter {
       final rect = Rect.fromLTRB(x1, y1, x2, y2);
       canvas.drawRect(rect, paint);
       
-      // Safety check for label
       String tag = detection['tag'] ?? "Unknown";
       String conf = ((detection['box'][4] ?? 0.0) * 100).toStringAsFixed(0);
 

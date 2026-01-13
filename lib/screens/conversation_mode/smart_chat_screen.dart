@@ -7,9 +7,12 @@ import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:video_player/video_player.dart';
 import 'package:just_audio/just_audio.dart';
-import 'package:speech_to_text/speech_to_text.dart' as stt;
+import 'package:record/record.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
 
-import '../../services/object_detector.dart';
 import '../Community_Module/post_detail_screen.dart';
 import '../Community_Module/post_data.dart';
 
@@ -39,28 +42,20 @@ class _SmartChatScreenState extends State<SmartChatScreen>
   // ===== Text Mode =====
   final TextEditingController _textController = TextEditingController();
 
-  // ===== Sign Mode (Camera + YOLO) =====
+  // ===== Camera (Video Mode) =====
   CameraController? _cameraController;
   Future<void>? _initializeControllerFuture;
-  final ObjectDetector _detector = ObjectDetector();
-  bool _isScanning = false;
-  List<Map<String, dynamic>> _detections = [];
-  bool _modelLoaded = false;
-  
-  // Stability Buffer for Sign Detection
-  final Map<String, int> _detectionBuffer = {};
-  static const int _stabilityThreshold = 5; 
-  String _lastStableWord = '';
-  
-  // Performance tracking
-  DateTime? _lastRunTime;
   List<CameraDescription> _cameras = [];
   int _selectedCameraIdx = 0;
+  bool _isRecordingVideo = false;
 
-  // ===== Voice Mode =====
-  stt.SpeechToText? _speech;
-  bool _isListening = false;
-  String _voiceText = '';
+  // ===== Audio (Voice Mode) =====
+  final AudioRecorder _audioRecorder = AudioRecorder();
+  bool _isRecordingAudio = false;
+  
+  // ===== Recording Timer =====
+  Timer? _recordingTimer;
+  int _recordingDuration = 0;
 
   // ===== Chat History =====
   final Map<String, VideoPlayerController> _videoControllers = {};
@@ -72,24 +67,13 @@ class _SmartChatScreenState extends State<SmartChatScreen>
     WidgetsBinding.instance.addObserver(this);
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     
-    _initializeModel();
     _setupCameras();
-    _initializeSpeech();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused) {
-      _stopScanning();
-    }
-  }
-
-  void _initializeModel() async {
-    await _detector.loadModel();
-    if (mounted) {
-      setState(() {
-        _modelLoaded = _detector.isLoaded;
-      });
+      _stopVideoRecording(cancel: true);
     }
   }
 
@@ -105,141 +89,149 @@ class _SmartChatScreenState extends State<SmartChatScreen>
     }
   }
 
-  void _initializeCamera() {
+  Future<void> _initializeCamera() async {
     if (_cameras.isEmpty) return;
     
+    final status = await Permission.camera.request();
+    if (!status.isGranted) return;
+
     _cameraController = CameraController(
       _cameras[_selectedCameraIdx],
       ResolutionPreset.high,
-      enableAudio: false,
-      imageFormatGroup: Platform.isAndroid
-          ? ImageFormatGroup.yuv420
-          : ImageFormatGroup.bgra8888,
+      enableAudio: true,
     );
 
-    _initializeControllerFuture = _cameraController!.initialize().then((_) {
-      if (mounted) setState(() {});
-      _startScanning();
-    });
+    _initializeControllerFuture = _cameraController!.initialize();
+    await _initializeControllerFuture;
+    if (mounted) setState(() {});
   }
 
-  Future<void> _initializeSpeech() async {
-      _speech = stt.SpeechToText();
-      await _speech!.initialize();
-  }
-
-  // ===== Sign Mode: YOLO Detection =====
-  Future<void> _startScanning() async {
-    if (_cameraController == null || !_cameraController!.value.isInitialized) {
-      return;
-    }
-    setState(() {
-      _isScanning = true;
-      _detections = [];
-      _detectionBuffer.clear();
-    });
-    await _startStreaming();
-  }
-
-  Future<void> _startStreaming() async {
+  // ===== Supabase Storage Integration =====
+  Future<String?> _uploadFileToSupabase(File file, String folder) async {
     try {
-      await _cameraController!.startImageStream((CameraImage image) {
-        _processCameraFrame(image);
-      });
+      final fileName = '${DateTime.now().millisecondsSinceEpoch}_${p.basename(file.path)}';
+      final path = '$folder/$fileName';
+      
+      await Supabase.instance.client.storage
+          .from('chat_uploads')
+          .upload(path, file);
+          
+      final String publicUrl = Supabase.instance.client.storage
+          .from('chat_uploads')
+          .getPublicUrl(path);
+          
+      return publicUrl;
     } catch (e) {
-      debugPrint("Stream Error: $e");
+      debugPrint("Upload Error: $e");
+      return null;
     }
   }
 
-  void _processCameraFrame(CameraImage image) async {
-    if (_detector.isBusy) return;
+  // ===== Video Recording =====
+  Future<void> _startVideoRecording() async {
+    if (_cameraController == null || !_cameraController!.value.isInitialized) return;
+    if (_cameraController!.value.isRecordingVideo) return;
 
-    final now = DateTime.now();
-    if (_lastRunTime != null &&
-        now.difference(_lastRunTime!).inMilliseconds < 500) {
-      return;
-    }
-    _lastRunTime = now;
-
-    final results = await _detector.yoloOnFrame(image);
-
-    if (mounted && _isScanning) {
+    try {
+      await _cameraController!.startVideoRecording();
       setState(() {
-        _detections = results;
+        _isRecordingVideo = true;
+        _recordingDuration = 0;
+      });
+      _startTimer();
+    } catch (e) {
+      debugPrint("Start Video Error: $e");
+    }
+  }
+
+  Future<void> _stopVideoRecording({bool cancel = false}) async {
+    if (_cameraController == null || !_cameraController!.value.isRecordingVideo) return;
+
+    try {
+      final XFile videoFile = await _cameraController!.stopVideoRecording();
+      _stopTimer();
+      setState(() {
+        _isRecordingVideo = false;
       });
 
-      if (results.isNotEmpty) {
-        final detection = results.first;
-        final String word = detection['tag'];
-        
-        _detectionBuffer[word] = (_detectionBuffer[word] ?? 0) + 1;
-        _detectionBuffer.removeWhere((key, value) => key != word);
-        
-        if (_detectionBuffer[word]! >= _stabilityThreshold && word != _lastStableWord) {
-          _lastStableWord = word;
-          _insertWordToTextField(word);
-          _detectionBuffer.clear();
+      if (!cancel) {
+        final url = await _uploadFileToSupabase(File(videoFile.path), 'videos');
+        if (url != null) {
+          _sendMediaMessage(url, 'video');
         }
       }
+    } catch (e) {
+      debugPrint("Stop Video Error: $e");
     }
   }
 
-  void _insertWordToTextField(String word) {
-    final currentText = _textController.text;
-    final newText = currentText.isEmpty ? word : '$currentText $word';
-    _textController.text = newText;
-    _textController.selection = TextSelection.fromPosition(
-      TextPosition(offset: newText.length),
-    );
-  }
-
-  Future<void> _stopScanning() async {
-    if (_cameraController != null && _cameraController!.value.isStreamingImages) {
-      await _cameraController!.stopImageStream();
-    }
-    if (mounted) {
-      setState(() {
-        _isScanning = false;
-        _detections = [];
-        _detectionBuffer.clear();
-      });
-    }
-  }
-
-  // ===== Voice Mode =====
-  void _startListening() async {
-    if (_speech == null || !_speech!.isAvailable) return;
-    
-    setState(() {
-      _isListening = true;
-      _voiceText = '';
-     });
-
-    await _speech!.listen(
-      onResult: (result) {
+  // ===== Audio Recording =====
+  Future<void> _startAudioRecording() async {
+    try {
+      if (await _audioRecorder.hasPermission()) {
+        final directory = await getTemporaryDirectory();
+        final path = p.join(directory.path, 'audio_${DateTime.now().millisecondsSinceEpoch}.m4a');
+        
+        await _audioRecorder.start(const RecordConfig(), path: path);
         setState(() {
-          _voiceText = result.recognizedWords;
-          _textController.text = _voiceText;
+          _isRecordingAudio = true;
+          _recordingDuration = 0;
         });
-       },
-    );
+        _startTimer();
+      }
+    } catch (e) {
+      debugPrint("Start Audio Error: $e");
+    }
   }
 
-  void _stopListening() async {
-    if (_speech != null) {
-      await _speech!.stop();
+  Future<void> _stopAudioRecording() async {
+    try {
+      final path = await _audioRecorder.stop();
+      _stopTimer();
+      setState(() {
+        _isRecordingAudio = false;
+      });
+
+      if (path != null) {
+        final url = await _uploadFileToSupabase(File(path), 'audio');
+        if (url != null) {
+          _sendMediaMessage(url, 'voice');
+        }
+      }
+    } catch (e) {
+      debugPrint("Stop Audio Error: $e");
     }
-    
-    setState(() {
-      _isListening = false;
+  }
+
+  void _startTimer() {
+    _recordingTimer?.cancel();
+    _recordingTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      setState(() {
+        _recordingDuration++;
+      });
     });
+  }
+
+  void _stopTimer() {
+    _recordingTimer?.cancel();
+    _recordingTimer = null;
+  }
+
+  String _formatDuration(int seconds) {
+    final minutes = (seconds / 60).floor();
+    final remainingSeconds = seconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}';
   }
 
   // ===== Firebase: Send Message =====
   Future<void> _sendMessage() async {
     final text = _textController.text.trim();
     if (text.isEmpty) return;
+    await _sendMediaMessage(text, 'text');
+    _textController.clear();
+  }
 
+  Future<void> _sendMediaMessage(String content, String type) async {
     final messageRef = FirebaseFirestore.instance
         .collection('conversation')
         .doc(widget.conversationId)
@@ -249,19 +241,15 @@ class _SmartChatScreenState extends State<SmartChatScreen>
     await messageRef.set({
       'messageId': messageRef.id,
       'senderId': widget.currentUserID,
-      'content': text,
-      'type': 'text',
+      'content': content,
+      'type': type,
       'isRead': false,
       'createdAt': FieldValue.serverTimestamp(),
       'deletedFor': [],
     });
 
-    await _updateConversationDocument(text);
-
-    _textController.clear();
-    setState(() {
-      _lastStableWord = ''; 
-    });
+    String lastMsgText = type == 'text' ? content : '[${type[0].toUpperCase()}${type.substring(1)}]';
+    await _updateConversationDocument(lastMsgText);
   }
 
   Future<void> _updateConversationDocument(String lastMessage) async {
@@ -645,7 +633,7 @@ class _SmartChatScreenState extends State<SmartChatScreen>
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
           _buildModeButton('Text', '⌨️'),
-          _buildModeButton('Sign', '📷'),
+          _buildModeButton('Video', '📹'),
           _buildModeButton('Voice', '🎤'),
         ],
       ),
@@ -657,15 +645,15 @@ class _SmartChatScreenState extends State<SmartChatScreen>
     return GestureDetector(
       onTap: () {
         setState(() {
-          if (_inputMode == 'Sign') {
-            _stopScanning();
+          if (_inputMode == 'Video') {
+            _stopVideoRecording(cancel: true);
           } else if (_inputMode == 'Voice') {
-            _stopListening();
+            _stopAudioRecording();
           }
 
           _inputMode = mode;
 
-          if (mode == 'Sign' && _cameraController == null) {
+          if (mode == 'Video' && _cameraController == null) {
             _initializeCamera();
           }
         });
@@ -702,13 +690,13 @@ class _SmartChatScreenState extends State<SmartChatScreen>
     );
   }
 
-  // ===== UI: Dynamic Input Area with SAFEAREA FIX =====
+  // ===== UI: Dynamic Input Area =====
   Widget _buildInputArea() {
     switch (_inputMode) {
       case 'Text':
         return _buildTextInput();
-      case 'Sign':
-        return _buildSignInput();
+      case 'Video':
+        return _buildVideoInput();
       case 'Voice':
         return _buildVoiceInput();
       default:
@@ -717,14 +705,13 @@ class _SmartChatScreenState extends State<SmartChatScreen>
   }
 
   Widget _buildTextInput() {
-    // --- FIX: Added SafeArea to Text Input ---
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
         border: Border(top: BorderSide(color: Colors.grey.shade200)),
       ),
       child: SafeArea(
-        top: false, // Only safe area at bottom
+        top: false,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           child: Row(
@@ -763,7 +750,7 @@ class _SmartChatScreenState extends State<SmartChatScreen>
     );
   }
 
-  Widget _buildSignInput() {
+  Widget _buildVideoInput() {
     return Container(
       height: 350,
       decoration: BoxDecoration(
@@ -777,83 +764,78 @@ class _SmartChatScreenState extends State<SmartChatScreen>
           // Camera Preview
           if (_cameraController != null && _cameraController!.value.isInitialized)
             Positioned.fill(
-              child: _buildCameraPreview(),
+              child: FittedBox(
+                fit: BoxFit.cover,
+                child: SizedBox(
+                  width: _cameraController!.value.previewSize!.height,
+                  height: _cameraController!.value.previewSize!.width,
+                  child: CameraPreview(_cameraController!),
+                ),
+              ),
             )
           else
             const Center(
               child: CircularProgressIndicator(color: Colors.white),
             ),
 
-          Positioned(
-            top: 12, left: 12,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: _modelLoaded ? Colors.green : Colors.red,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                _modelLoaded ? 'AI Active' : 'Loading...',
-                style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-              ),
-            ),
-          ),
-
-          if (_detections.isNotEmpty)
+          // Recording Overlay
+          if (_isRecordingVideo)
             Positioned(
-              top: 12, right: 12,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.blue.withOpacity(0.8),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  'Detected: ${_detections.first['tag']}',
-                  style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-                ),
-              ),
-            ),
-
-          // --- FIX: Added SafeArea to Sign Input Text Field ---
-          Positioned(
-            bottom: 0, left: 0, right: 0,
-            child: Container(
-              color: Colors.white,
-              child: SafeArea(
-                top: false,
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
+              top: 20,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withOpacity(0.8),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
                   child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _textController,
-                          decoration: InputDecoration(
-                            hintText: 'Detected signs will appear here...',
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(25),
-                              borderSide: BorderSide.none,
-                            ),
-                            filled: true,
-                            fillColor: Colors.grey[100],
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 10,
-                            ),
-                          ),
-                          maxLines: null,
-                        ),
-                      ),
+                      const Icon(Icons.fiber_manual_record, color: Colors.white, size: 16),
                       const SizedBox(width: 8),
-                      CircleAvatar(
-                        backgroundColor: const Color(0xFF5B259F),
-                        child: IconButton(
-                          icon: const Icon(Icons.send, color: Colors.white),
-                          onPressed: _sendMessage,
-                        ),
+                      Text(
+                        _formatDuration(_recordingDuration),
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                       ),
                     ],
+                  ),
+                ),
+              ),
+            ),
+
+          // Record Button
+          Positioned(
+            bottom: 30,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: GestureDetector(
+                onTap: () {
+                  if (_isRecordingVideo) {
+                    _stopVideoRecording();
+                  } else {
+                    _startVideoRecording();
+                  }
+                },
+                child: Container(
+                  width: 70,
+                  height: 70,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 4),
+                  ),
+                  child: Center(
+                    child: Container(
+                      width: _isRecordingVideo ? 30 : 50,
+                      height: _isRecordingVideo ? 30 : 50,
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        borderRadius: BorderRadius.circular(_isRecordingVideo ? 4 : 25),
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -864,42 +846,7 @@ class _SmartChatScreenState extends State<SmartChatScreen>
     );
   }
 
-  Widget _buildCameraPreview() {
-    if (_cameraController == null || !_cameraController!.value.isInitialized) {
-      return const SizedBox.shrink();
-    }
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final size = Size(constraints.maxWidth, constraints.maxHeight);
-        return Stack(
-          fit: StackFit.expand,
-          children: [
-            FittedBox(
-              fit: BoxFit.cover,
-              child: SizedBox(
-                width: _cameraController!.value.previewSize!.height,
-                height: _cameraController!.value.previewSize!.width,
-                child: CameraPreview(_cameraController!),
-              ),
-            ),
-            if (_isScanning && _detections.isNotEmpty)
-              CustomPaint(
-                painter: BoundingBoxPainter(
-                  detections: _detections,
-                  previewSize: _cameraController!.value.previewSize!,
-                  screenSize: size,
-                  isFrontCamera: _cameras[_selectedCameraIdx].lensDirection == CameraLensDirection.front,
-                ),
-              ),
-          ],
-        );
-      }
-    );
-  }
-
   Widget _buildVoiceInput() {
-    // --- FIX: Added SafeArea to Voice Input ---
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -912,66 +859,38 @@ class _SmartChatScreenState extends State<SmartChatScreen>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (_isListening)
-                Container(
-                  height: 60,
-                  margin: const EdgeInsets.only(bottom: 20),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(
-                      5,
-                      (index) => Container(
-                        width: 4,
-                        margin: const EdgeInsets.symmetric(horizontal: 2),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF5B259F),
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                    ),
-                  ),
+              if (_isRecordingAudio)
+                Text(
+                  _formatDuration(_recordingDuration),
+                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.red),
                 ),
-
+              const SizedBox(height: 20),
               GestureDetector(
-                onLongPressStart: (_) => _startListening(),
-                onLongPressEnd: (_) {
-                  _stopListening();
-                  if (_textController.text.isNotEmpty) {
-                    _sendMessage();
-                  }
-                },
+                onLongPressStart: (_) => _startAudioRecording(),
+                onLongPressEnd: (_) => _stopAudioRecording(),
                 child: Container(
                   width: 80, height: 80,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: _isListening ? Colors.red : const Color(0xFF5B259F),
+                    color: _isRecordingAudio ? Colors.red : const Color(0xFF5B259F),
                     boxShadow: [
                       BoxShadow(
-                        color: (_isListening ? Colors.red : const Color(0xFF5B259F)).withOpacity(0.3),
+                        color: (_isRecordingAudio ? Colors.red : const Color(0xFF5B259F)).withOpacity(0.3),
                         blurRadius: 20, spreadRadius: 5,
                       ),
                     ],
                   ),
                   child: Icon(
-                    _isListening ? Icons.mic : Icons.mic_none,
+                    _isRecordingAudio ? Icons.mic : Icons.mic_none,
                     color: Colors.white, size: 40,
                   ),
                 ),
               ),
               const SizedBox(height: 12),
               Text(
-                _isListening ? 'Listening...' : 'Hold to Speak',
+                _isRecordingAudio ? 'Recording...' : 'Hold to Record',
                 style: TextStyle(fontSize: 16, color: Colors.grey[700], fontWeight: FontWeight.w500),
               ),
-              
-              if (!_isListening)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Text(
-                    'Note: Add speech_to_text package to enable',
-                    style: TextStyle(fontSize: 12, color: Colors.grey[500], fontStyle: FontStyle.italic),
-                  ),
-                ),
             ],
           ),
         ),
@@ -983,9 +902,9 @@ class _SmartChatScreenState extends State<SmartChatScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _textController.dispose();
-    _stopScanning();
-    _detector.dispose();
     _cameraController?.dispose();
+    _audioRecorder.dispose();
+    _recordingTimer?.cancel();
     for (var controller in _videoControllers.values) {
       controller.dispose();
     }
@@ -1051,7 +970,7 @@ class _SmartChatScreenState extends State<SmartChatScreen>
                         const SizedBox(height: 16),
                         Text('No messages yet', style: TextStyle(fontSize: 16, color: Colors.grey[500])),
                         const SizedBox(height: 8),
-                        Text('Start chatting using Text, Sign, or Voice!', style: TextStyle(fontSize: 14, color: Colors.grey[400])),
+                        Text('Start chatting using Text, Video, or Voice!', style: TextStyle(fontSize: 14, color: Colors.grey[400])),
                       ],
                     ),
                   );
@@ -1068,70 +987,9 @@ class _SmartChatScreenState extends State<SmartChatScreen>
           ),
 
           _buildModeSelector(),
-
-          // --- FIX: Optional Safety wrapper for the input area call itself ---
           _buildInputArea(),
         ],
       ),
     );
-  }
-}
-
-class BoundingBoxPainter extends CustomPainter {
-  final List<Map<String, dynamic>> detections;
-  final Size previewSize;
-  final Size screenSize;
-  final bool isFrontCamera;
-
-  BoundingBoxPainter({
-    required this.detections,
-    required this.previewSize,
-    required this.screenSize,
-    required this.isFrontCamera,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    double scaleX = size.width / previewSize.height;
-    double scaleY = size.height / previewSize.width;
-    final double scale = math.max(scaleX, scaleY);
-    double offsetX = (size.width - (previewSize.height * scale)) / 2;
-    double offsetY = (size.height - (previewSize.width * scale)) / 2;
-
-    final Paint paint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3.0
-      ..color = Colors.green;
-
-    final TextStyle textStyle = TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold, backgroundColor: Colors.green);
-
-    for (var detection in detections) {
-      final box = detection['box'];
-      double x1 = box[0] * scale + offsetX;
-      double y1 = box[1] * scale + offsetY;
-      double x2 = box[2] * scale + offsetX;
-      double y2 = box[3] * scale + offsetY;
-
-      if (isFrontCamera) {
-        double tempX1 = size.width - x2;
-        double tempX2 = size.width - x1;
-        x1 = tempX1;
-        x2 = tempX2;
-      }
-
-      final rect = Rect.fromLTRB(x1, y1, x2, y2);
-      canvas.drawRect(rect, paint);
-
-      final String label = "${detection['tag']} ${(detection['box'][4] * 100).toStringAsFixed(0)}%";
-      final TextSpan span = TextSpan(text: label, style: textStyle);
-      final TextPainter tp = TextPainter(text: span, textAlign: TextAlign.left, textDirection: TextDirection.ltr);
-      tp.layout();
-      tp.paint(canvas, Offset(x1, y1 - 20));
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) {
-    return true;
   }
 }
