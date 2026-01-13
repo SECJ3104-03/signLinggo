@@ -13,7 +13,8 @@ import 'post_data.dart';
 import 'video_player_widget.dart';
 import 'package:signlinggo/screens/conversation_mode/conversation_mode_screen.dart';
 import 'real_time_widget.dart';
-import 'share_post_sheet.dart'; // <--- Import the new sheet
+import 'share_post_sheet.dart';
+import 'package:signlinggo/screens/conversation_mode/smart_chat_screen.dart';
 
 class PostCard extends StatefulWidget {
   final PostData post;
@@ -62,9 +63,9 @@ class _PostCardState extends State<PostCard> {
     if (currentUser == null) return;
 
     if (currentUser.uid == widget.post.authorId) {
-       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("That's you!")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("That's you!")));
       return;
     }
 
@@ -79,9 +80,11 @@ class _PostCardState extends State<PostCard> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => ConversationScreen(
+        builder: (context) => SmartChatScreen(
           chatName: widget.post.author,
-          avatar: widget.post.authorProfileImage ?? (widget.post.initials.isNotEmpty ? widget.post.initials : '?'),
+          avatar:
+              widget.post.authorProfileImage ??
+              (widget.post.initials.isNotEmpty ? widget.post.initials : '?'),
           conversationId: conversationId,
           currentUserID: currentUserId,
         ),
@@ -91,20 +94,29 @@ class _PostCardState extends State<PostCard> {
 
   // --- CHANGED: Renamed from _sharePost to _shareSystem ---
   Future<void> _shareSystem() async {
-    final String shareText = '${widget.post.title}\n\n${widget.post.content}\n\nSent via SignLinggo App';
+    final String shareText =
+        '${widget.post.title}\n\n${widget.post.content}\n\nSent via SignLinggo App';
     final String? mediaPath = widget.post.videoUrl ?? widget.post.imageUrl;
 
     if (mediaPath == null) {
       Share.share(shareText);
     } else {
-      setState(() { _isSharing = true; });
+      setState(() {
+        _isSharing = true;
+      });
       try {
         XFile fileToShare;
         if (mediaPath.startsWith('http') || mediaPath.startsWith('https')) {
           final response = await http.get(Uri.parse(mediaPath));
           final tempDir = await getTemporaryDirectory();
-          final String fileExtension = mediaPath.split('.').last.split('?').first;
-          final File tempFile = File('${tempDir.path}/shared_file.$fileExtension');
+          final String fileExtension = mediaPath
+              .split('.')
+              .last
+              .split('?')
+              .first;
+          final File tempFile = File(
+            '${tempDir.path}/shared_file.$fileExtension',
+          );
           await tempFile.writeAsBytes(response.bodyBytes);
           fileToShare = XFile(tempFile.path);
         } else if (mediaPath.startsWith('assets/')) {
@@ -112,10 +124,12 @@ class _PostCardState extends State<PostCard> {
           final tempDir = await getTemporaryDirectory();
           final String fileName = mediaPath.split('/').last;
           final File tempFile = File('${tempDir.path}/$fileName');
-          await tempFile.writeAsBytes(byteData.buffer.asUint8List(
-            byteData.offsetInBytes,
-            byteData.lengthInBytes
-          ));
+          await tempFile.writeAsBytes(
+            byteData.buffer.asUint8List(
+              byteData.offsetInBytes,
+              byteData.lengthInBytes,
+            ),
+          );
           fileToShare = XFile(tempFile.path);
         } else {
           fileToShare = XFile(mediaPath);
@@ -125,7 +139,10 @@ class _PostCardState extends State<PostCard> {
         print("Error sharing file: $e");
         Share.share(shareText);
       } finally {
-        if (mounted) setState(() { _isSharing = false; });
+        if (mounted)
+          setState(() {
+            _isSharing = false;
+          });
       }
     }
   }
@@ -140,8 +157,8 @@ class _PostCardState extends State<PostCard> {
         decoration: const BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(20), 
-            topRight: Radius.circular(20)
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
           ),
         ),
         // --- FIX: Wrap content in SafeArea to avoid overlap with nav bar ---
@@ -152,20 +169,24 @@ class _PostCardState extends State<PostCard> {
                 padding: const EdgeInsets.all(16.0),
                 child: Center(
                   child: Container(
-                    width: 40, height: 4, 
+                    width: 40,
+                    height: 4,
                     decoration: BoxDecoration(
-                      color: Colors.grey[300], 
-                      borderRadius: BorderRadius.circular(2)
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(2),
                     ),
                   ),
                 ),
               ),
               ListTile(
-                leading: const Icon(Icons.send_rounded, color: Color(0xFFAC46FF)),
+                leading: const Icon(
+                  Icons.send_rounded,
+                  color: Color(0xFFAC46FF),
+                ),
                 title: const Text('Send in SignLinggo'),
                 onTap: () {
-                  Navigator.pop(context); 
-                  
+                  Navigator.pop(context);
+
                   final user = FirebaseAuth.instance.currentUser;
                   if (user != null) {
                     showModalBottomSheet(
@@ -173,23 +194,26 @@ class _PostCardState extends State<PostCard> {
                       isScrollControlled: true,
                       backgroundColor: Colors.transparent,
                       builder: (context) => SharePostSheet(
-                        post: widget.post, 
-                        currentUserId: user.uid
+                        post: widget.post,
+                        currentUserId: user.uid,
                       ),
                     );
                   } else {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text("Please login first"))
+                      const SnackBar(content: Text("Please login first")),
                     );
                   }
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.share_outlined, color: Colors.black87),
+                leading: const Icon(
+                  Icons.share_outlined,
+                  color: Colors.black87,
+                ),
                 title: const Text('Share via...'),
                 onTap: () {
                   Navigator.pop(context);
-                  _shareSystem(); 
+                  _shareSystem();
                 },
               ),
               // Add a little bottom padding for extra breathing room if needed
@@ -247,58 +271,63 @@ class _PostCardState extends State<PostCard> {
           // 1. CLICKABLE AVATAR
           GestureDetector(
             onTap: _navigateToDirectMessage,
-            child: (widget.post.authorProfileImage != null && widget.post.authorProfileImage!.isNotEmpty)
-              ? Container(
-                  width: 39.98,
-                  height: 39.98,
-                  clipBehavior: Clip.antiAlias,
-                  decoration: const BoxDecoration(
-                    shape: BoxShape.circle,
-                  ),
-                  child: Image.network(
-                    widget.post.authorProfileImage!,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        decoration: ShapeDecoration(
-                          gradient: widget.post.profileGradient,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(41659800)),
-                        ),
-                        child: Center(
-                          child: Text(
-                            widget.post.initials,
-                            style: const TextStyle(color: Color(0xFF0A0A0A), fontSize: 16),
+            child:
+                (widget.post.authorProfileImage != null &&
+                    widget.post.authorProfileImage!.isNotEmpty)
+                ? Container(
+                    width: 39.98,
+                    height: 39.98,
+                    clipBehavior: Clip.antiAlias,
+                    decoration: const BoxDecoration(shape: BoxShape.circle),
+                    child: Image.network(
+                      widget.post.authorProfileImage!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          decoration: ShapeDecoration(
+                            gradient: widget.post.profileGradient,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(41659800),
+                            ),
                           ),
-                        ),
-                      );
-                    },
-                  ),
-                )
-              : Container(
-                  width: 39.98,
-                  height: 39.98,
-                  clipBehavior: Clip.antiAlias,
-                  decoration: ShapeDecoration(
-                    gradient: widget.post.profileGradient,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(41659800),
+                          child: Center(
+                            child: Text(
+                              widget.post.initials,
+                              style: const TextStyle(
+                                color: Color(0xFF0A0A0A),
+                                fontSize: 16,
+                              ),
+                            ),
+                          ),
+                        );
+                      },
                     ),
-                  ),
-                  child: Center(
-                    child: Text(
-                      widget.post.initials,
-                      style: const TextStyle(
-                        color: Color(0xFF0A0A0A),
-                        fontSize: 16,
-                        fontFamily: 'Arimo',
-                        fontWeight: FontWeight.w400,
-                        height: 1.50,
+                  )
+                : Container(
+                    width: 39.98,
+                    height: 39.98,
+                    clipBehavior: Clip.antiAlias,
+                    decoration: ShapeDecoration(
+                      gradient: widget.post.profileGradient,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(41659800),
+                      ),
+                    ),
+                    child: Center(
+                      child: Text(
+                        widget.post.initials,
+                        style: const TextStyle(
+                          color: Color(0xFF0A0A0A),
+                          fontSize: 16,
+                          fontFamily: 'Arimo',
+                          fontWeight: FontWeight.w400,
+                          height: 1.50,
+                        ),
                       ),
                     ),
                   ),
-                ),
           ),
-          
+
           const SizedBox(width: 12),
 
           Expanded(
@@ -319,7 +348,7 @@ class _PostCardState extends State<PostCard> {
                     ),
                   ),
                 ),
-                
+
                 // 3. TAGS & TIMESTAMP
                 Wrap(
                   crossAxisAlignment: WrapCrossAlignment.center,
@@ -396,18 +425,28 @@ class _PostCardState extends State<PostCard> {
               onTap: widget.onFollowTap,
               child: Container(
                 height: 26,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 4,
+                ),
                 decoration: ShapeDecoration(
-                  color: widget.post.isFollowed ? const Color(0xFFF3F4F6) : const Color(0xFF155DFC),
+                  color: widget.post.isFollowed
+                      ? const Color(0xFFF3F4F6)
+                      : const Color(0xFF155DFC),
                   shape: RoundedRectangleBorder(
-                    side: const BorderSide(width: 1.24, color: Colors.transparent),
+                    side: const BorderSide(
+                      width: 1.24,
+                      color: Colors.transparent,
+                    ),
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
                 child: Text(
                   widget.post.isFollowed ? 'Followed' : 'Follow',
                   style: TextStyle(
-                    color: widget.post.isFollowed ? const Color(0xFF495565) : Colors.white,
+                    color: widget.post.isFollowed
+                        ? const Color(0xFF495565)
+                        : Colors.white,
                     fontSize: 14,
                     fontFamily: 'Arimo',
                     fontWeight: FontWeight.w400,
@@ -519,9 +558,13 @@ class _PostCardState extends State<PostCard> {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             _buildFooterIcon(
-              icon: widget.post.isLiked ? Icons.favorite : Icons.favorite_border,
+              icon: widget.post.isLiked
+                  ? Icons.favorite
+                  : Icons.favorite_border,
               label: widget.post.likes.toString(),
-              color: widget.post.isLiked ? const Color(0xFFFA2B36) : const Color(0xFF495565),
+              color: widget.post.isLiked
+                  ? const Color(0xFFFA2B36)
+                  : const Color(0xFF495565),
               onTap: widget.onLikeTap,
             ),
 
@@ -529,7 +572,9 @@ class _PostCardState extends State<PostCard> {
 
             _buildFooterIcon(
               icon: Icons.chat_bubble_outline,
-              label: (widget.post.commentCount < 0 ? 0 : widget.post.commentCount).toString(),
+              label:
+                  (widget.post.commentCount < 0 ? 0 : widget.post.commentCount)
+                      .toString(),
               color: const Color(0xFF495565),
               onTap: _navigateToCommentScreen,
             ),
@@ -540,7 +585,11 @@ class _PostCardState extends State<PostCard> {
                 onTap: _navigateToDirectMessage,
                 child: Row(
                   children: [
-                    const Icon(Icons.send_outlined, color: Color(0xFF495565), size: 20),
+                    const Icon(
+                      Icons.send_outlined,
+                      color: Color(0xFF495565),
+                      size: 20,
+                    ),
                   ],
                 ),
               ),
@@ -550,7 +599,7 @@ class _PostCardState extends State<PostCard> {
 
             // --- CHANGED: Use new share button handler ---
             InkWell(
-              onTap: _isSharing ? null : _onShareButtonTapped, 
+              onTap: _isSharing ? null : _onShareButtonTapped,
               child: SizedBox(
                 width: 19.98,
                 height: 19.98,
@@ -558,9 +607,15 @@ class _PostCardState extends State<PostCard> {
                     ? const SizedBox(
                         width: 14,
                         height: 14,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.grey)
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.grey,
+                        ),
                       )
-                    : const Icon(Icons.share_outlined, color: Color(0xFF495565)),
+                    : const Icon(
+                        Icons.share_outlined,
+                        color: Color(0xFF495565),
+                      ),
               ),
             ),
           ],

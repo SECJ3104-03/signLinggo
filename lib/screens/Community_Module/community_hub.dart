@@ -76,36 +76,62 @@ class _CommunityHubEditedState extends State<CommunityHubEdited> {
     }
   }
 
-  void _onMoreOptionsTapped(PostData post) {
+ void _onMoreOptionsTapped(PostData post) {
     showModalBottomSheet(
       context: context,
       useRootNavigator: true, 
-      isScrollControlled: true, 
+      isScrollControlled: true,
+      // Set background color to transparent if you want the rounded look
+      backgroundColor: Colors.transparent, 
       builder: (context) {
-        return Wrap(
-          children: [
-            ListTile(
-              leading: const Icon(Icons.edit_outlined),
-              title: const Text('Edit Post'),
-              onTap: () {
-                Navigator.pop(context); 
-                _navigateToEditPost(post); 
-              },
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(20), 
+              topRight: Radius.circular(20)
             ),
-            ListTile(
-              leading: Icon(Icons.delete_outline_rounded, color: Colors.red[600]),
-              title: Text('Delete Post', style: TextStyle(color: Colors.red[600])),
-              onTap: () {
-                Navigator.pop(context); 
-                _onDeleteTapped(post.id); 
-              },
+          ),
+          // --- FIX: Wrap with SafeArea to push content above the nav bar ---
+          child: SafeArea(
+            child: Wrap(
+              children: [
+                // Visual handle (the little grey bar at the top)
+                Center(
+                  child: Container(
+                    margin: const EdgeInsets.only(top: 12, bottom: 8),
+                    width: 40, height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300], 
+                      borderRadius: BorderRadius.circular(2)
+                    ),
+                  ),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.edit_outlined),
+                  title: const Text('Edit Post'),
+                  onTap: () {
+                    Navigator.pop(context); 
+                    _navigateToEditPost(post); 
+                  },
+                ),
+                ListTile(
+                  leading: Icon(Icons.delete_outline_rounded, color: Colors.red[600]),
+                  title: Text('Delete Post', style: TextStyle(color: Colors.red[600])),
+                  onTap: () {
+                    Navigator.pop(context); 
+                    _onDeleteTapped(post.id); 
+                  },
+                ),
+                // Extra padding for aesthetics
+                const SizedBox(height: 8),
+              ],
             ),
-          ],
+          ),
         );
       },
     );
   }
-
   void _onCategoryTapped(String category) {
     setState(() {
       _selectedCategory = category;
