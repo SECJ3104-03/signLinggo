@@ -10,7 +10,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-
+import 'package:provider/provider.dart';
+import '../providers/app_provider.dart';
 import '../screens/landing/landing_screen.dart';
 import '../screens/sign_in/signin_screen.dart';
 import '../screens/register/register_screen.dart';
@@ -47,6 +48,7 @@ class AppRouter {
     // 🔐 Global auth guard
     redirect: (context, state) {
       final user = FirebaseAuth.instance.currentUser;
+      final app = context.read<AppProvider>();
       final location = state.uri.toString();
 
       final isAuthRoute = location == '/signin' ||
@@ -54,12 +56,12 @@ class AppRouter {
           location == '/landing';
 
       // ❌ Not logged in → force Sign In
-      if (user == null && !isAuthRoute) {
+      if (user == null && !app.isGuestMode && !isAuthRoute) {
         return '/signin';
       }
 
       // ✅ Logged in → block auth pages
-      if (user != null && isAuthRoute) {
+      if ((user != null || app.isGuestMode) && isAuthRoute) {
         return '/home';
       }
 
