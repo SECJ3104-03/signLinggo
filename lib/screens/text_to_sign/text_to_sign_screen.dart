@@ -1,12 +1,13 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math; // Added for max
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:camera/camera.dart';
 import 'package:flutter/services.dart';
 
-import '../../services/object_detector.dart'; // Ensure this path matches your project
+import '../../services/object_detector.dart'; 
 
 class TextTranslationScreen extends StatefulWidget {
   const TextTranslationScreen({super.key});
@@ -31,12 +32,14 @@ class _TextTranslationScreenState extends State<TextTranslationScreen> with Widg
   final ObjectDetector _detector = ObjectDetector();
   bool _isScanning = false;
   bool _modelLoaded = false;
+  bool _isSwitching = false; // Prevent crashes while switching models
   List<Map<String, dynamic>> _detections = [];
-  String _currentDetectedSign = "Waiting for sign...";
+  String _currentDetectedSign = "Waiting...";
 
-  // Filtering Logic
+  // Categories
   String _selectedCategory = 'Alphabets';
-  final List<String> _numberLabels = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
+  
+  // Mapping for Text-to-Sign (Image Display)
   final List<String> _wordLabels = [
     'Bread', 'Brother', 'Bus', 'Drink', 'Eat', 'Elder sister',
     'Father', 'Help', 'Hotel', 'How much', 'Hungry', 'Mother',
@@ -47,8 +50,10 @@ class _TextTranslationScreenState extends State<TextTranslationScreen> with Widg
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _initializeModel();
-    _initializeSpeech(); // Initialize Speech Engine
+    // Initialize Speech
+    _initializeSpeech();
+    // Pre-load default model (Alphabets)
+    _loadSpecificModel('Alphabets');
   }
 
   @override
@@ -58,6 +63,16 @@ class _TextTranslationScreenState extends State<TextTranslationScreen> with Widg
     _detector.dispose();
     _textController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (_cameraController == null || !_cameraController!.value.isInitialized) return;
+    if (state == AppLifecycleState.inactive) {
+      _stopCamera();
+    } else if (state == AppLifecycleState.resumed && isSignToText) {
+      _startCamera();
+    }
   }
 
   // --- SPEECH LOGIC ---
@@ -75,18 +90,15 @@ class _TextTranslationScreenState extends State<TextTranslationScreen> with Widg
       debugPrint("Speech recognition not available");
       return;
     }
-
     setState(() {
       _isListening = true;
       _voiceText = '';
     });
-
     await _speech!.listen(
       onResult: (result) {
         setState(() {
           _voiceText = result.recognizedWords;
           _textController.text = _voiceText;
-          // Keep cursor at end
           _textController.selection = TextSelection.fromPosition(
             TextPosition(offset: _textController.text.length),
           );
@@ -96,18 +108,72 @@ class _TextTranslationScreenState extends State<TextTranslationScreen> with Widg
   }
 
   void _stopListening() async {
-    if (_speech != null) {
-      await _speech!.stop();
+    if (_speech != null) await _speech!.stop();
+    if (mounted) setState(() => _isListening = false);
+  }
+
+  // --- AI MODEL MANAGEMENT ---
+  Future<void> _loadSpecificModel(String category) async {
+    setState(() {
+      _isSwitching = true;
+      _modelLoaded = false;
+    });
+
+    String modelPath = "";
+    String labelsPath = "";
+    bool isQuantized = false;
+
+    // EXACT same logic as your SignRecognitionScreen
+    switch (category) {
+      case 'Alphabets':
+        modelPath = "assets/models/ahmed_best_int8.tflite"; 
+        labelsPath = "assets/models/labels.txt";
+        isQuantized = true; 
+        break;
+      case 'Numbers':
+        modelPath = "assets/models/numbers2_best_int8.tflite";
+        labelsPath = "assets/models/numbers_labels.txt";
+        isQuantized = true;
+        break;
+      case 'Words':
+        modelPath = "assets/models/words_best_float32.tflite";
+        labelsPath = "assets/models/words_labels.txt";
+        isQuantized = false;
+        break;
     }
-    if (mounted) {
-      setState(() => _isListening = false);
+
+    try {
+      await _detector.loadModel(
+        modelPath: modelPath,
+        labelsPath: labelsPath,
+        isQuantized: isQuantized
+      );
+      if (mounted) {
+        setState(() {
+          _modelLoaded = true;
+          _isSwitching = false;
+          _selectedCategory = category;
+        });
+      }
+    } catch (e) {
+      print("Error loading model: $e");
     }
   }
 
-  // --- AI LOGIC ---
-  Future<void> _initializeModel() async {
-    await _detector.loadModel();
-    if (mounted) setState(() => _modelLoaded = _detector.isLoaded);
+  Future<void> _changeCategory(String category) async {
+    if (_selectedCategory == category || _isSwitching) return;
+    
+    // Stop stream temporarily
+    if (_cameraController != null && _cameraController!.value.isStreamingImages) {
+      await _cameraController!.stopImageStream();
+    }
+
+    await _loadSpecificModel(category);
+
+    // Restart stream if we are in camera mode
+    if (isSignToText && _cameraController != null) {
+       _startStreaming();
+    }
   }
 
   // --- CAMERA LIFECYCLE ---
@@ -129,6 +195,9 @@ class _TextTranslationScreenState extends State<TextTranslationScreen> with Widg
 
     await _cameraController!.initialize();
     if (!mounted) return;
+    
+    // Auto Focus fix
+    await _cameraController!.setFocusMode(FocusMode.auto);
 
     setState(() {}); 
     _startStreaming();
@@ -151,7 +220,9 @@ class _TextTranslationScreenState extends State<TextTranslationScreen> with Widg
 
     try {
       await _cameraController!.startImageStream((CameraImage image) {
-        _processCameraFrame(image);
+        if (_modelLoaded && !_detector.isBusy && !_isSwitching) {
+           _processCameraFrame(image);
+        }
       });
     } catch (e) {
       print("Stream Error: $e");
@@ -159,36 +230,19 @@ class _TextTranslationScreenState extends State<TextTranslationScreen> with Widg
   }
 
   void _processCameraFrame(CameraImage image) async {
-    if (_detector.isBusy) return;
-
     final results = await _detector.yoloOnFrame(image);
-    List<Map<String, dynamic>> filteredResults = [];
-
-    // --- FILTERING LOGIC ---
-    if (_selectedCategory == 'Alphabets') {
-      filteredResults = results.where((result) {
-        String tag = result['tag'].toString().trim();
-        bool isNumber = _numberLabels.any((l) => l.toLowerCase() == tag.toLowerCase());
-        bool isWord = _wordLabels.any((l) => l.toLowerCase() == tag.toLowerCase());
-        return !isNumber && !isWord;
-      }).toList();
-    } else if (_selectedCategory == 'Numbers') {
-      filteredResults = results.where((result) {
-        String tag = result['tag'].toString().trim();
-        return _numberLabels.any((l) => l.toLowerCase() == tag.toLowerCase());
-      }).toList();
-    } else if (_selectedCategory == 'Words') {
-      filteredResults = results.where((result) {
-        String tag = result['tag'].toString().trim();
-        return _wordLabels.any((l) => l.toLowerCase() == tag.toLowerCase());
-      }).toList();
-    }
 
     if (mounted && isSignToText) {
       setState(() {
-        _detections = filteredResults;
-        if (filteredResults.isNotEmpty) {
-           _currentDetectedSign = filteredResults.first['tag'];
+        _detections = results;
+        if (results.isNotEmpty) {
+           // Get the tag with highest confidence
+           var best = results.first;
+           // Format confidence
+           String conf = ((best['box'][4] ?? 0.0) * 100).toStringAsFixed(0);
+           _currentDetectedSign = "${best['tag']} ($conf%)";
+        } else {
+           _currentDetectedSign = "Scanning...";
         }
       });
     }
@@ -267,6 +321,7 @@ class _TextTranslationScreenState extends State<TextTranslationScreen> with Widg
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: false, // Prevents keyboard from squashing UI
       appBar: AppBar(
         title: const Text('Translator', style: TextStyle(color: Colors.black, fontFamily: 'Arimo')),
         centerTitle: true,
@@ -360,10 +415,8 @@ class _TextTranslationScreenState extends State<TextTranslationScreen> with Widg
           
           const SizedBox(height: 24),
           
-          // --- CONTROLS ROW ---
           Row(
             children: [
-              // HOLD TO SPEAK BUTTON
               Expanded(
                 child: GestureDetector(
                   onLongPressStart: (_) => _startListening(),
@@ -372,7 +425,6 @@ class _TextTranslationScreenState extends State<TextTranslationScreen> with Widg
                     duration: const Duration(milliseconds: 200),
                     padding: const EdgeInsets.symmetric(vertical: 20),
                     decoration: BoxDecoration(
-                      // Red when listening, White (outlined) when idle
                       color: _isListening ? Colors.redAccent : Colors.white,
                       border: Border.all(
                         color: _isListening ? Colors.redAccent : Colors.grey,
@@ -405,7 +457,6 @@ class _TextTranslationScreenState extends State<TextTranslationScreen> with Widg
               
               const SizedBox(width: 12),
               
-              // TRANSLATE BUTTON
               Expanded(
                 child: ElevatedButton(
                   onPressed: _translateText,
@@ -422,7 +473,6 @@ class _TextTranslationScreenState extends State<TextTranslationScreen> with Widg
           
           const SizedBox(height: 24),
           
-          // TRANSLATION RESULT
           if (_translatedText.isNotEmpty)
             Container(
               width: double.infinity,
@@ -457,15 +507,21 @@ class _TextTranslationScreenState extends State<TextTranslationScreen> with Widg
     );
   }
 
-  // --- VIEW B: CAMERA MODE ---
+  // --- VIEW B: CAMERA MODE (With Fixed Aspect Ratio) ---
   Widget _buildSignToTextMode() {
     if (_cameraController == null || !_cameraController!.value.isInitialized) {
       return const Center(child: CircularProgressIndicator());
     }
 
+    // CALCULATE SCALE (Same as your SignRecognitionScreen)
+    final size = MediaQuery.of(context).size;
+    final previewSize = _cameraController!.value.previewSize ?? const Size(1280, 720);
+    var scale = size.aspectRatio * previewSize.aspectRatio;
+    if (scale < 1) scale = 1 / scale;
+
     return Column(
       children: [
-        // Category Selector (Alphabets/Numbers/Words)
+        // Category Selector
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -477,45 +533,65 @@ class _TextTranslationScreenState extends State<TextTranslationScreen> with Widg
                 child: ChoiceChip(
                   label: Text(category),
                   selected: isSelected,
-                  onSelected: (bool selected) {
-                    if (selected) setState(() => _selectedCategory = category);
-                  },
                   selectedColor: const Color(0xFF00B8DA),
-                  labelStyle: TextStyle(color: isSelected ? Colors.white : Colors.black),
+                  labelStyle: TextStyle(
+                    color: isSelected ? Colors.white : Colors.black, 
+                    fontWeight: FontWeight.bold
+                  ),
+                  onSelected: (bool selected) {
+                    if (selected) _changeCategory(category);
+                  },
                 ),
               );
             }).toList(),
           ),
         ),
 
-        // Camera Preview
+        // Camera Preview (Trimmed & Scaled)
         Expanded(
           child: Container(
             margin: const EdgeInsets.symmetric(horizontal: 16),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.black12),
-              boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 10)],
-            ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(20),
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  CameraPreview(_cameraController!),
-                  CustomPaint(
-                    painter: BoundingBoxPainter(
-                      detections: _detections,
-                      previewSize: _cameraController!.value.previewSize!,
-                    ),
-                  ),
-                ],
+              child: Container(
+                color: Colors.black,
+                child: Stack(
+                  fit: StackFit.expand,
+                  alignment: Alignment.center,
+                  children: [
+                     // 1. Scaled Camera
+                     Transform.scale(
+                        scale: scale,
+                        child: Center(
+                          child: CameraPreview(_cameraController!),
+                        ),
+                     ),
+                     
+                     // 2. Scaled Bounding Boxes
+                     if (_detections.isNotEmpty && !_isSwitching)
+                       Transform.scale(
+                         scale: scale,
+                         child: CustomPaint(
+                           painter: BoundingBoxPainter(
+                             detections: _detections,
+                             previewSize: _cameraController!.value.previewSize!,
+                           ),
+                         ),
+                       ),
+
+                     if (_isSwitching)
+                       Container(
+                         color: Colors.black54,
+                         child: const Center(child: Text("Switching Model...", style: TextStyle(color: Colors.white))),
+                       )
+                  ],
+                ),
               ),
             ),
           ),
         ),
 
-        // Detection Result Display
+        // Result Display
         Container(
           width: double.infinity,
           margin: const EdgeInsets.all(16),
@@ -541,7 +617,7 @@ class _TextTranslationScreenState extends State<TextTranslationScreen> with Widg
   }
 }
 
-// Painter class remains the same
+// Painter class 
 class BoundingBoxPainter extends CustomPainter {
   final List<Map<String, dynamic>> detections;
   final Size previewSize;
