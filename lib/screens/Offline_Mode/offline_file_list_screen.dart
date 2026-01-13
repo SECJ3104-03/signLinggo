@@ -503,9 +503,13 @@ class _OfflineFileListScreenState extends State<OfflineFileListScreen> {
           children: [
             Expanded(
               child: Container(
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   color: Color(0xFFF0F0F0),
                   borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                  image: const DecorationImage(
+                  image: AssetImage('assets/assets/placeholder.png'),
+                  fit: BoxFit.cover,
+                  ),
                 ),
                 child: Stack(
                   children: [
