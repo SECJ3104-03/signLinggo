@@ -136,7 +136,7 @@ class _TextTranslationScreenState extends State<TextTranslationScreen> with Widg
         isQuantized = true;
         break;
       case 'Words':
-        modelPath = "assets/models/words_best_float32.tflite";
+        modelPath = "assets/models/words2_best_float32.tflite";
         labelsPath = "assets/models/words_labels.txt";
         isQuantized = false;
         break;
